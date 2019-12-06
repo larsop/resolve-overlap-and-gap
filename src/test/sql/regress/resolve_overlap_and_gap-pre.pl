@@ -2,7 +2,7 @@
 use File::Copy;
 use File::Spec::Functions;
 
-$FILE_NAME_PRE='find_overlap_and_gap-pre.sql';
+$FILE_NAME_PRE='resolve_overlap_and_gap-pre.sql';
 print "\n Output file is $FILE_NAME_PRE \n";
 
 open($fh_out, ">", $FILE_NAME_PRE);
@@ -14,8 +14,8 @@ for my $file (glob '../../../main/sql/func*') {
 
 # get def for content based grid, 
 # TODO find another way to pick up this from https://github.com/larsop/content_balanced_grid
-copy_file_into('find_overlap_gap-pre-cbg-def.sql',$fh_out);
-print "use the find_overlap_gap-pre-cbg-def.sql \n";
+copy_file_into('resolve_overlap_gap-pre-cbg-def.sql',$fh_out);
+print "use the resolve_overlap_gap-pre-cbg-def.sql \n";
 
 # get code for overlap and gap
 # TODO find another way to pick up this from https://github.com/larsop/find-overlap-and-gap

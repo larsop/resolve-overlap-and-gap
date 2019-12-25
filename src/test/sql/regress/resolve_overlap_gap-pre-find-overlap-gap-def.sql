@@ -1,4 +1,3 @@
--- TODO find another way to pick up this from https://github.com/larsop/find-overlap-and-gap
 
 -- this is internal helper function
 -- this is a function that creates unlogged tables and the the grid neeed when later checking this table for overlap and gaps. 
@@ -143,7 +142,7 @@ overlapgap_boundery_ varchar -- The schema.table name the outer boundery of the 
 
 
 
-DROP FUNCTION IF EXISTS find_overlap_gap_make_run_cmd(
+DROP PROCEDURE IF EXISTS find_overlap_gap_run(
 table_to_analyze_ varchar, -- The table to analyze 
 geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
 srid_ int, -- the srid for the given geo column on the table analyze
@@ -151,14 +150,25 @@ table_name_result_prefix_ varchar, -- This is the prefix used for the result tab
 max_rows_in_each_cell_ int -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
 );
 
-CREATE OR REPLACE FUNCTION find_overlap_gap_make_run_cmd(
+DROP PROCEDURE IF EXISTS find_overlap_gap_run(
 table_to_analyze_ varchar, -- The table to analyze 
 geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
 srid_ int, -- the srid for the given geo column on the table analyze
 table_name_result_prefix_ varchar, -- This is the prefix used for the result tables
+max_parallel_jobs_ int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
+max_rows_in_each_cell_ int -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
+);
+
+CREATE OR REPLACE PROCEDURE find_overlap_gap_run(
+table_to_analyze_ varchar, -- The table to analyze 
+geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
+srid_ int, -- the srid for the given geo column on the table analyze
+table_name_result_prefix_ varchar, -- This is the prefix used for the result tables
+max_parallel_jobs_ int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
 max_rows_in_each_cell_ int DEFAULT 5000 -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
-) RETURNS SETOF text 
-AS $$DECLARE
+) LANGUAGE plpgsql 
+AS $$
+DECLARE
 	command_string text;
 	num_rows int;
 
@@ -166,7 +176,10 @@ AS $$DECLARE
 	id_list_tmp int[];
 	this_list_id int;
 	
+	stmts text[];
+
 	func_call text;
+	
 	
 	-- the number of cells created in the grid
 	num_cells int;
@@ -175,6 +188,8 @@ AS $$DECLARE
 	overlapgap_gap varchar = table_name_result_prefix_ || '_gap'; -- The schema.table name for the gaps/holes found in each cell 
 	overlapgap_grid varchar  = table_name_result_prefix_ || '_grid'; -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
 	overlapgap_boundery varchar = table_name_result_prefix_ || '_boundery'; -- The schema.table name the outer boundery of the data found in each cell 
+	
+	call_result boolean;
 
 BEGIN
 
@@ -216,21 +231,30 @@ BEGIN
 		func_call := FORMAT('SELECT find_overlap_gap_single_cell(%s,%s,%s,%s,%s,%s)',quote_literal(table_to_analyze_),quote_literal(geo_collumn_name_),srid_,
 		quote_literal(table_name_result_prefix_),this_list_id,num_cells);
 		INSERT INTO return_call_list(func_call) VALUES (func_call);
+		stmts[this_list_id] = func_call;
 	END loop;
 
-	-- return call for each cell
-	RETURN QUERY select * FROM return_call_list;
 
-END;
-$$
-LANGUAGE plpgsql;
+	COMMIT;
+	
+	select execute_parallel(stmts,max_parallel_jobs_) into call_result;
+	
+	IF (call_result = false) THEN 
+		RAISE EXCEPTION 'Failed to run overlap and gap for % with the following statement list %', table_to_analyze_, stmts;
+	END IF;
+	
 
-GRANT EXECUTE on FUNCTION find_overlap_gap_make_run_cmd(table_to_analyze_ varchar, -- The table to analyze 
+END $$;
+
+GRANT EXECUTE on PROCEDURE find_overlap_gap_run(table_to_analyze_ varchar, -- The table to analyze 
 geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
 srid_ int, -- the srid for the given geo column on the table analyze
 table_name_result_prefix_ varchar, -- This is the prefix used for the result tables
+max_parallel_jobs_ int,
 max_rows_in_each_cell_ int
 ) TO public;
+
+
 
 
 
@@ -472,7 +496,7 @@ BEGIN
 
 END;
 $$
-LANGUAGE plpgsql;
+LANGUAGE plpgsql PARALLEL SAFE COST 1;
 
 GRANT EXECUTE on FUNCTION find_overlap_gap_single_cell(
 	table_to_analyze_ varchar, -- The table to analyze 

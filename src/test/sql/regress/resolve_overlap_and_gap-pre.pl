@@ -21,6 +21,10 @@ print "use the resolve_overlap_gap-pre-cbg-def.sql \n";
 # TODO find another way to pick up this from https://github.com/larsop/find-overlap-and-gap
 copy_file_into('resolve_overlap_gap-pre-find-overlap-gap-def.sql',$fh_out);
 
+# get execute paralell TODO find another way to pick up this from https://github.com/larsop/postgres_execute_parallel
+copy_file_into('resolve_overlap_gap-pre-execute-par.sql',$fh_out);
+print "use the find_overlap_gap-pre-execute-par.sql \n";
+
 #copy input file
 copy_file_into('overlap_gap_input_t1.sql',$fh_out);
 

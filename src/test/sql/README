@@ -20,3 +20,33 @@ By the way ypu update the README file for run_test.pl in the file I coppiedform
 ./run_test.pl --verbose --spatial_ref_sys resolve_overlap_and_gap
 
 
+
+	
+> From: Justin Pryzby <pryzby@telsasoft.com>
+> Sent: Saturday, December 7, 2019 2:25 AM
+> To: Lars Aksel Opsahl <Lars.Opsahl@nibio.no>
+> Cc: pgsql-performance@lists.postgresql.org <pgsql-performance@lists.postgresql.org>
+> Subject: Re: How to run in parallel in Postgres
+>  
+> On Thu, Dec 05, 2019 at 12:10:42PM +0000, Lars Aksel Opsahl wrote:
+> > I have a function that prepares data, so the big job can be run it in parallel.
+> > 
+> > Since Postgres now supports parallel I was wondering if it's easy to trigger parallel dynamically created SQL calls.
+> > 
+> > If you look at https://github.com/larsop/find-overlap-and-gap/blob/master/src/test/sql/regress/find_overlap_and_gap.sql  you see that
+> > 
+> > find_overlap_gap_make_run_cmd generates as set of 28 sql calls.
+> >
+> > So is it in a simple way possible to use Postgres parallel functionality to call this 28 functions i parallel so I don't have dependent on externally install programs  ?
+> 
+> SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',1,28);
+> SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',2,28);
+> SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',3,28);
+> ...
+> 
+> I see that find_overlap_gap_single_cell creates tables, so cannot be run in parallel.
+> Maybe you could consider rewriting it to return data to its caller instead.
+> You'd also need to mark it as PARALLEL SAFE, of course.
+> Your other functions involved should be PARALLEL SAFE too.
+> 
+> Justin

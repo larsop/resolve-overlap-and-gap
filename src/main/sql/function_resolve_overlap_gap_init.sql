@@ -41,6 +41,35 @@ AS $$DECLARE
 
 	
 BEGIN
+	
+	
+	geo_collumn_on_test_table_ := geo_collumn_name_;
+	
+	IF (drop_result_tables_ = true) THEN
+		EXECUTE FORMAT('DROP TABLE IF EXISTS %s',overlapgap_grid_);
+	END IF;
+
+	-- create a content based grid
+	EXECUTE FORMAT('CREATE TABLE %s( id serial, %s geometry(Geometry,%s))',overlapgap_grid_,geo_collumn_name_,srid_);
+	
+	command_string := FORMAT('INSERT INTO %s(%s) 
+	SELECT q_grid.cell::geometry(geometry,%s)  as %s 
+	FROM (
+	SELECT(ST_Dump(
+	cbg_content_based_balanced_grid(ARRAY[ %s],%s))
+	).geom AS cell) AS q_grid',
+	overlapgap_grid_,
+	geo_collumn_name_,
+	srid_,
+	geo_collumn_name_,
+	quote_literal(table_to_analyze_ || ' ' || geo_collumn_on_test_table_)::text,
+	max_rows_in_each_cell
+	);
+	-- display
+	RAISE NOTICE 'command_string %.', command_string;
+	-- execute the sql command
+	EXECUTE command_string;
+
 
 	return num_cells;
 

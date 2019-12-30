@@ -3,25 +3,21 @@
 -- this is a function that creates unlogged tables and the the grid neeed when later checking this table for overlap and gaps. 
  
 DROP FUNCTION IF EXISTS resolve_overlap_gap_init(
-table_to_analyze_ varchar, -- The schema.table name with polygons to analyze for gaps and intersects
+table_to_resolve_ varchar, -- The schema.table name with polygons to analyze for gaps and intersects
 geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
 srid_ int, -- the srid for the given geo column on the table analyze
 max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes 
-overlapgap_overlap_ varchar, -- The schema.table name for the overlap/intersects found in each cell 
-overlapgap_gap_ varchar, -- The schema.table name for the gaps/holes found in each cell 
 overlapgap_grid_ varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
-overlapgap_boundery_ varchar -- The schema.table name the outer boundery of the data found in each cell 
+topology_schema_name_ varchar -- The topology schema name where we store store sufaces and lines from the simple feature dataset
 );
 
 CREATE OR REPLACE FUNCTION resolve_overlap_gap_init(
-table_to_analyze_ varchar, -- The schema.table name with polygons to analyze for gaps and intersects
+table_to_resolve_ varchar, -- The schema.table name with polygons to analyze for gaps and intersects
 geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
 srid_ int, -- the srid for the given geo column on the table analyze
 max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes 
-overlapgap_overlap_ varchar, -- The schema.table name for the overlap/intersects found in each cell 
-overlapgap_gap_ varchar, -- The schema.table name for the gaps/holes found in each cell 
 overlapgap_grid_ varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
-overlapgap_boundery_ varchar -- The schema.table name the outer boundery of the data found in each cell 
+topology_schema_name_ varchar -- The topology schema name where we store store sufaces and lines from the simple feature dataset
 )
     RETURNS INTEGER
 AS $$DECLARE
@@ -35,12 +31,55 @@ AS $$DECLARE
 	-- drop result tables
 	drop_result_tables_ boolean = true;
 	
-
-	-- test table geo columns name
-	geo_collumn_on_test_table_ varchar;
-
 	
 BEGIN
+
+	-- ############################# Handle Topology 
+	-- drop schema if exists
+	IF (drop_result_tables_ = true AND (SELECT count(*) from topology.topology WHERE name = quote_literal(topology_schema_name_)) = 1 ) THEN
+		EXECUTE FORMAT('SELECT topology.droptopology(%s)',quote_literal(topology_schema_name_));
+	END IF;
+	EXECUTE FORMAT('DROP SCHEMA IF EXISTS %s CASCADE',topology_schema_name_);
+
+	-- create topo 
+	EXECUTE FORMAT('SELECT topology.createtopology(%s)',quote_literal(topology_schema_name_));
+	
+	
+	
+	-- ############################# Handle content based grid init
+	-- drop content based grid table if exits 
+	IF (drop_result_tables_ = true) THEN
+		EXECUTE FORMAT('DROP TABLE IF EXISTS %s',overlapgap_grid_);
+	END IF;
+
+	-- create a content based grid table for input data
+	EXECUTE FORMAT('CREATE TABLE %s( id serial, %s geometry(Geometry,%s))',overlapgap_grid_,geo_collumn_name_,srid_);
+	
+	command_string := FORMAT('INSERT INTO %s(%s) 
+	SELECT q_grid.cell::geometry(geometry,%s)  as %s 
+	FROM (
+	SELECT(ST_Dump(
+	cbg_content_based_balanced_grid(ARRAY[ %s],%s))
+	).geom AS cell) AS q_grid',
+	overlapgap_grid_,
+	geo_collumn_name_,
+	srid_,
+	geo_collumn_name_,
+	quote_literal(table_to_resolve_ || ' ' || geo_collumn_name_)::text,
+	max_rows_in_each_cell
+	);
+	-- display
+	RAISE NOTICE 'command_string %.', command_string;
+	-- execute the sql command
+	EXECUTE command_string;
+
+	-- count number of cells in grid
+	command_string := FORMAT('SELECT count(*) from %s',overlapgap_grid_);
+	-- display
+	RAISE NOTICE 'command_string % .', command_string;
+	-- execute the sql command
+	EXECUTE command_string  INTO num_cells;
+
 
 	return num_cells;
 
@@ -49,14 +88,12 @@ $$
 LANGUAGE plpgsql;
 
 GRANT EXECUTE on FUNCTION  resolve_overlap_gap_init(
-table_to_analyze_ varchar, -- The schema.table name with polygons to analyze for gaps and intersects
+table_to_resolve_ varchar, -- The schema.table name with polygons to analyze for gaps and intersects
 geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
 srid_ int, -- the srid for the given geo column on the table analyze
 max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes 
-overlapgap_overlap_ varchar, -- The schema.table name for the overlap/intersects found in each cell 
-overlapgap_gap_ varchar, -- The schema.table name for the gaps/holes found in each cell 
 overlapgap_grid_ varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
-overlapgap_boundery_ varchar -- The schema.table name the outer boundery of the data found in each cell 
+topology_schema_name_ varchar -- The topology schema name where we store store sufaces and lines from the simple feature dataset
 ) TO public;
 
 -- This is the main funtion used resolve overlap and gap
@@ -67,10 +104,15 @@ geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analy
 srid_ int, -- the srid for the given geo column on the table analyze
 table_name_result_prefix_ varchar, -- This is table name prefix including schema used for the result tables
 -- || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell 
--- || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell 
 -- || '_gap'; -- The schema.table name for the gaps/holes found in each cell 
 -- || '_grid'; -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
 -- || '_boundery'; -- The schema.table name the outer boundery of the data found in each cell 
+-- NB. Any exting data will related to this table names will be deleted 
+
+
+topology_name_ varchar,  -- The topology schema name where we store store sufaces and lines from the simple feature dataset.
+-- NB. Any exting data will related to topology_name will be deleted 
+
 max_parallel_jobs_ int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
 max_rows_in_each_cell_ int -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
 );
@@ -81,12 +123,17 @@ geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analy
 srid_ int, -- the srid for the given geo column on the table analyze
 table_name_result_prefix_ varchar, -- This is table name prefix including schema used for the result tables
 -- || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell 
--- || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell 
 -- || '_gap'; -- The schema.table name for the gaps/holes found in each cell 
 -- || '_grid'; -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
 -- || '_boundery'; -- The schema.table name the outer boundery of the data found in each cell 
+-- NB. Any exting data will related to this table names will be deleted 
+
+
+topology_name_ varchar,  -- The topology schema name where we store store sufaces and lines from the simple feature dataset.
+-- NB. Any exting data will related to topology_name will be deleted 
+
 max_parallel_jobs_ int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
-max_rows_in_each_cell_ int DEFAULT 5000 -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
+max_rows_in_each_cell_ int -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
 ) LANGUAGE plpgsql 
 AS $$
 DECLARE
@@ -105,24 +152,48 @@ DECLARE
 	-- the number of cells created in the grid
 	num_cells int;
 
-	overlapgap_overlap varchar = table_name_result_prefix_ || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell 
-	overlapgap_gap varchar = table_name_result_prefix_ || '_gap'; -- The schema.table name for the gaps/holes found in each cell 
 	overlapgap_grid varchar  = table_name_result_prefix_ || '_grid'; -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
-	overlapgap_boundery varchar = table_name_result_prefix_ || '_boundery'; -- The schema.table name the outer boundery of the data found in each cell 
 	
 	call_result boolean;
 
 BEGIN
 	
+	
+	--Generate command to create grid
+	command_string := FORMAT('SELECT resolve_overlap_gap_init(%s,%s,%s,%s,%s,%s)',
+	quote_literal(table_to_resolve_),
+	quote_literal(geo_collumn_name_),
+	srid_,
+	max_rows_in_each_cell_,
+	quote_literal(overlapgap_grid),
+	quote_literal(topology_name_)
+	);
+		
+	-- display the string
+	RAISE NOTICE '%', command_string;
+	-- execute the string
+	EXECUTE command_string INTO num_cells;
+
 
 END $$;
 
-GRANT EXECUTE on PROCEDURE resolve_overlap_gap_run(table_to_resolve_ varchar, -- The table to analyze 
+GRANT EXECUTE on PROCEDURE resolve_overlap_gap_run(
+table_to_resolve_ varchar, -- The table to resolve 
 geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
 srid_ int, -- the srid for the given geo column on the table analyze
-table_name_result_prefix_ varchar, -- This is the prefix used for the result tables
-max_parallel_jobs_ int,
-max_rows_in_each_cell_ int
+table_name_result_prefix_ varchar, -- This is table name prefix including schema used for the result tables
+-- || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell 
+-- || '_gap'; -- The schema.table name for the gaps/holes found in each cell 
+-- || '_grid'; -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
+-- || '_boundery'; -- The schema.table name the outer boundery of the data found in each cell 
+-- NB. Any exting data will related to this table names will be deleted 
+
+
+topology_name varchar,  -- The topology schema name where we store store sufaces and lines from the simple feature dataset.
+-- NB. Any exting data will related to topology_name will be deleted 
+
+max_parallel_jobs_ int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
+max_rows_in_each_cell_ int -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
 ) TO public;
 
 

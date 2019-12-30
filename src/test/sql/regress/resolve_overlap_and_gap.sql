@@ -31,6 +31,7 @@ SELECT 'check boundery table',  count(*) num_boudery, ROUND(sum(st_area(ST_Trans
 from test_data.overlap_gap_input_t1_res_boundery) as r;                  
 
 -- Call function to resolve overlap and gap in the function in test_data.overlap_gap_input_t1 which we just testet for overlap
-CALL resolve_overlap_gap_run('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',10,50);
+CALL resolve_overlap_gap_run('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res','test_topo',10,50);
 
+SELECT topology.droptopology('test_topo');
 

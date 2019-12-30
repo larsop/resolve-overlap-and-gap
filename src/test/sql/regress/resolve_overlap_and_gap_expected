@@ -6,3 +6,4 @@ check gap table|761|880473615091
 check grid table|28|1995881723837
 check boundery table|70|452276031212
 CALL
+Topology 'test_topo' dropped

@@ -35,21 +35,15 @@ AS $$DECLARE
 	-- drop result tables
 	drop_result_tables_ boolean = true;
 	
-
-	-- test table geo columns name
-	geo_collumn_on_test_table_ varchar;
-
 	
 BEGIN
-	
-	
-	geo_collumn_on_test_table_ := geo_collumn_name_;
-	
+
+	-- drop grid table if exits 
 	IF (drop_result_tables_ = true) THEN
 		EXECUTE FORMAT('DROP TABLE IF EXISTS %s',overlapgap_grid_);
 	END IF;
 
-	-- create a content based grid
+	-- create a content based grid based for input data
 	EXECUTE FORMAT('CREATE TABLE %s( id serial, %s geometry(Geometry,%s))',overlapgap_grid_,geo_collumn_name_,srid_);
 	
 	command_string := FORMAT('INSERT INTO %s(%s) 
@@ -62,13 +56,20 @@ BEGIN
 	geo_collumn_name_,
 	srid_,
 	geo_collumn_name_,
-	quote_literal(table_to_analyze_ || ' ' || geo_collumn_on_test_table_)::text,
+	quote_literal(table_to_analyze_ || ' ' || geo_collumn_name_)::text,
 	max_rows_in_each_cell
 	);
 	-- display
 	RAISE NOTICE 'command_string %.', command_string;
 	-- execute the sql command
 	EXECUTE command_string;
+
+	-- count number of cells in grid
+	command_string := FORMAT('SELECT count(*) from %s',overlapgap_grid_);
+	-- display
+	RAISE NOTICE 'command_string % .', command_string;
+	-- execute the sql command
+	EXECUTE command_string  INTO num_cells;
 
 
 	return num_cells;

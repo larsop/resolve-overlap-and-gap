@@ -46,6 +46,12 @@ BEGIN
 	-- create topology 
 	EXECUTE FORMAT('SELECT topology.createtopology(%s)',quote_literal(topology_schema_name_));
 	
+	-- Set unlogged to increase performance 
+	EXECUTE FORMAT('ALTER TABLE %s.edge_data SET unlogged',topology_schema_name_);
+	EXECUTE FORMAT('ALTER TABLE %s.node SET unlogged',topology_schema_name_);
+	EXECUTE FORMAT('ALTER TABLE %s.face SET unlogged',topology_schema_name_);
+	EXECUTE FORMAT('ALTER TABLE %s.relation SET unlogged',topology_schema_name_);
+
 	
 	
 	-- ############################# Handle content based grid init

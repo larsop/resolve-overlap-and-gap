@@ -39,11 +39,19 @@ BEGIN
 	IF (drop_result_tables_ = true AND (SELECT count(*) from topology.topology WHERE name = quote_literal(topology_schema_name_)) = 1 ) THEN
 		EXECUTE FORMAT('SELECT topology.droptopology(%s)',quote_literal(topology_schema_name_));
 	END IF;
+	
+	-- drop this schema in case it exists
 	EXECUTE FORMAT('DROP SCHEMA IF EXISTS %s CASCADE',topology_schema_name_);
 
-	-- create topo 
+	-- create topology 
 	EXECUTE FORMAT('SELECT topology.createtopology(%s)',quote_literal(topology_schema_name_));
 	
+	-- Set unlogged to increase performance 
+	EXECUTE FORMAT('ALTER TABLE %s.edge_data SET unlogged',topology_schema_name_);
+	EXECUTE FORMAT('ALTER TABLE %s.node SET unlogged',topology_schema_name_);
+	EXECUTE FORMAT('ALTER TABLE %s.face SET unlogged',topology_schema_name_);
+	EXECUTE FORMAT('ALTER TABLE %s.relation SET unlogged',topology_schema_name_);
+
 	
 	
 	-- ############################# Handle content based grid init

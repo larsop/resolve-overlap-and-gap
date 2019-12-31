@@ -51,7 +51,14 @@ BEGIN
 	EXECUTE FORMAT('ALTER TABLE %s.node SET unlogged',topology_schema_name_);
 	EXECUTE FORMAT('ALTER TABLE %s.face SET unlogged',topology_schema_name_);
 	EXECUTE FORMAT('ALTER TABLE %s.relation SET unlogged',topology_schema_name_);
+	
+	-- Create indexes
+	EXECUTE FORMAT('CREATE INDEX ON %s.relation(layer_id)',topology_schema_name_);
+	EXECUTE FORMAT('CREATE INDEX ON %s.relation(abs(element_id))',topology_schema_name_);
+	EXECUTE FORMAT('CREATE INDEX ON %s.edge_data USING GIST (geom)',topology_schema_name_);
 
+	-- TODO find out what to do with help tables /Users/lop/dev/git/topologi/skog/src/main/sql/help_tables.sql
+	
 	
 	
 	-- ############################# Handle content based grid init

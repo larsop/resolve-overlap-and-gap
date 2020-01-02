@@ -1,0 +1,9 @@
+[submodule "submodule/content_balanced_grid"]
+	path = submodule/content_balanced_grid
+	url = https://github.com/larsop/content_balanced_grid
+[submodule "submodule/postgres_execute_parallel"]
+	path = submodule/postgres_execute_parallel
+	url = https://github.com/larsop/postgres_execute_parallel
+[submodule "submodule/find-overlap-and-gap"]
+	path = submodule/find-overlap-and-gap
+	url = https://github.com/larsop/find-overlap-and-gap

@@ -57,7 +57,10 @@ BEGIN
 	EXECUTE FORMAT('CREATE INDEX ON %s.relation(abs(element_id))',topology_schema_name_);
 	EXECUTE FORMAT('CREATE INDEX ON %s.edge_data USING GIST (geom)',topology_schema_name_);
 
-
+	-- TODO find out what to do with help tables 
+	-- /Users/lop/dev/git/topologi/skog/src/main/sql/help_tables.sql
+	-- /Users/lop/dev/git/topologi/skog/src/main/sql/table_border_line_segments.sql
+	
 	
 	
 	-- ############################# Handle content based grid init
@@ -266,7 +269,6 @@ GRANT EXECUTE on FUNCTION resolve_overlap_gap_single_cell(
  
 
 
--- TODO find another way to pick up this from https://github.com/larsop/content_balanced_grid
 
 -- example of how to use
 -- select ST_Area(cbg_get_table_extent(ARRAY['org_esri_union.table_1 geo_1', 'org_esri_union.table_2 geo_2']));
@@ -546,6 +548,130 @@ LANGUAGE 'plpgsql';
 -- Grant so all can use it
 GRANT EXECUTE ON FUNCTION cbg_content_based_balanced_grid (table_name_column_name_array VARCHAR[],max_rows integer) to public;
 
+/**
+ * Based on code from Joe Conway <mail@joeconway.com>
+ * https://www.postgresql-archive.org/How-to-run-in-parallel-in-Postgres-td6114510.html
+ * 
+ */
+
+DROP FUNCTION IF EXISTS execute_parallel(stmts text[]);
+DROP FUNCTION IF EXISTS execute_parallel(stmts text[], num_parallel_thread int);
+
+-- TODO add test return value
+-- TODO catch error on main loop to be sure connenctinos are closed
+
+CREATE OR REPLACE FUNCTION execute_parallel(stmts text[], num_parallel_thread int DEFAULT 3)
+RETURNS boolean AS
+$$
+declare
+  i int = 1;
+  current_stmt_index int = 1;
+  current_stmt_sent int = 0;
+  num_stmts_executed int = 1;
+  num_stmts_failed int = 0;
+  num_conn_opened int = 0;
+  retv text;
+  retvnull text;
+  conn_status int;
+  conn text;
+  connstr text;
+  rv int;
+  new_stmts_started boolean; 
+  all_stmts_done boolean; 
+
+  db text := current_database();
+begin
+	
+	-- Check if num parallel theads if bugger than num stmts
+	IF (num_parallel_thread > array_length(stmts,1)) THEN
+  	  	num_parallel_thread = array_length(stmts,1);
+  	END IF;
+
+  	
+  	-- Open connections for num_parallel_thread
+	-- and send off the first batch of jobs
+	BEGIN
+	  	for i in 1..num_parallel_thread loop
+		    conn := 'conn' || i::text;
+		    connstr := 'dbname=' || db;
+		    perform dblink_connect(conn, connstr);
+		    num_conn_opened = num_conn_opened + 1;
+		end loop;
+	EXCEPTION WHEN OTHERS THEN
+	  	
+	  	RAISE NOTICE 'Failed to open all requested onnections % , reduce to  %', num_parallel_thread, num_conn_opened;
+	  	
+		-- Check if num parallel theads if bugger than num stmts
+		IF (num_conn_opened < num_parallel_thread) THEN
+	  	  	num_parallel_thread = num_conn_opened;
+	  	END IF;
+
+	END;
+
+
+	IF (num_conn_opened > 0) THEN
+	  	-- Enter main loop
+	  	LOOP 
+	  	  new_stmts_started = false;
+	  	  all_stmts_done = true;
+
+		  for i in 1..num_parallel_thread loop
+			conn := 'conn' || i::text;
+		    select dblink_is_busy(conn) into conn_status;
+
+		    if (conn_status = 0) THEN
+		    	BEGIN
+				    select val into retv from dblink_get_result(conn) as d(val text);
+			  		--RAISE NOTICE 'current_stmt_index =% , val1 status= %', current_stmt_index, retv;
+				    -- Two times to reuse connecton according to doc.
+				    select val into retvnull from dblink_get_result(conn) as d(val text);
+			  		--RAISE NOTICE 'current_stmt_index =% , val2 status= %', current_stmt_index, retv;
+				EXCEPTION WHEN OTHERS THEN
+					RAISE NOTICE 'Got an error for conn %  retv %', conn, retv;
+					num_stmts_failed = num_stmts_failed + 1;
+				END;
+			    IF (current_stmt_index <= array_length(stmts,1)) THEN
+			   		RAISE NOTICE 'Call stmt %  on connection  %', stmts[current_stmt_index], conn;
+				    rv := dblink_send_query(conn, stmts[current_stmt_index]);
+					current_stmt_index = current_stmt_index + 1;
+					all_stmts_done = false;
+					new_stmts_started = true;
+				END IF;
+			ELSE
+				all_stmts_done = false;
+		    END IF;
+
+		    
+		  end loop;
+-- 		  RAISE NOTICE 'current_stmt_index =% , array_length= %', current_stmt_index, array_length(stmts,1);
+		  EXIT WHEN (current_stmt_index - 1) = array_length(stmts,1) AND all_stmts_done = true AND new_stmts_started = false; 
+		  
+		  -- Do a slepp if nothings happens to reduce CPU load 
+		  IF (new_stmts_started = false) THEN 
+		  	RAISE NOTICE 'sleep at current_stmt_index =% , array_length= %', current_stmt_index, array_length(stmts,1);
+		  	perform pg_sleep(1);
+		  END IF;
+		END LOOP ;
+	
+		-- cose connections for num_parallel_thread
+	  	for i in 1..num_parallel_thread loop
+		    conn := 'conn' || i::text;
+		    perform dblink_disconnect(conn);
+		end loop;
+  END IF;
+
+
+  IF num_stmts_failed = 0 AND (current_stmt_index -1)= array_length(stmts,1) THEN
+  	return true;
+  else
+  	return false;
+  END IF;
+  
+END;
+$$ language plpgsql;
+
+GRANT EXECUTE on FUNCTION execute_parallel(stmts text[], num_parallel_thread int) TO public;
+
 
 -- this is internal helper function
 -- this is a function that creates unlogged tables and the the grid neeed when later checking this table for overlap and gaps. 
@@ -694,7 +820,7 @@ DROP PROCEDURE IF EXISTS find_overlap_gap_run(
 table_to_analyze_ varchar, -- The table to analyze 
 geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
 srid_ int, -- the srid for the given geo column on the table analyze
-table_name_result_prefix_ varchar, -- This is the prefix used for the result tables
+table_name_result_prefix_ varchar, -- This is table name prefix including schema used for the result tables
 max_rows_in_each_cell_ int -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
 );
 
@@ -711,7 +837,13 @@ CREATE OR REPLACE PROCEDURE find_overlap_gap_run(
 table_to_analyze_ varchar, -- The table to analyze 
 geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
 srid_ int, -- the srid for the given geo column on the table analyze
-table_name_result_prefix_ varchar, -- This is the prefix used for the result tables
+table_name_result_prefix_ varchar, -- This is table name prefix including schema used for the result tables
+-- || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell 
+-- || '_gap'; -- The schema.table name for the gaps/holes found in each cell 
+-- || '_grid'; -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
+-- || '_boundery'; -- The schema.table name the outer boundery of the data found in each cell 
+-- NB. Any exting data will related to this table names will be deleted 
+
 max_parallel_jobs_ int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
 max_rows_in_each_cell_ int DEFAULT 5000 -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
 ) LANGUAGE plpgsql 
@@ -794,12 +926,19 @@ BEGIN
 
 END $$;
 
-GRANT EXECUTE on PROCEDURE find_overlap_gap_run(table_to_analyze_ varchar, -- The table to analyze 
+GRANT EXECUTE on PROCEDURE find_overlap_gap_run( 
+table_to_analyze_ varchar, -- The table to analyze 
 geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
 srid_ int, -- the srid for the given geo column on the table analyze
-table_name_result_prefix_ varchar, -- This is the prefix used for the result tables
-max_parallel_jobs_ int,
-max_rows_in_each_cell_ int
+table_name_result_prefix_ varchar, -- This is table name prefix including schema used for the result tables
+-- || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell 
+-- || '_gap'; -- The schema.table name for the gaps/holes found in each cell 
+-- || '_grid'; -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
+-- || '_boundery'; -- The schema.table name the outer boundery of the data found in each cell 
+-- NB. Any exting data will related to this table names will be deleted 
+
+max_parallel_jobs_ int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
+max_rows_in_each_cell_ int  -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
 ) TO public;
 
 
@@ -1055,130 +1194,6 @@ GRANT EXECUTE on FUNCTION find_overlap_gap_single_cell(
 ) TO public;
  
 
-
-/**
- * Based on code from Joe Conway <mail@joeconway.com>
- * https://www.postgresql-archive.org/How-to-run-in-parallel-in-Postgres-td6114510.html
- * 
- */
-
-DROP FUNCTION IF EXISTS execute_parallel(stmts text[]);
-DROP FUNCTION IF EXISTS execute_parallel(stmts text[], num_parallel_thread int);
-
--- TODO add test return value
--- TODO catch error on main loop to be sure connenctinos are closed
-
-CREATE OR REPLACE FUNCTION execute_parallel(stmts text[], num_parallel_thread int DEFAULT 3)
-RETURNS boolean AS
-$$
-declare
-  i int = 1;
-  current_stmt_index int = 1;
-  current_stmt_sent int = 0;
-  num_stmts_executed int = 1;
-  num_stmts_failed int = 0;
-  num_conn_opened int = 0;
-  retv text;
-  retvnull text;
-  conn_status int;
-  conn text;
-  connstr text;
-  rv int;
-  new_stmts_started boolean; 
-  all_stmts_done boolean; 
-
-  db text := current_database();
-begin
-	
-	-- Check if num parallel theads if bugger than num stmts
-	IF (num_parallel_thread > array_length(stmts,1)) THEN
-  	  	num_parallel_thread = array_length(stmts,1);
-  	END IF;
-
-  	
-  	-- Open connections for num_parallel_thread
-	-- and send off the first batch of jobs
-	BEGIN
-	  	for i in 1..num_parallel_thread loop
-		    conn := 'conn' || i::text;
-		    connstr := 'dbname=' || db;
-		    perform dblink_connect(conn, connstr);
-		    num_conn_opened = num_conn_opened + 1;
-		end loop;
-	EXCEPTION WHEN OTHERS THEN
-	  	
-	  	RAISE NOTICE 'Failed to open all requested onnections % , reduce to  %', num_parallel_thread, num_conn_opened;
-	  	
-		-- Check if num parallel theads if bugger than num stmts
-		IF (num_conn_opened < num_parallel_thread) THEN
-	  	  	num_parallel_thread = num_conn_opened;
-	  	END IF;
-
-	END;
-
-
-	IF (num_conn_opened > 0) THEN
-	  	-- Enter main loop
-	  	LOOP 
-	  	  new_stmts_started = false;
-	  	  all_stmts_done = true;
-
-		  for i in 1..num_parallel_thread loop
-			conn := 'conn' || i::text;
-		    select dblink_is_busy(conn) into conn_status;
-
-		    if (conn_status = 0) THEN
-		    	BEGIN
-				    select val into retv from dblink_get_result(conn) as d(val text);
-			  		--RAISE NOTICE 'current_stmt_index =% , val1 status= %', current_stmt_index, retv;
-				    -- Two times to reuse connecton according to doc.
-				    select val into retvnull from dblink_get_result(conn) as d(val text);
-			  		--RAISE NOTICE 'current_stmt_index =% , val2 status= %', current_stmt_index, retv;
-				EXCEPTION WHEN OTHERS THEN
-					RAISE NOTICE 'Got an error for conn %  retv %', conn, retv;
-					num_stmts_failed = num_stmts_failed + 1;
-				END;
-			    IF (current_stmt_index <= array_length(stmts,1)) THEN
-			   		RAISE NOTICE 'Call stmt %  on connection  %', stmts[current_stmt_index], conn;
-				    rv := dblink_send_query(conn, stmts[current_stmt_index]);
-					current_stmt_index = current_stmt_index + 1;
-					all_stmts_done = false;
-					new_stmts_started = true;
-				END IF;
-			ELSE
-				all_stmts_done = false;
-		    END IF;
-
-		    
-		  end loop;
--- 		  RAISE NOTICE 'current_stmt_index =% , array_length= %', current_stmt_index, array_length(stmts,1);
-		  EXIT WHEN (current_stmt_index - 1) = array_length(stmts,1) AND all_stmts_done = true AND new_stmts_started = false; 
-		  
-		  -- Do a slepp if nothings happens to reduce CPU load 
-		  IF (new_stmts_started = false) THEN 
-		  	RAISE NOTICE 'sleep at current_stmt_index =% , array_length= %', current_stmt_index, array_length(stmts,1);
-		  	perform pg_sleep(1);
-		  END IF;
-		END LOOP ;
-	
-		-- cose connections for num_parallel_thread
-	  	for i in 1..num_parallel_thread loop
-		    conn := 'conn' || i::text;
-		    perform dblink_disconnect(conn);
-		end loop;
-  END IF;
-
-
-  IF num_stmts_failed = 0 AND (current_stmt_index -1)= array_length(stmts,1) THEN
-  	return true;
-  else
-  	return false;
-  END IF;
-  
-END;
-$$ language plpgsql;
-
-GRANT EXECUTE on FUNCTION execute_parallel(stmts text[], num_parallel_thread int) TO public;
 
 CREATE SCHEMA test_data;
 --- give puclic access

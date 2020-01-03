@@ -924,3 +924,1175 @@ GRANT EXECUTE on FUNCTION find_overlap_gap_single_cell(
  
 
 
+-- TODO remove this code and make it generic
+
+-- create schema for topo_rein data, tables, .... 
+CREATE SCHEMA topo_rein;
+-- give puclic access
+GRANT USAGE ON SCHEMA topo_rein TO public;
+
+
+-- This function is used to create indexes
+CREATE OR REPLACE FUNCTION topo_rein.get_relation_id( geo TopoGeometry) RETURNS integer AS $$DECLARE
+    relation_id integer;
+BEGIN
+	relation_id := (geo).id;
+   	RETURN relation_id;
+END;
+$$ LANGUAGE plpgsql
+IMMUTABLE;
+
+COMMENT ON FUNCTION topo_rein.get_relation_id(TopoGeometry) IS 'Return the id used to find the row in the relation for polygons). Needed to create function based indexs.';
+
+
+
+-- A composite type to hold sosi kopi_data
+CREATE TYPE topo_rein.sosi_kopidata 
+AS (
+	omradeid smallint,
+	originaldatavert  VARCHAR(50),
+	kopidato DATE
+);
+
+-- A composite type to hold sosi registreringsversjon
+CREATE TYPE topo_rein.sosi_registreringsversjon 
+AS (
+	produkt varchar,
+	versjon varchar
+);
+
+
+-- A composite type to hold sosi kvalitet
+-- beskrivelse av kvaliteten på stedfestingen
+CREATE TYPE topo_rein.sosi_kvalitet 
+AS (
+	-- metode for måling i grunnriss (x,y), og høyde (z) når metoden er den samme som ved måling i grunnriss
+	-- TODO Hentes fra kode tabell eller bruke en constraint ???
+	maalemetode smallint,
+	
+	-- punktstandardavviket i grunnriss for punkter samt tverravvik for linjer
+	-- Merknad: Oppgitt i cm
+	noyaktighet integer,
+
+	-- hvor godt den kartlagte detalj var synbar ved kartleggingen
+	-- TODO Hentes fra kode tabell eller bruke en constraint ???
+	synbarhet smallint
+);
+
+-- A composite type to hold sosi sosi felles egenskaper
+CREATE TYPE topo_rein.sosi_felles_egenskaper
+AS (
+	-- identifikasjondato når data ble registrert/observert/målt første gang, som utgangspunkt for første digitalisering
+	-- Merknad:førsteDatafangstdato brukes hvis det er av interesse å forvalte informasjon om når en ble klar over objektet. Dette kan for eksempel gjelde datoen for første flybilde som var utgangspunkt for registrering i en database.
+	-- lage regler for hvordan den skal brukes, kan i mange tilfeller arves
+	-- henger sammen med UUID, ny UUID ny datofangst dato
+	forstedatafangstdato DATE,
+
+	-- Unik identifikasjon av et objekt, ivaretatt av den ansvarlige produsent/forvalter, som kan benyttes av eksterne applikasjoner som referanse til objektet. 
+	-- NOTE1 Denne eksterne objektidentifikasjonen må ikke forveksles med en tematisk objektidentifikasjon, slik som f.eks bygningsnummer. 
+	-- NOTE 2 Denne unike identifikatoren vil ikke endres i løpet av objektets levetid. 
+	-- TODO Test if we can use this as a unique id.
+	identifikasjon varchar,
+	-- bygd opp navnerom/lokalid/versjon
+	-- navnerom: NO_LDIR_REINDRIFT_VAARBEITE
+	-- versjon: 0
+	-- lokalid:  rowid	
+	-- eks identifikasjon = "NO_LDIR_REINDRIFT_VAARBEITE 0 199999999"
+
+
+	-- beskrivelse av kvaliteten på stedfestingen
+	-- Merknad: Denne er identisk med ..KVALITET i tidligere versjoner av SOSI.
+	kvalitet topo_rein.sosi_kvalitet,
+
+	
+	-- dato for siste endring på objektetdataene 
+	-- Merknad: Oppdateringsdato kan være forskjellig fra Datafangsdato ved at data som er registrert kan bufres en kortere eller lengre periode før disse legges inn i datasystemet (databasen).
+	-- Definition: Date and time at which this version of the spatial object was inserted or changed in the spatial data set. 
+	oppdateringsdato DATE, 
+
+	-- referanse til opphavsmaterialet, kildematerialet, organisasjons/publiseringskilde
+	-- Merknad: Kan også beskrive navn på person og årsak til oppdatering
+	opphav VARCHAR(255),
+
+	-- dato når dataene er fastslått å være i samsvar med virkeligheten 
+	-- Merknad: Verifiseringsdato er identisk med ..DATO i tidligere versjoner av SOSI	verifiseringsdato DATE
+	-- lage regler for hvordan den skal brukes
+	-- flybilde fra 2008 vil gi data 2008, må være input fra brukeren
+	verifiseringsdato DATE,
+
+	-- Hva gjør vi med disse verdiene som vi har brukt tidligere brukte  i AR5 ?
+	-- Er vi sikre på at vi ikke trenger de
+
+	-- datafangstdato DATE, 
+	-- Vet ikke om vi skal ha med den, må tenke litt
+	-- Skal ikke være med hvis Knut og Ingvild ikke sier noe annet
+	
+	-- vil bli et produktspek til ???
+	-- taes med ikke til slutt brukere
+	informasjon  VARCHAR(255) ARRAY, 
+	
+	-- trengs ikke i følge Knut og Ingvild
+	-- kopidata topo_rein.sosi_kopidata, 
+	
+	-- trengs ikke i følge Knut og Ingvild
+	-- prosess_historie VARCHAR(255) ARRAY,
+	
+	-- kan være forskjellige verdier ut fra når data ble lagt f.eks null verdier for nye attributter eldre enn 4.0
+	-- bør være med
+	registreringsversjon topo_rein.sosi_registreringsversjon
+
+	
+);
+
+
+-- this is type used extrac data from json
+CREATE TYPE topo_rein.simple_sosi_felles_egenskaper AS (
+	"fellesegenskaper.forstedatafangstdato" date , 
+	"fellesegenskaper.verifiseringsdato" date ,
+	"fellesegenskaper.oppdateringsdato" date ,
+	"fellesegenskaper.opphav" varchar, 
+	"fellesegenskaper.kvalitet.maalemetode" int ,
+	"fellesegenskaper.kvalitet.noyaktighet" int ,
+	"fellesegenskaper.kvalitet.synbarhet" smallint
+	
+);
+
+
+
+-- A composite type to hold key value that will recoreded before a update
+-- and compared after the update, used be sure no changes hapends out side 
+-- the area that should be updated 
+-- DROP TYPE topo_rein.closeto_values_type cascade;
+
+CREATE TYPE topo_rein.closeto_values_type
+AS (
+	-- line length that intersects reinflate
+	closeto_length_reinflate_inter numeric,
+	
+	-- line count that intersects the edge
+	closeto_count_edge_inter int,
+	
+	-- line count that intersetcs reinlinje 
+	closeto_count_reinlinje_inter int,
+	
+	-- used to check that attribute value close has not changed a close to
+	artype_and_length_as_text text,
+	
+	-- used to check that the area is ok after update 
+	-- as we use today we do not remove any data we just add new polygins or change exiting 
+	-- the layer should always be covered
+	envelope_area_inter  numeric
+
+);
+
+
+-- TODO add more comments
+COMMENT ON COLUMN topo_rein.sosi_felles_egenskaper.verifiseringsdato IS 'Sosi common meta attribute';
+COMMENT ON COLUMN topo_rein.sosi_felles_egenskaper.opphav IS 'Sosi common meta attribute';
+COMMENT ON COLUMN topo_rein.sosi_felles_egenskaper.informasjon IS 'Sosi common meta attribute';
+
+-- create schema for topo_update data, tables, .... 
+CREATE SCHEMA topo_update;
+
+-- make comment this schema  
+COMMENT ON SCHEMA topo_update IS 'Is a schema for topo_update attributes and ref to topolygy data. Don´t do any direct update on tables in this schema, all changes should be done using stored proc.';
+
+-- make the scema public
+GRANT USAGE ON SCHEMA topo_update to public;
+
+
+-- craeted to make it possible to return a set of objects from the topo function
+-- Todo find a better way to du this 
+DROP TABLE IF EXISTS topo_update.topogeometry_def; 
+CREATE TABLE topo_update.topogeometry_def(topo topogeometry);
+
+
+---------------------------------------------------------------------------------
+
+-- A composite type to hold infor about the currrent layers that will be updated 
+-- this will be used to pick up meta info from the topolgy layer doing a update
+CREATE TYPE topo_update.input_meta_info 
+AS (
+	-- refferes to topology.topology
+	topology_name varchar,
+	
+	-- reffers to topology.layer
+	layer_schema_name varchar,
+	layer_table_name varchar,
+	layer_feature_column varchar,
+
+	-- For a edge this is 2 and for a surface this is 3 
+	element_type int,
+
+	-- this is the snapp to tolerance used for snap to when adding new vector data 
+	-- a typical value used for degrees is 0.0000000001
+	snap_tolerance float8,
+	
+	-- this is computed by using function topo_update.get_topo_layer_id
+	border_layer_id int,
+	
+	-- refferes to topology.topology
+	srid  int
+	
+
+);
+
+
+
+---------------------------------------------------------------------------------
+
+-- A composite type to hold infor about the currrent layers that will be updated 
+-- this will be used to pick up meta info from the topolgy layer doing a update
+CREATE TYPE topo_update.json_input_structure 
+AS (
+
+-- the input geo picked from the client properties
+input_geo geometry,
+
+-- JSON that is sent from the client combained with the server json properties
+json_properties json,
+
+-- this build up based on the input json  this used for both line and  point
+sosi_felles_egenskaper topo_rein.sosi_felles_egenskaper,
+
+-- this only used for the surface objectand does not contain any info about drawing
+sosi_felles_egenskaper_flate topo_rein.sosi_felles_egenskaper
+
+);
+
+-- This is a common method to parse all input data
+-- It returns a struture that is adjusted reindrift that depends on sosi felles eganskaper
+
+
+DROP FUNCTION IF EXISTS topo_update.handle_input_json_props(json, json, int,boolean) ;
+DROP FUNCTION IF EXISTS topo_update.handle_input_json_props(json, json, int) ;
+
+CREATE OR REPLACE FUNCTION  topo_update.handle_input_json_props(client_json_feature json,  server_json_feature json, srid_out int) 
+RETURNS topo_update.json_input_structure AS $$DECLARE
+
+DECLARE 
+use_default_dates boolean = true;
+BEGIN
+return  topo_update.handle_input_json_props(client_json_feature,  server_json_feature, srid_out, use_default_dates); 
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+
+
+-- This is a common method to parse all input data
+-- It returns a struture that is adjusted reindrift that depends on sosi felles eganskaper
+
+CREATE OR REPLACE FUNCTION  topo_update.handle_input_json_props(client_json_feature json,  server_json_feature json, srid_out int, use_default_dates boolean) 
+RETURNS topo_update.json_input_structure AS $$DECLARE
+
+DECLARE 
+-- holds the value for felles egenskaper from input
+simple_sosi_felles_egenskaper topo_rein.simple_sosi_felles_egenskaper;
+
+-- JSON that is sent from the cleint
+client_json_properties json;
+
+-- JSON produced on the server side
+server_json_properties json;
+
+-- Keys in the server JSON properties
+server_json_keys text;
+keys_to_set   TEXT[];
+values_to_set json[];
+
+-- holde the computed value for json input reday to use
+json_input_structure topo_update.json_input_structure;  
+
+BEGIN
+
+	RAISE NOTICE 'client_json_feature %, server_json_feature % use_default_dates %',  client_json_feature, server_json_feature , use_default_dates;
+	
+	-- geth the geometry may be null
+	json_input_structure.input_geo := topo_rein.get_geom_from_json(client_json_feature::json,srid_out);
+
+	-- get json from the client
+	client_json_properties := to_json(client_json_feature::json->'properties');
+	RAISE NOTICE 'client_json_properties %',  client_json_properties ;
+	
+	-- get the json from the serrver, may be null
+	IF server_json_feature IS NOT NULL THEN
+		server_json_properties := to_json(server_json_feature::json->'properties');
+	  	RAISE NOTICE 'server_json_properties  % ',  server_json_properties ;
+	
+		-- overwrite client JSON properties with server property values
+	  	SELECT array_agg("key"),array_agg("value")  INTO keys_to_set,values_to_set
+		FROM json_each(server_json_properties) WHERE "value"::text != 'null';
+		client_json_properties := topo_update.json_object_set_keys(client_json_properties, keys_to_set, values_to_set);
+		RAISE NOTICE 'json_properties after update  %',  client_json_properties ;
+	END IF;
+
+	json_input_structure.json_properties := client_json_properties;
+	
+	-- This maps from the simple format used on the client 
+	-- Because the client do not support Postgres user defined types like we have used in  topo_rein.sosi_felles_egenskaper;
+	-- First append the info from the client properties, only properties that maps to valid names in topo_rein.simple_sosi_felles_egenskaper will be used.
+	simple_sosi_felles_egenskaper := json_populate_record(NULL::topo_rein.simple_sosi_felles_egenskaper,client_json_properties );
+
+	RAISE NOTICE 'felles_egenskaper_sosi point/line before  %',  simple_sosi_felles_egenskaper;
+
+	-- Here we map from simple properties to topo_rein.sosi_felles_egenskaper for line an point objects
+	json_input_structure.sosi_felles_egenskaper := topo_rein.get_rein_felles_egenskaper(simple_sosi_felles_egenskaper,use_default_dates);
+	
+	RAISE NOTICE 'felles_egenskaper_sosi point/line after  %',  json_input_structure.sosi_felles_egenskaper;
+	
+	-- Here we get info for the surface objects
+   	json_input_structure.sosi_felles_egenskaper_flate := topo_rein.get_rein_felles_egenskaper_flate(simple_sosi_felles_egenskaper,use_default_dates);
+	
+
+	RETURN json_input_structure;
+
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+
+-- apply the list of new surfaces to the exting list of object
+-- pick values from objects close to an so on
+-- return the id's of the rows affected
+
+-- DROP FUNCTION topo_update.update_domain_surface_layer(_new_topo_objects regclass) cascade;
+
+
+CREATE OR REPLACE FUNCTION topo_update.update_domain_surface_layer(surface_topo_info topo_update.input_meta_info, border_topo_info topo_update.input_meta_info, json_input_structure topo_update.json_input_structure,  _new_topo_objects regclass) 
+RETURNS SETOF topo_update.topogeometry_def AS $$
+DECLARE
+
+-- this border layer id will picked up by input parameters
+border_layer_id int;
+
+-- this surface layer id will picked up by input parameters
+surface_layer_id int;
+
+-- this is the tolerance used for snap to 
+snap_tolerance float8 = null;
+
+-- hold striped gei
+edge_with_out_loose_ends geometry = null;
+
+-- holds dynamic sql to be able to use the same code for different
+command_string text;
+
+-- holds the num rows affected when needed
+num_rows_affected int;
+
+-- number of rows to delete from org table
+num_rows_to_delete int;
+
+-- The border topology
+new_border_data topology.topogeometry;
+
+-- used for logging
+add_debug_tables int = 0;
+
+-- array of quoted field identifiers
+-- for attribute fields passed in by user and known (by name)
+-- in the target table
+update_fields text[];
+
+-- array of quoted field identifiers
+-- for attribute fields passed in by user and known (by name)
+-- in the temp table
+update_fields_t text[];
+
+-- String surface layer name
+surface_layer_name text;
+
+-- the closed geom if the instring is closed
+valid_closed_user_geometry geometry = null;
+
+-- temp variable
+temp_text_var TEXT;
+
+
+
+BEGIN
+	-- this is the tolerance used for snap to 
+	snap_tolerance := surface_topo_info.snap_tolerance;
+	
+	-- find border layer id
+	border_layer_id := border_topo_info.border_layer_id;
+	RAISE NOTICE 'topo_update.update_domain_surface_layer border_layer_id   %',  border_layer_id ;
+	
+	-- find surface layer id
+	surface_layer_id := surface_topo_info.border_layer_id;
+	RAISE NOTICE 'topo_update.update_domain_surface_layer surface_layer_id   %',  surface_layer_id ;
+
+	surface_layer_name := surface_topo_info.layer_schema_name || '.' || surface_topo_info.layer_table_name;
+
+	-- check if this is closed polygon drawn by the user 
+	-- if it's a closed polygon the only surface inside this polygon should be affected
+	IF St_IsClosed(json_input_structure.input_geo) THEN
+		valid_closed_user_geometry = ST_MakePolygon(json_input_structure.input_geo);
+	END IF;
+
+	-- get the data into a new tmp table
+	DROP TABLE IF EXISTS new_surface_data; 
+
+	
+	EXECUTE format('CREATE TEMP TABLE new_surface_data AS (SELECT * FROM %s)', _new_topo_objects);
+	ALTER TABLE new_surface_data ADD COLUMN id_foo SERIAL PRIMARY KEY;
+	ALTER TABLE new_surface_data ADD COLUMN status_foo int default 0;
+
+	
+	DROP TABLE IF EXISTS old_surface_data; 
+	-- Find out if any old topo objects overlaps with this new objects using the relation table
+	-- by using the surface objects owned by the both the new objects and the exting one
+	-- Exlude the the new surface object created
+	-- We are using the rows in new_surface_data to cpare with, this contains all the rows which are affected
+	command_string :=  format('CREATE TEMP TABLE old_surface_data AS 
+	(SELECT 
+	re.* 
+	FROM 
+	%I.relation re,
+	%I.relation re_tmp,
+	new_surface_data new_sd
+	WHERE 
+	re.layer_id =%L AND
+	re.element_type = 3 AND
+	re.element_id = re_tmp.element_id AND
+	re_tmp.layer_id = %L AND
+	re_tmp.element_type = 3 AND
+	(new_sd.surface_topo).id = re_tmp.topogeo_id AND
+	(new_sd.surface_topo).id != re.topogeo_id)',
+    surface_topo_info.topology_name,
+    surface_topo_info.topology_name,
+    surface_layer_id,
+    surface_layer_id);  
+	EXECUTE command_string;
+	
+	DROP TABLE IF EXISTS old_surface_data_not_in_new; 
+	-- Find any old objects that are not covered totaly by new surfaces 
+	-- This objets should not be deleted, but the geometry should only decrease in size.
+	-- TODO Take a disscusion about how to handle attributtes in this cases
+	-- TODO add a test case for this
+	command_string :=  format('CREATE TEMP TABLE old_surface_data_not_in_new AS 
+	(SELECT 
+	re.* 
+	FROM 
+	%I.relation re,
+	old_surface_data re_tmp
+	WHERE 
+	re.layer_id = %L AND
+	re.element_type = 3 AND
+	re.topogeo_id = re_tmp.topogeo_id AND
+	re.element_id NOT IN (SELECT element_id FROM old_surface_data))',
+    surface_topo_info.topology_name,
+    surface_layer_id);  
+	EXECUTE command_string;
+
+	
+	
+	DROP TABLE IF EXISTS old_rows_be_reused;
+	-- IF old_surface_data_not_in_new is empty we know that all areas are coverbed by the new objects
+	-- and we can delete/resuse this objects for the new rows
+	-- Get a list of old row id's used
+	
+	command_string :=  format('CREATE TEMP TABLE old_rows_be_reused AS 
+	-- we can have distinct here 
+	(SELECT distinct(old_data_row.id) FROM 
+	%I.%I old_data_row,
+	old_surface_data sf 
+	WHERE (old_data_row.%I).id = sf.topogeo_id)',
+    surface_topo_info.layer_schema_name,
+    surface_topo_info.layer_table_name,
+    surface_topo_info.layer_feature_column);  
+	EXECUTE command_string;
+
+	
+	-- Take a copy of old attribute values because they will be needed when you add new rows.
+	-- The new surfaces should pick up old values from the old row attributtes that overlaps the new rows
+	-- We also have to take copy of the geometry we need that to find overlaps when we pick up old values
+	-- TODO this should have been solved by using topology relation table, but I do that later 
+	DROP TABLE IF EXISTS old_rows_attributes;
+	
+	command_string :=  format('CREATE TEMP TABLE old_rows_attributes AS 
+	(SELECT distinct old_data_row.*, old_data_row.omrade::geometry as foo_geo FROM 
+	%I.%I  old_data_row,
+	old_surface_data sf 
+	WHERE (old_data_row.%I).id = sf.topogeo_id)',
+    surface_topo_info.layer_schema_name,
+    surface_topo_info.layer_table_name,
+    surface_topo_info.layer_feature_column);  
+	EXECUTE command_string;
+
+		-- Only used for debug
+	IF add_debug_tables = 1 THEN
+		-- list topo objects to be reused
+		-- get new objects created from topo_update.create_edge_surfaces
+		DROP TABLE IF EXISTS topo_rein.update_domain_surface_layer_t4;
+		CREATE TABLE topo_rein.update_domain_surface_layer_t4 AS 
+		( SELECT * FROM old_rows_attributes) ;
+	END IF;
+
+	
+	-- Only used for debug
+	IF add_debug_tables = 1 THEN
+		-- list topo objects to be reused
+		-- get new objects created from topo_update.create_edge_surfaces
+		DROP TABLE IF EXISTS topo_rein.update_domain_surface_layer_t1;
+		CREATE TABLE topo_rein.update_domain_surface_layer_t1 AS 
+		( SELECT r.id, r.omrade::geometry AS geo, 'reuse topo objcts' || r.omrade::text AS topo
+			FROM topo_rein.arstidsbeite_sommer_flate r, old_rows_be_reused reuse WHERE reuse.id = r.id) ;
+	END IF;
+
+	
+	-- We now know which rows we can reuse clear out old data rom the realation table
+	command_string :=  format('UPDATE %I.%I  r
+	SET %I = clearTopoGeom(%I)
+	FROM old_rows_be_reused reuse
+	WHERE reuse.id = r.id',
+    surface_topo_info.layer_schema_name,
+    surface_topo_info.layer_table_name,
+    surface_topo_info.layer_feature_column,
+    surface_topo_info.layer_feature_column);  
+	EXECUTE command_string;
+	
+	GET DIAGNOSTICS num_rows_affected = ROW_COUNT;
+	RAISE NOTICE 'topo_update.update_domain_surface_layer Number rows to be reused in org table %',  num_rows_affected;
+
+	-- If no rows are updated the user don't have update rights, we are using row level security
+	-- We return no data and it will done a rollback
+	IF num_rows_affected = 0 AND (SELECT count(*) FROM old_rows_be_reused)::int > 0 THEN
+		RETURN;	
+	END IF;
+	
+	SELECT (num_rows_affected - (SELECT count(*) FROM new_surface_data)) INTO num_rows_to_delete;
+
+	RAISE NOTICE 'topo_update.update_domain_surface_layer Number rows to be added in org table  %',  count(*) FROM new_surface_data;
+
+	RAISE NOTICE 'topo_update.update_domain_surface_layer Number rows to be deleted in org table  %',  num_rows_to_delete;
+
+	-- When overwrite we may have more rows in the org table so we may need do delete the rows that are not needed 
+	-- from  topo_rein.arstidsbeite_var_flate, we the just delete the left overs 
+	command_string :=  format('DELETE FROM %I.%I
+	WHERE ctid IN (
+	SELECT r.ctid FROM
+	%I.%I r,
+	old_rows_be_reused reuse
+	WHERE reuse.id = r.id 
+	LIMIT  greatest(%L, 0))',
+    surface_topo_info.layer_schema_name,
+    surface_topo_info.layer_table_name,
+    surface_topo_info.layer_schema_name,
+    surface_topo_info.layer_table_name,
+    num_rows_to_delete
+  	);  
+	EXECUTE command_string;
+	
+	
+	-- Delete rows, also rows that could be reused, since I was not able to update those.
+	-- TODO fix update of old rows instead of using delete
+	DROP TABLE IF EXISTS new_rows_updated_in_org_table;
+	
+	command_string :=  format('CREATE TEMP TABLE new_rows_updated_in_org_table AS (SELECT * FROM %I.%I  limit 0);
+	WITH updated AS (
+		DELETE FROM %I.%I  old
+		USING old_rows_be_reused reuse
+		WHERE old.id = reuse.id
+		returning *
+	)
+	INSERT INTO new_rows_updated_in_org_table(omrade)
+	SELECT omrade FROM updated',
+    surface_topo_info.layer_schema_name,
+    surface_topo_info.layer_table_name,
+    surface_topo_info.layer_schema_name,
+    surface_topo_info.layer_table_name
+  	);  
+	EXECUTE command_string;
+	
+	GET DIAGNOSTICS num_rows_affected = ROW_COUNT;
+	RAISE NOTICE 'topo_update.update_domain_surface_layer Number old rows to deleted in table %',  num_rows_affected;
+	
+	
+
+
+	-- Only used for debug
+	IF add_debug_tables = 1 THEN
+		-- list new objects added reused
+		-- get new objects created from topo_update.create_edge_surfaces
+		DROP TABLE IF EXISTS topo_rein.update_domain_surface_layer_t2;
+		CREATE TABLE topo_rein.update_domain_surface_layer_t2 AS 
+		( SELECT r.id, r.omrade::geometry AS geo, 'old rows deleted update' || r.omrade::text AS topo
+			FROM new_rows_updated_in_org_table r) ;
+	END IF;
+
+	
+	IF (SELECT count(*) FROM old_rows_attributes)::int > 0 THEN
+
+      -- Update status, value before insert attribttus 
+	
+ 	    command_string := format(
+ 	    'UPDATE new_surface_data a
+ 		SET 
+ 		status_foo = c.status
+ 		FROM old_rows_attributes c
+ 		WHERE ST_Intersects(c.foo_geo,ST_pointOnSurface(a.surface_topo::geometry))'
+ 	    );
+ 	    EXECUTE command_string;
+ 		
+ 		GET DIAGNOSTICS num_rows_affected = ROW_COUNT;
+ 		--UPDATE new_surface_data a SET status_foo = 1 where status_foo <> 1;
+ 	
+ 	END IF;
+
+	-- insert missing rows and keep a copy in them a temp table
+	DROP TABLE IF EXISTS new_rows_added_in_org_table;
+	
+	command_string :=  format('CREATE TEMP TABLE new_rows_added_in_org_table AS (SELECT * FROM %I.%I limit 0);
+	WITH inserted AS (
+	INSERT INTO  %I.%I(%I,reinbeitebruker_id,felles_egenskaper,status)
+	SELECT new.surface_topo, new.reinbeitebruker_id, new.felles_egenskaper as felles_egenskaper, new.status_foo as status
+	FROM new_surface_data new
+	WHERE NOT EXISTS ( SELECT f.id FROM %I.%I f WHERE (new.surface_topo).id = (f.%I).id )
+	returning *
+	)
+	INSERT INTO new_rows_added_in_org_table(id,omrade)
+	SELECT inserted.id, omrade FROM inserted',
+    surface_topo_info.layer_schema_name,
+    surface_topo_info.layer_table_name,
+    surface_topo_info.layer_schema_name,
+    surface_topo_info.layer_table_name,
+    surface_topo_info.layer_feature_column,
+    surface_topo_info.layer_schema_name,
+    surface_topo_info.layer_table_name,
+    surface_topo_info.layer_feature_column
+  	);  
+	EXECUTE command_string;
+	
+	
+	-- Only used for debug
+	IF add_debug_tables = 1 THEN
+		-- list new objects added reused
+		-- get new objects created from topo_update.create_edge_surfaces
+		DROP TABLE IF EXISTS topo_rein.update_domain_surface_layer_t3;
+		CREATE TABLE topo_rein.update_domain_surface_layer_t3 AS 
+		( SELECT r.id, r.omrade::geometry AS geo, 'new topo objcts' || r.omrade::text AS topo
+			FROM new_rows_added_in_org_table r) ;
+	END IF;
+
+	   	-- update the newly inserted rows with attribute values based from old_rows_table
+    -- find the rows toubching
+  DROP TABLE IF EXISTS touching_surface;
+  
+
+  -- If this is a not a closed polygon you have use touches
+  IF  valid_closed_user_geometry IS NULL  THEN
+	  CREATE TEMP TABLE touching_surface AS 
+	  (SELECT a.id, topo_update.touches(surface_layer_name,a.id,surface_topo_info) as id_from 
+	  FROM new_rows_added_in_org_table a);
+  ELSE
+  -- IF this a cloesed polygon only use objcet thats inside th e surface drawn by the user
+	  CREATE TEMP TABLE touching_surface AS 
+	  (
+	  SELECT a.id, topo_update.touches(surface_layer_name,a.id,surface_topo_info) as id_from 
+	  FROM new_rows_added_in_org_table a
+	  WHERE ST_Covers(valid_closed_user_geometry,ST_PointOnSurface(a.omrade::geometry))
+	  );
+	  
+  END IF;
+
+
+	  -- Extract name of fields with not-null values:
+  -- Extract name of fields with not-null values and append the table prefix n.:
+  -- Only update json value that exits 
+  IF (SELECT count(*) FROM old_rows_attributes)::int > 0 THEN
+  
+ 	 	RAISE NOTICE 'topo_update.update_domain_surface_layer num rows in old attrbuttes: %', (SELECT count(*) FROM old_rows_attributes)::int;
+
+ 	 	-- Update felles_egenskaper attribttus 
+	    command_string := format(
+	    'UPDATE %I.%I a
+		SET 
+		felles_egenskaper.forstedatafangstdato = (c.felles_egenskaper).forstedatafangstdato, 
+		felles_egenskaper.verifiseringsdato = (c.felles_egenskaper).verifiseringsdato, 
+		felles_egenskaper.opphav = (c.felles_egenskaper).opphav 
+		FROM new_rows_added_in_org_table b, 
+		old_rows_attributes c
+		WHERE 
+	    a.id = b.id AND                           
+	    ST_Intersects(c.foo_geo,ST_pointOnSurface(a.%I::geometry))',
+	    surface_topo_info.layer_schema_name,
+	    surface_topo_info.layer_table_name,
+	    surface_topo_info.layer_feature_column
+	    );
+		RAISE NOTICE 'topo_update.update_domain_surface_layer command_string %', command_string;
+		EXECUTE command_string;
+		
+		GET DIAGNOSTICS num_rows_affected = ROW_COUNT;
+		RAISE NOTICE 'topo_update.update_domain_surface_layer no old attribute values found  %',  num_rows_affected;
+
+        -- Update other attribttus 
+  		SELECT
+	  	array_agg(quote_ident(update_column)) AS update_fields,
+	  	array_agg('c.'||quote_ident(update_column)) as update_fields_t
+		  INTO
+		  	update_fields,
+		  	update_fields_t
+		  FROM (
+		   SELECT distinct(key) AS update_column
+		   FROM old_rows_attributes t, json_each_text(to_json((t)))  
+		   WHERE key != 'id' AND key != 'foo_geo'  AND key != 'omrade' AND key != 'felles_egenskaper'  
+		  ) AS keys;
+		
+		  RAISE NOTICE 'topo_update.update_domain_surface_layer Extract name of not-null fields-c: %', update_fields_t;
+		  RAISE NOTICE 'topo_update.update_domain_surface_layer Extract name of not-null fields-c: %', update_fields;
+		
+	    command_string := format(
+	    'UPDATE %I.%I a
+		SET 
+		(%s) = (%s) 
+		FROM new_rows_added_in_org_table b, 
+		old_rows_attributes c
+		WHERE 
+	    a.id = b.id AND                           
+	    ST_Intersects(c.foo_geo,ST_pointOnSurface(a.%I::geometry))',
+	    surface_topo_info.layer_schema_name,
+	    surface_topo_info.layer_table_name,
+	    array_to_string(update_fields, ','),
+	    array_to_string(update_fields_t, ','),
+	    surface_topo_info.layer_feature_column
+	    );
+	    EXECUTE command_string;
+		
+		GET DIAGNOSTICS num_rows_affected = ROW_COUNT;
+		RAISE NOTICE 'topo_update.update_domain_surface_layer no old attribute values found  %',  num_rows_affected;
+
+	
+	END IF;
+
+      -- if there are any toching interfaces  
+	IF (SELECT count(*) FROM touching_surface)::int > 0 THEN
+
+	IF valid_closed_user_geometry IS NOT NULL THEN
+	   SELECT
+		  	array_agg(quote_ident(update_column)) AS update_fields
+		  INTO
+		  	update_fields
+		  FROM (
+		   SELECT distinct(key) AS update_column
+		   FROM new_rows_added_in_org_table t, json_each_text(to_json((t)))  
+		   WHERE key != 'id' AND key != 'foo_geo' AND key != 'omrade' 
+		   AND key != 'felles_egenskaper' AND key != 'status' 
+		   AND key != 'saksbehandler' AND key != 'slette_status_kode' AND key != 'alle_reinbeitebr_id' AND key != 'simple_geo'
+		  ) AS keys;
+		  RAISE NOTICE 'topo_update.update_domain_surface_layer Extract name of not-null fields-a: %', update_fields;
+	ELSE
+	   SELECT
+		  	array_agg(quote_ident(update_column)) AS update_fields
+		  INTO
+		  	update_fields
+		  FROM (
+		   SELECT distinct(key) AS update_column
+		   FROM new_rows_added_in_org_table t, json_each_text(to_json((t)))  
+		   WHERE key != 'reinbeitebruker_id' AND key != 'id' AND  key != 'foo_geo' AND key != 'omrade' 
+		   AND key != 'felles_egenskaper' AND key != 'status' 
+		   AND key != 'saksbehandler' AND key != 'slette_status_kode' AND key != 'alle_reinbeitebr_id' AND key != 'simple_geo'
+		  ) AS keys;
+		  RAISE NOTICE 'topo_update.update_domain_surface_layer Extract name of not-null fields-a: %', update_fields;	
+	END IF;
+		
+	   	-- update the newly inserted rows with attribute values based from old_rows_table
+	    -- find the rows toubching
+--	  	DROP TABLE IF EXISTS touching_surface;
+--		CREATE TEMP TABLE touching_surface AS 
+--		(SELECT topo_update.touches(surface_layer_name,a.id,surface_topo_info) as id 
+--		FROM new_rows_added_in_org_table a);
+	
+	
+		-- we set values with null row that can pick up a value from a neighbor.
+		-- NB! this onlye work if new rows dont' have any defalut value
+		-- TODO use a test based on new rows added and not a test on null values
+		FOR temp_text_var IN SELECT unnest( update_fields ) LOOP
+	        raise notice 'update colum: %', temp_text_var;
+		    command_string := format('UPDATE %I.%I a
+			SET 
+				%s = d.%s 
+			FROM 
+			%I.%I d,
+			touching_surface b
+			WHERE 
+			d.id = b.id_from AND
+			a.id = b.id AND
+			d.%s is not null AND
+			a.%s is null',
+		    surface_topo_info.layer_schema_name,
+		    surface_topo_info.layer_table_name,
+		    temp_text_var,
+		    temp_text_var,
+		    surface_topo_info.layer_schema_name,
+		    surface_topo_info.layer_table_name,
+		    temp_text_var,
+		    temp_text_var);
+--			RAISE NOTICE '? command_string %', command_string;
+			EXECUTE command_string;
+		
+--			GET DIAGNOSTICS num_rows_affected = ROW_COUNT;
+--			RAISE NOTICE 'topo_update.update_domain_surface_layer Number num_rows_affected  %',  num_rows_affected;
+   		END loop;
+
+  
+	END IF;
+
+
+	
+
+
+
+	RETURN QUERY SELECT a.surface_topo::topogeometry as t FROM new_surface_data a;
+
+	
+END;
+$$ LANGUAGE plpgsql;
+
+
+--	RAISE NOTICE 'topo_update.update_domain_surface_layer touching_surface  %', to_json(array_agg(row_to_json(t.*))) FROM touching_surface t;
+--	RAISE NOTICE 'topo_update.update_domain_surface_layer new_surface_data  %', to_json(array_agg(row_to_json(t.*))) FROM new_surface_data t;
+--	RAISE NOTICE 'topo_update.update_domain_surface_layer new_rows_added_in_org_table  %', to_json(array_agg(row_to_json(t.*))) FROM new_rows_added_in_org_table t;
+--	RAISE NOTICE 'topo_update.update_domain_surface_layer old_rows_attributes  %', to_json(array_agg(row_to_json(t.*))) FROM old_rows_attributes t;
+--  RAISE NOTICE 'topo_update.update_domain_surface_layer old_surface_data %', to_json(array_agg(row_to_json(t.*))) FROM old_surface_data t;
+--	RAISE NOTICE 'topo_update.update_domain_surface_layer valid_closed_user_geometry  %', ST_AsText(valid_closed_user_geometry);
+
+--{"15" : "0106000020A210000001000000010300000001000000080000004D5073032713244136C9202FD79C5D41FAAF4A00A31D2441B4D7C9EA529A5D413F8E9C0F18212441959EA025449D5D4168008CDCFF3B2441AA2C686E169E5D41417493AD4E392441F9099639F6975D416D070D7C840024410DD0B708F2975D417D4058E360072441F789B7297B9C5D414D5073032713244136C9202FD79C5D41"},
+--{"16" : "0106000020A210000001000000010300000001000000050000003F8E9C0F18212441959EA025449D5D414D5073032713244136C9202FD79C5D416315863C41FE23414ADE8359DBA15D410D5E3E58F8262441B4E7F75D44A25D413F8E9C0F18212441959EA025449D5D41"},
+--{"17" : "0106000020A210000001000000010300000001000000040000003F8E9C0F18212441959EA025449D5D41FAAF4A00A31D2441B4D7C9EA529A5D414D5073032713244136C9202FD79C5D413F8E9C0F18212441959EA025449D5D41"}]
+-- This is a simple helper function that createa a common dataholder object based on input objects
+-- TODO splitt in different objects dependig we don't send unused parameters around
+-- snap_tolerance float8 is optinal if not given default is 0
+
+CREATE OR REPLACE FUNCTION topo_update.make_input_meta_info(layer_schema text, layer_table text, layer_column text,
+  snap_tolerance float8 = 0)
+RETURNS topo_update.input_meta_info AS $$
+DECLARE
+
+
+topo_info topo_update.input_meta_info ;
+
+BEGIN
+	
+	
+	-- Read parameters
+	topo_info.layer_schema_name := layer_schema;
+	topo_info.layer_table_name := layer_table;
+	topo_info.layer_feature_column := layer_column;
+	topo_info.snap_tolerance := snap_tolerance;
+
+-- Find out topology name and element_type from layer identifier
+  BEGIN
+    SELECT t.name, l.feature_type, t.srid
+    FROM topology.topology t, topology.layer l
+    WHERE l.level = 0 -- need be primitive
+      AND l.schema_name = topo_info.layer_schema_name
+      AND l.table_name = topo_info.layer_table_name
+      AND l.feature_column = topo_info.layer_feature_column
+      AND t.id = l.topology_id
+    INTO STRICT topo_info.topology_name,
+                topo_info.element_type,
+                topo_info.srid;
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      RAISE EXCEPTION 'Cannot find info for primitive layer %.%.%',
+        topo_info.layer_schema_name,
+        topo_info.layer_table_name,
+        topo_info.layer_feature_column;
+  END;
+
+	-- find border layer id
+	topo_info.border_layer_id := topo_update.get_topo_layer_id(topo_info);
+
+    return topo_info;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+-- This is a common method to parse all input data
+-- It returns a struture that is adjusted reindrift that depends on sosi felles eganskaper
+
+
+DROP FUNCTION IF EXISTS topo_update.handle_input_json_props(json, json, int,boolean) ;
+DROP FUNCTION IF EXISTS topo_update.handle_input_json_props(json, json, int) ;
+
+CREATE OR REPLACE FUNCTION  topo_update.handle_input_json_props(client_json_feature json,  server_json_feature json, srid_out int) 
+RETURNS topo_update.json_input_structure AS $$DECLARE
+
+DECLARE 
+use_default_dates boolean = true;
+BEGIN
+return  topo_update.handle_input_json_props(client_json_feature,  server_json_feature, srid_out, use_default_dates); 
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+
+
+-- This is a common method to parse all input data
+-- It returns a struture that is adjusted reindrift that depends on sosi felles eganskaper
+
+CREATE OR REPLACE FUNCTION  topo_update.handle_input_json_props(client_json_feature json,  server_json_feature json, srid_out int, use_default_dates boolean) 
+RETURNS topo_update.json_input_structure AS $$DECLARE
+
+DECLARE 
+-- holds the value for felles egenskaper from input
+simple_sosi_felles_egenskaper topo_rein.simple_sosi_felles_egenskaper;
+
+-- JSON that is sent from the cleint
+client_json_properties json;
+
+-- JSON produced on the server side
+server_json_properties json;
+
+-- Keys in the server JSON properties
+server_json_keys text;
+keys_to_set   TEXT[];
+values_to_set json[];
+
+-- holde the computed value for json input reday to use
+json_input_structure topo_update.json_input_structure;  
+
+BEGIN
+
+	RAISE NOTICE 'client_json_feature %, server_json_feature % use_default_dates %',  client_json_feature, server_json_feature , use_default_dates;
+	
+	-- geth the geometry may be null
+	json_input_structure.input_geo := topo_rein.get_geom_from_json(client_json_feature::json,srid_out);
+
+	-- get json from the client
+	client_json_properties := to_json(client_json_feature::json->'properties');
+	RAISE NOTICE 'client_json_properties %',  client_json_properties ;
+	
+	-- get the json from the serrver, may be null
+	IF server_json_feature IS NOT NULL THEN
+		server_json_properties := to_json(server_json_feature::json->'properties');
+	  	RAISE NOTICE 'server_json_properties  % ',  server_json_properties ;
+	
+		-- overwrite client JSON properties with server property values
+	  	SELECT array_agg("key"),array_agg("value")  INTO keys_to_set,values_to_set
+		FROM json_each(server_json_properties) WHERE "value"::text != 'null';
+		client_json_properties := topo_update.json_object_set_keys(client_json_properties, keys_to_set, values_to_set);
+		RAISE NOTICE 'json_properties after update  %',  client_json_properties ;
+	END IF;
+
+	json_input_structure.json_properties := client_json_properties;
+	
+	-- This maps from the simple format used on the client 
+	-- Because the client do not support Postgres user defined types like we have used in  topo_rein.sosi_felles_egenskaper;
+	-- First append the info from the client properties, only properties that maps to valid names in topo_rein.simple_sosi_felles_egenskaper will be used.
+	simple_sosi_felles_egenskaper := json_populate_record(NULL::topo_rein.simple_sosi_felles_egenskaper,client_json_properties );
+
+	RAISE NOTICE 'felles_egenskaper_sosi point/line before  %',  simple_sosi_felles_egenskaper;
+
+	-- Here we map from simple properties to topo_rein.sosi_felles_egenskaper for line an point objects
+	json_input_structure.sosi_felles_egenskaper := topo_rein.get_rein_felles_egenskaper(simple_sosi_felles_egenskaper,use_default_dates);
+	
+	RAISE NOTICE 'felles_egenskaper_sosi point/line after  %',  json_input_structure.sosi_felles_egenskaper;
+	
+	-- Here we get info for the surface objects
+   	json_input_structure.sosi_felles_egenskaper_flate := topo_rein.get_rein_felles_egenskaper_flate(simple_sosi_felles_egenskaper,use_default_dates);
+	
+
+	RETURN json_input_structure;
+
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+
+-- Return the geom from Json and transform it to correct zone
+
+CREATE OR REPLACE FUNCTION topo_rein.get_geom_from_json(feat json, srid_out int) 
+RETURNS geometry AS $$DECLARE
+
+DECLARE 
+geom geometry;
+srid int;
+BEGIN
+
+	geom := ST_GeomFromGeoJSON(feat->>'geometry');
+	srid = St_Srid(geom);
+	
+	IF (srid_out != srid) THEN
+		geom := ST_transform(geom,srid_out);
+	END IF;
+	
+	geom := ST_SetSrid(geom,srid_out);
+
+	RAISE NOTICE 'srid %, geom  %',   srid_out, ST_AsEWKT(geom);
+
+	RETURN geom;
+
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+
+-- used to get felles egenskaper for with all values
+-- including måle metode
+
+CREATE OR REPLACE FUNCTION topo_rein.get_rein_felles_egenskaper(felles topo_rein.simple_sosi_felles_egenskaper) 
+RETURNS topo_rein.sosi_felles_egenskaper AS $$DECLARE
+DECLARE 
+use_default_dates boolean = true;
+BEGIN
+return topo_rein.get_rein_felles_egenskaper(felles, use_default_dates ) ;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE ;
+
+
+CREATE OR REPLACE FUNCTION topo_rein.get_rein_felles_egenskaper(felles topo_rein.simple_sosi_felles_egenskaper, use_default_dates boolean ) 
+RETURNS topo_rein.sosi_felles_egenskaper AS $$DECLARE
+
+DECLARE 
+
+res topo_rein.sosi_felles_egenskaper ;
+res_kvalitet topo_rein.sosi_kvalitet;
+
+
+BEGIN
+
+res := topo_rein.get_rein_felles_egenskaper_flate(felles,use_default_dates);
+
+-- add målemetode
+res_kvalitet.maalemetode := (felles)."fellesegenskaper.kvalitet.maalemetode";
+res_kvalitet.noyaktighet := (felles)."fellesegenskaper.kvalitet.noyaktighet";
+res_kvalitet.synbarhet := (felles)."fellesegenskaper.kvalitet.synbarhet";
+res.kvalitet = res_kvalitet;
+
+return res;
+
+END;
+$$ LANGUAGE plpgsql IMMUTABLE ;
+
+
+-- used to get felles egenskaper for where we don't use målemetode
+CREATE OR REPLACE FUNCTION topo_rein.get_rein_felles_egenskaper_flate(felles topo_rein.simple_sosi_felles_egenskaper ) 
+RETURNS topo_rein.sosi_felles_egenskaper AS $$DECLARE
+use_default_dates boolean = true;
+DECLARE 
+BEGIN
+	return topo_rein.get_rein_felles_egenskaper_flate(felles,use_default_dates);
+END;
+$$ LANGUAGE plpgsql IMMUTABLE ;
+
+
+-- used to get felles egenskaper for where we don't use målemetode
+CREATE OR REPLACE FUNCTION topo_rein.get_rein_felles_egenskaper_flate(felles topo_rein.simple_sosi_felles_egenskaper,use_default_dates boolean) 
+RETURNS topo_rein.sosi_felles_egenskaper AS $$DECLARE
+
+DECLARE 
+
+res topo_rein.sosi_felles_egenskaper;
+res_kvalitet topo_rein.sosi_kvalitet;
+res_sosi_registreringsversjon topo_rein.sosi_registreringsversjon;
+
+
+BEGIN
+
+	
+res.opphav :=  (felles)."fellesegenskaper.opphav";
+res.oppdateringsdato :=  current_date;
+	
+
+IF use_default_dates = true THEN	
+	RAISE NOTICE '------------------------------------Use default date values ';
+
+	res.forstedatafangstdato := current_date;
+	
+	-- if we have a value for felles_egenskaper.forstedatafangstdato 
+	IF (felles)."fellesegenskaper.forstedatafangstdato" is NOT null THEN
+		res.forstedatafangstdato :=  (felles)."fellesegenskaper.forstedatafangstdato";
+	END IF;
+	
+	-- if we have a value for felles_egenskaper.verifiseringsdato is null use forstedatafangstdato
+	IF (felles)."fellesegenskaper.verifiseringsdato" is null THEN
+		res.verifiseringsdato := res.forstedatafangstdato;
+	ELSE
+		res.verifiseringsdato := (felles)."fellesegenskaper.verifiseringsdato";
+	END IF;
+
+ELSE
+	RAISE NOTICE '------------------------------------Do not default date values ';
+	IF (felles)."fellesegenskaper.forstedatafangstdato" is NOT null THEN
+		res.forstedatafangstdato :=  (felles)."fellesegenskaper.forstedatafangstdato";
+    END IF;
+    
+	IF (felles)."fellesegenskaper.verifiseringsdato" is NOT null THEN
+		res.verifiseringsdato := (felles)."fellesegenskaper.verifiseringsdato";
+	ELSIF (felles)."fellesegenskaper.forstedatafangstdato" is NOT null THEN
+		-- if verifiseringsdato is null use forstedatafangstdato if not null
+		res.verifiseringsdato := (felles)."fellesegenskaper.forstedatafangstdato";
+    END IF;
+END IF;
+
+
+return res;
+
+END;
+$$ LANGUAGE plpgsql IMMUTABLE ;
+
+
+
+-- used to get felles egenskaper when it is a update
+-- we then only update verifiseringsdato, opphav
+-- res is the old record
+-- felles is the new value from server
+
+CREATE OR REPLACE FUNCTION topo_rein.get_rein_felles_egenskaper_update(
+curent_value topo_rein.sosi_felles_egenskaper, 
+new_value_from_client topo_rein.sosi_felles_egenskaper) 
+RETURNS topo_rein.sosi_felles_egenskaper AS $$DECLARE
+
+DECLARE 
+	current_res_kvalitet topo_rein.sosi_kvalitet;
+	new_res_kvalitet topo_rein.sosi_kvalitet;
+
+BEGIN
+
+current_res_kvalitet := (curent_value)."kvalitet";
+new_res_kvalitet := (new_value_from_client)."kvalitet";
+	
+
+-- if vo value fr the client don't use it.
+IF (new_value_from_client)."forstedatafangstdato" is not null THEN
+	curent_value.forstedatafangstdato :=  (new_value_from_client)."forstedatafangstdato";
+END IF;
+
+-- if vo value fr the client don't use it.
+IF (new_value_from_client)."verifiseringsdato" is not null THEN
+	curent_value.verifiseringsdato :=  (new_value_from_client)."verifiseringsdato";
+END IF;
+
+curent_value.oppdateringsdato :=  current_date;
+
+
+-- if vo value fr the client don't use it.
+IF (new_value_from_client)."opphav" is not null THEN
+	curent_value.opphav :=  (new_value_from_client)."opphav";
+END IF;
+
+-- if vo value fr the client don't use it.
+IF (new_res_kvalitet)."maalemetode" is not null THEN
+	current_res_kvalitet.maalemetode :=  (new_res_kvalitet)."maalemetode";
+END IF;
+
+-- if vo value fr the client don't use it.
+IF (new_res_kvalitet)."noyaktighet" is not null THEN
+	current_res_kvalitet.noyaktighet :=  (new_res_kvalitet)."noyaktighet";
+END IF;
+
+-- if vo value fr the client don't use it.
+IF (new_res_kvalitet)."synbarhet" is not null THEN
+	current_res_kvalitet.synbarhet :=  (new_res_kvalitet)."synbarhet";
+END IF;
+
+curent_value.kvalitet = current_res_kvalitet;
+
+return curent_value;
+
+END;
+$$ LANGUAGE plpgsql IMMUTABLE ;
+
+
+
+
+
+
+

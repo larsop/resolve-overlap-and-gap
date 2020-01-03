@@ -24,7 +24,22 @@ if (-d "../../../../submodule") {
 	for my $file (glob '../../../../submodule/find-overlap-and-gap/src/main/sql/func*') {
 		copy_file_into($file,$fh_out);
 	}
+	
+	# Copy extra files needed by https://github.com/NibioOpenSource/pgtopo_update_sql.git
+	copy_file_into('../../../../src/main/extern_sql/schema_topo_rein.sql',$fh_out);
+	
 
+	# git submodule add --force https://github.com/NibioOpenSource/pgtopo_update_sql.git submodule/pgtopo_update_sql
+	# get functions from pgtopo_update_sql
+	copy_file_into('../../../../submodule/pgtopo_update_sql/src/main/sql/topo_update/schema_topo_update.sql',$fh_out);
+	copy_file_into('../../../../submodule/pgtopo_update_sql/src/main/sql/topo_update/schema_userdef_structures_02.sql',$fh_out);
+	copy_file_into('../../../../submodule/pgtopo_update_sql/src/main/sql/topo_update/function_02_handle_input_json_props.sql',$fh_out);
+	copy_file_into('../../../../submodule/pgtopo_update_sql/src/main/sql/topo_update/function_02_update_domain_surface_layer.sql',$fh_out);
+	copy_file_into('../../../../submodule/pgtopo_update_sql/src/main/sql/topo_update/function_01_make_input_meta_info.sql',$fh_out);
+	copy_file_into('../../../../submodule/pgtopo_update_sql/src/main/sql/topo_update/function_02_handle_input_json_props.sql',$fh_out);
+	copy_file_into('../../../../submodule/pgtopo_update_sql/src/main/sql/topo_update/function_01_get_geom_from_json.sql',$fh_out);
+	copy_file_into('../../../../submodule/pgtopo_update_sql/src/main/sql/topo_update/function_01_get_felles_egenskaper.sql',$fh_out);
+	
 	close($fh_out);	 
 
 }

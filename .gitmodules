@@ -7,3 +7,6 @@
 [submodule "submodule/find-overlap-and-gap"]
 	path = submodule/find-overlap-and-gap
 	url = https://github.com/larsop/find-overlap-and-gap
+[submodule "submodule/pgtopo_update_sql"]
+	path = submodule/pgtopo_update_sql
+	url = https://github.com/NibioOpenSource/pgtopo_update_sql.git

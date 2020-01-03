@@ -21,5 +21,6 @@ The following is planed to implement
 
 #Pre stage 01
 - Install the needed helper code 
+- Schemas topo_update, topo_rein added/used by https://github.com/NibioOpenSource/pgtopo_update_sql.git
 
 

@@ -46,6 +46,9 @@ if (-d "../../../../submodule") {
 	for my $file (glob '../../../main/extern_pgtopo_update_sql/func*') {
 		copy_file_into($file,$fh_out);
 	}
+	for my $file (glob '../../../main/extern_pgtopo_update_sql/view*') {
+		copy_file_into($file,$fh_out);
+	}
 
 	close($fh_out);	 
 

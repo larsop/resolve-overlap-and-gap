@@ -56,6 +56,10 @@ BEGIN
 	EXECUTE FORMAT('CREATE INDEX ON %s.relation(layer_id)',topology_schema_name_);
 	EXECUTE FORMAT('CREATE INDEX ON %s.relation(abs(element_id))',topology_schema_name_);
 	EXECUTE FORMAT('CREATE INDEX ON %s.edge_data USING GIST (geom)',topology_schema_name_);
+	EXECUTE FORMAT('CREATE INDEX ON %s.relation(element_id)',topology_schema_name_);
+	EXECUTE FORMAT('CREATE INDEX ON %s.relation(topogeo_id)',topology_schema_name_);
+
+
 
 	-- TODO find out what to do with help tables 
 	-- /Users/lop/dev/git/topologi/skog/src/main/sql/help_tables.sql

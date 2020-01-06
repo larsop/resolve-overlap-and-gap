@@ -30,7 +30,7 @@ if (-d "../../../../submodule") {
 	
 
 	# git submodule add --force https://github.com/NibioOpenSource/pgtopo_update_sql.git submodule/pgtopo_update_sql
-	# get functions from pgtopo_update_sql
+	# get functions from pgtopo_update_sql repo
 	copy_file_into('../../../../submodule/pgtopo_update_sql/src/main/sql/topo_update/schema_topo_update.sql',$fh_out);
 	copy_file_into('../../../../submodule/pgtopo_update_sql/src/main/sql/topo_update/schema_userdef_structures_02.sql',$fh_out);
 	copy_file_into('../../../../submodule/pgtopo_update_sql/src/main/sql/topo_update/function_02_handle_input_json_props.sql',$fh_out);
@@ -40,6 +40,13 @@ if (-d "../../../../submodule") {
 	copy_file_into('../../../../submodule/pgtopo_update_sql/src/main/sql/topo_update/function_01_get_geom_from_json.sql',$fh_out);
 	copy_file_into('../../../../submodule/pgtopo_update_sql/src/main/sql/topo_update/function_01_get_felles_egenskaper.sql',$fh_out);
 	
+	# get SQL code used by resolve for overlap gap 
+	# (Maybe move this code to https://github.com/NibioOpenSource/pgtopo_update_sql.git)
+	copy_file_into'../../../main/extern_pgtopo_update_sql/help_tables_for_logging.sql',$fh_out);
+	for my $file (glob '../../../main/extern_pgtopo_update_sql/func*') {
+		copy_file_into($file,$fh_out);
+	}
+
 	close($fh_out);	 
 
 }
@@ -48,10 +55,9 @@ if (-d "../../../../submodule") {
 
 $FILE_NAME_PRE='resolve_overlap_and_gap-pre.sql';
 print "\n Output file is $FILE_NAME_PRE \n";
-
 open($fh_out, ">", $FILE_NAME_PRE);
 
-# get funtion defs for overlap gab 
+# get SQL code resolve for overlap gap 
 for my $file (glob '../../../main/sql/func*') {
 	copy_file_into($file,$fh_out);
 }

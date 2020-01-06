@@ -85,7 +85,9 @@ DROP FUNCTION IF EXISTS execute_parallel(stmts text[], num_parallel_thread int);
 
 drop extension dblink cascade;
 
--- Drop 
+DROP FUNCTION IF EXISTS "vsr_get_data_type"(_t regclass, _c text);
+
+-- Drop function used by view_ar5_forest_split_distinct_func.sql
 drop schema topo_update cascade;
 
 drop schema topo_rein cascade;

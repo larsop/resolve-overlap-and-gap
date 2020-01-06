@@ -1,275 +1,4 @@
 
--- this is internal helper function
--- this is a function that creates unlogged tables and the the grid neeed when later checking this table for overlap and gaps. 
- 
-DROP FUNCTION IF EXISTS resolve_overlap_gap_init(
-table_to_resolve_ varchar, -- The schema.table name with polygons to analyze for gaps and intersects
-geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
-srid_ int, -- the srid for the given geo column on the table analyze
-max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes 
-overlapgap_grid_ varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
-topology_schema_name_ varchar -- The topology schema name where we store store sufaces and lines from the simple feature dataset
-);
-
-CREATE OR REPLACE FUNCTION resolve_overlap_gap_init(
-table_to_resolve_ varchar, -- The schema.table name with polygons to analyze for gaps and intersects
-geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
-srid_ int, -- the srid for the given geo column on the table analyze
-max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes 
-overlapgap_grid_ varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
-topology_schema_name_ varchar -- The topology schema name where we store store sufaces and lines from the simple feature dataset
-)
-    RETURNS INTEGER
-AS $$DECLARE
-
-	-- used to run commands
-	command_string text;
-	
-	-- the number of cells created in the grid
-	num_cells int;
-	
-	-- drop result tables
-	drop_result_tables_ boolean = true;
-	
-	
-BEGIN
-
-	-- ############################# Handle Topology 
-	-- drop schema if exists
-	IF (drop_result_tables_ = true AND (SELECT count(*) from topology.topology WHERE name = quote_literal(topology_schema_name_)) = 1 ) THEN
-		EXECUTE FORMAT('SELECT topology.droptopology(%s)',quote_literal(topology_schema_name_));
-	END IF;
-	
-	-- drop this schema in case it exists
-	EXECUTE FORMAT('DROP SCHEMA IF EXISTS %s CASCADE',topology_schema_name_);
-
-	-- create topology 
-	EXECUTE FORMAT('SELECT topology.createtopology(%s)',quote_literal(topology_schema_name_));
-	
-	-- Set unlogged to increase performance 
-	EXECUTE FORMAT('ALTER TABLE %s.edge_data SET unlogged',topology_schema_name_);
-	EXECUTE FORMAT('ALTER TABLE %s.node SET unlogged',topology_schema_name_);
-	EXECUTE FORMAT('ALTER TABLE %s.face SET unlogged',topology_schema_name_);
-	EXECUTE FORMAT('ALTER TABLE %s.relation SET unlogged',topology_schema_name_);
-	
-	-- Create indexes
-	EXECUTE FORMAT('CREATE INDEX ON %s.relation(layer_id)',topology_schema_name_);
-	EXECUTE FORMAT('CREATE INDEX ON %s.relation(abs(element_id))',topology_schema_name_);
-	EXECUTE FORMAT('CREATE INDEX ON %s.edge_data USING GIST (geom)',topology_schema_name_);
-
-	-- TODO find out what to do with help tables 
-	-- /Users/lop/dev/git/topologi/skog/src/main/sql/help_tables.sql
-	-- /Users/lop/dev/git/topologi/skog/src/main/sql/table_border_line_segments.sql
-	
-	
-	
-	-- ############################# Handle content based grid init
-	-- drop content based grid table if exits 
-	IF (drop_result_tables_ = true) THEN
-		EXECUTE FORMAT('DROP TABLE IF EXISTS %s',overlapgap_grid_);
-	END IF;
-
-	-- create a content based grid table for input data
-	EXECUTE FORMAT('CREATE TABLE %s( id serial, %s geometry(Geometry,%s))',overlapgap_grid_,geo_collumn_name_,srid_);
-	
-	command_string := FORMAT('INSERT INTO %s(%s) 
-	SELECT q_grid.cell::geometry(geometry,%s)  as %s 
-	FROM (
-	SELECT(ST_Dump(
-	cbg_content_based_balanced_grid(ARRAY[ %s],%s))
-	).geom AS cell) AS q_grid',
-	overlapgap_grid_,
-	geo_collumn_name_,
-	srid_,
-	geo_collumn_name_,
-	quote_literal(table_to_resolve_ || ' ' || geo_collumn_name_)::text,
-	max_rows_in_each_cell
-	);
-	-- display
-	RAISE NOTICE 'command_string %.', command_string;
-	-- execute the sql command
-	EXECUTE command_string;
-
-	-- count number of cells in grid
-	command_string := FORMAT('SELECT count(*) from %s',overlapgap_grid_);
-	-- display
-	RAISE NOTICE 'command_string % .', command_string;
-	-- execute the sql command
-	EXECUTE command_string  INTO num_cells;
-
-
-	return num_cells;
-
-END;
-$$
-LANGUAGE plpgsql;
-
-GRANT EXECUTE on FUNCTION  resolve_overlap_gap_init(
-table_to_resolve_ varchar, -- The schema.table name with polygons to analyze for gaps and intersects
-geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
-srid_ int, -- the srid for the given geo column on the table analyze
-max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes 
-overlapgap_grid_ varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
-topology_schema_name_ varchar -- The topology schema name where we store store sufaces and lines from the simple feature dataset
-) TO public;
-
--- This is the main funtion used resolve overlap and gap
-
-DROP PROCEDURE IF EXISTS resolve_overlap_gap_run(
-table_to_resolve_ varchar, -- The table to resolve 
-geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
-srid_ int, -- the srid for the given geo column on the table analyze
-table_name_result_prefix_ varchar, -- This is table name prefix including schema used for the result tables
--- || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell 
--- || '_gap'; -- The schema.table name for the gaps/holes found in each cell 
--- || '_grid'; -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
--- || '_boundery'; -- The schema.table name the outer boundery of the data found in each cell 
--- NB. Any exting data will related to this table names will be deleted 
-
-
-topology_name_ varchar,  -- The topology schema name where we store store sufaces and lines from the simple feature dataset.
--- NB. Any exting data will related to topology_name will be deleted 
-
-max_parallel_jobs_ int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
-max_rows_in_each_cell_ int -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
-);
-
-CREATE OR REPLACE PROCEDURE resolve_overlap_gap_run(
-table_to_resolve_ varchar, -- The table to resolve 
-geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
-srid_ int, -- the srid for the given geo column on the table analyze
-table_name_result_prefix_ varchar, -- This is table name prefix including schema used for the result tables
--- || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell 
--- || '_gap'; -- The schema.table name for the gaps/holes found in each cell 
--- || '_grid'; -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
--- || '_boundery'; -- The schema.table name the outer boundery of the data found in each cell 
--- NB. Any exting data will related to this table names will be deleted 
-
-
-topology_name_ varchar,  -- The topology schema name where we store store sufaces and lines from the simple feature dataset.
--- NB. Any exting data will related to topology_name will be deleted 
-
-max_parallel_jobs_ int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
-max_rows_in_each_cell_ int -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
-) LANGUAGE plpgsql 
-AS $$
-DECLARE
-	command_string text;
-	num_rows int;
-
-	part text;	
-	id_list_tmp int[];
-	this_list_id int;
-	
-	stmts text[];
-
-	func_call text;
-	
-	
-	-- the number of cells created in the grid
-	num_cells int;
-
-	overlapgap_grid varchar  = table_name_result_prefix_ || '_grid'; -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
-	
-	call_result boolean;
-
-BEGIN
-	
-	
-	--Generate command to create grid
-	command_string := FORMAT('SELECT resolve_overlap_gap_init(%s,%s,%s,%s,%s,%s)',
-	quote_literal(table_to_resolve_),
-	quote_literal(geo_collumn_name_),
-	srid_,
-	max_rows_in_each_cell_,
-	quote_literal(overlapgap_grid),
-	quote_literal(topology_name_)
-	);
-		
-	-- display the string
-	RAISE NOTICE '%', command_string;
-	-- execute the string
-	EXECUTE command_string INTO num_cells;
-
-
-END $$;
-
-GRANT EXECUTE on PROCEDURE resolve_overlap_gap_run(
-table_to_resolve_ varchar, -- The table to resolve 
-geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
-srid_ int, -- the srid for the given geo column on the table analyze
-table_name_result_prefix_ varchar, -- This is table name prefix including schema used for the result tables
--- || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell 
--- || '_gap'; -- The schema.table name for the gaps/holes found in each cell 
--- || '_grid'; -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
--- || '_boundery'; -- The schema.table name the outer boundery of the data found in each cell 
--- NB. Any exting data will related to this table names will be deleted 
-
-
-topology_name varchar,  -- The topology schema name where we store store sufaces and lines from the simple feature dataset.
--- NB. Any exting data will related to topology_name will be deleted 
-
-max_parallel_jobs_ int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
-max_rows_in_each_cell_ int -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
-) TO public;
-
-
-
-
-
-DROP FUNCTION IF EXISTS resolve_overlap_gap_single_cell(
- 	table_to_analyze_ varchar, -- The table to analyze 
- 	geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
- 	srid_ int, -- the srid for the given geo column on the table analyze
- 	table_name_result_prefix_ varchar, -- This is the prefix used for the result tables
-	this_list_id int, num_cells int
-);
-
-CREATE OR REPLACE FUNCTION resolve_overlap_gap_single_cell(
-		table_to_analyze_ varchar, -- The table to analyze 
-	geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
-	srid_ int, -- the srid for the given geo column on the table analyze
-	table_name_result_prefix_ varchar, -- This is the prefix used for the result tables
-	this_list_id int, num_cells int)
-    RETURNS text
-AS $$DECLARE
-	command_string text;
-	
-	num_rows_data int;
-
-	num_rows_overlap int;
-	num_rows_gap int;
-	num_rows_overlap_area int;
-	num_rows_gap_area int;
-	
-	
-	id_list_tmp int[];
-	
-	overlapgap_overlap varchar = table_name_result_prefix_ || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell 
-	overlapgap_gap varchar = table_name_result_prefix_ || '_gap'; -- The schema.table name for the gaps/holes found in each cell 
-	overlapgap_grid varchar  = table_name_result_prefix_ || '_grid'; -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
-	overlapgap_boundery varchar = table_name_result_prefix_ || '_boundery'; -- The schema.table name the outer boundery of the data found in each cell 
-
-BEGIN
-
-	return 'num_rows_overlap:' || num_rows_overlap || ', num_rows_gap:' || num_rows_gap;
-
-
-END;
-$$
-LANGUAGE plpgsql PARALLEL SAFE COST 1;
-
-GRANT EXECUTE on FUNCTION resolve_overlap_gap_single_cell(
-	table_to_analyze_ varchar, -- The table to analyze 
-	geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
-	srid_ int, -- the srid for the given geo column on the table analyze
-	table_name_result_prefix_ varchar, -- This is the prefix used for the result tables
-	this_list_id int, num_cells int
-) TO public;
- 
-
-
-
 -- example of how to use
 -- select ST_Area(cbg_get_table_extent(ARRAY['org_esri_union.table_1 geo_1', 'org_esri_union.table_2 geo_2']));
 -- select ST_Area(cbg_get_table_extent(ARRAY['org_ar5.ar5_flate geo']));
@@ -2367,33 +2096,249 @@ $$ LANGUAGE plpgsql IMMUTABLE ;
 
 
 
+-- TOOD find out how to handle log tables used for debug
+
+--DROP TABLE IF EXISTS topo_update.no_cut_line_failed;
+
+-- This is a list of lines that fails
+-- this is used for debug
+CREATE UNLOGGED TABLE topo_update.no_cut_line_failed(
+id serial PRIMARY KEY not null,
+log_time timestamp default now(),
+error_info text,
+geo geometry(LineString,25832) 
+);
+
+
+--DROP TABLE IF EXISTS  topo_update.long_time_log1;
+
+-- This is a list of lines that fails
+-- this is used for debug
+CREATE UNLOGGED TABLE topo_update.long_time_log1(
+id serial PRIMARY KEY not null,
+log_time timestamp default now(),
+execute_time real,
+info text,
+geo geometry(LineString,25832) 
+);
+
+
+--DROP TABLE IF EXISTS  topo_update.long_time_log2;
+
+-- This is a list of lines that fails
+-- this is used for debug
+CREATE UNLOGGED TABLE topo_update.long_time_log2(
+id serial PRIMARY KEY not null,
+log_time timestamp default now(),
+execute_time real,
+info text,
+sql text,
+geo geometry(Polygon,25832) 
+);
+
+-- This a function that will be called from the client when user is drawing a line
+-- This line will be applied the data in the line layer
+
+-- The result is a set of id's of the new line objects created
+
+  drop FUNCTION if exists 
+topo_update.create_nocutline_edge_domain_obj_retry(json_feature text,
+  border_topo_info topo_update.input_meta_info,
+  server_json_feature text);
+
+-- {
+CREATE OR REPLACE FUNCTION
+topo_update.create_nocutline_edge_domain_obj_retry(
+json_feature text,
+border_topo_info topo_update.input_meta_info,
+server_json_feature text default null)
+RETURNS TABLE(id integer) AS $$
+DECLARE
+
+
+-- holds dynamic sql to be able to use the same code for different
+command_string text;
+
+-- holde the computed value for json input reday to use
+json_input_structure topo_update.json_input_structure;  
+
+-- holde the computed value for json input reday to use
+json_input_structure_tmp topo_update.json_input_structure;  
+
+    counter integer:=0;
+    g Geometry;
+    inGeom Geometry;
+    tolerance real = 10;
+    start_tolerance integer = 10;
+
+    start_time timestamp with time zone;
+    done_time timestamp with time zone;
+    used_time real;
+    
+    apoint geometry[] DEFAULT '{}';
+    
+    spltt_line geometry;
+    
+    failed_to_insert boolean ;
+    	feat json;
+
+    
+rec record;
+BEGIN
+
+	start_time  := clock_timestamp();
+
+	-- TODO totally rewrite this code
+--	json_input_structure := topo_update.handle_input_json_props(json_feature::json,server_json_feature::json,border_topo_info.srid);
+	feat := json_feature::json;
+	json_input_structure.input_geo := ST_GeomFromGeoJSON(feat->>'geometry');
+
+	
+	start_tolerance = border_topo_info.snap_tolerance;
+
+	BEGIN
+
+		RAISE NOTICE 'work start with %,  containing % points', json_input_structure.input_geo, ST_NumPoints(json_input_structure.input_geo);
+
+
+		--test remove reptead points
+		inGeom := ST_RemoveRepeatedPoints(json_input_structure.input_geo,start_tolerance); 
+		json_input_structure.input_geo := inGeom;
+
+	
+		IF ST_NumPoints(json_input_structure.input_geo) < 1000 THEN
+--			RAISE NOTICE 'work start, ok :% border_layer_id %, with a line containing % points', start_time, border_topo_info.border_layer_id, ST_NumPoints(json_input_structure.input_geo);
+			perform topo_update.create_nocutline_edge_domain_try_one( border_topo_info, json_input_structure);
+		ELSE
+			RAISE NOTICE 'work start, to big:% border_layer_id %, with a line containing % points', start_time, border_topo_info.border_layer_id, ST_NumPoints(json_input_structure.input_geo);
+	
+			json_input_structure_tmp := topo_update.handle_input_json_props(json_feature::json,server_json_feature::json,border_topo_info.srid);
+			inGeom := json_input_structure.input_geo;
+	
+	
+			LOOP
+				counter := counter + 1000;
+			    -- some computations
+			    IF counter > (ST_NPoints(inGeom)-1) THEN
+			        EXIT;  -- exit loop
+			    ELSE 
+			    	apoint := array_append(apoint, ST_PointN(inGeom,counter));
+			    	--ST_PointN(g,counter);
+			    END IF;
+			    
+			END LOOP;
+	
+			spltt_line := ST_Split(inGeom,ST_Multi(ST_Collect(apoint)));
+			
+			drop table if exists line_list_tmp;
+			create temp table line_list_tmp as (select (ST_Dump(spltt_line)).geom AS line_part);
+	 
+			FOR rec IN
+		      SELECT *
+		      FROM   line_list_tmp
+		   LOOP
+		      RAISE NOTICE 'rec %', ST_Length(rec.line_part);
+		      json_input_structure_tmp.input_geo = rec.line_part;
+		      perform topo_update.create_nocutline_edge_domain_try_one( border_topo_info, json_input_structure_tmp);
+		   END LOOP;		
+		END IF;
+
+	done_time  := clock_timestamp();
+--	RAISE NOTICE 'work done row :% border_layer_id %, using % sec', done_time, border_topo_info.border_layer_id, (EXTRACT(EPOCH FROM (done_time - start_time)));
+  
+	EXCEPTION WHEN OTHERS THEN
+		RAISE NOTICE 'failed ::::::1 %', border_topo_info.border_layer_id;
+		counter := 0;
+
+		json_input_structure_tmp := topo_update.handle_input_json_props(json_feature::json,server_json_feature::json,border_topo_info.srid);
+		inGeom := json_input_structure.input_geo;
+		
+--	    BEGIN
+--		inGeom := ST_RemoveRepeatedPoints(inGeom,start_tolerance); 
+--		json_input_structure_tmp.input_geo := inGeom;
+--		perform topo_update.create_nocutline_edge_domain_try_one( border_topo_info, json_input_structure_tmp);
+--		return;
+--	    EXCEPTION WHEN OTHERS THEN
+--	    RAISE NOTICE 'failed with ST_RemoveRepeatedPoints % : %', ST_AsText(inGeom), tolerance;
+--	    END;
+	    
+		
+		FOR i IN 1..(ST_NPoints(inGeom)-1)
+	    LOOP
+	    	border_topo_info.snap_tolerance := start_tolerance;
+
+	        counter:=counter+1;
+	        g := ST_MakeLine(ST_PointN(inGeom,i),ST_PointN(inGeom,i+1));
+	        perform ST_setSrid(g,border_topo_info.srid);
+	        BEGIN
+		        
+		        
+		    json_input_structure_tmp.input_geo = g;
+			perform topo_update.create_nocutline_edge_domain_try_one( border_topo_info, json_input_structure_tmp);
+			
+	      	-- catch EXCEPTION
+	    	EXCEPTION WHEN OTHERS THEN
+	    		RAISE NOTICE 'failed ::::::2 % num %, border_topo_info.snap_tolerance %', border_topo_info.border_layer_id, i, border_topo_info.snap_tolerance;
+
+	    		tolerance := border_topo_info.snap_tolerance;
+
+	    	   WHILE tolerance > 0 LOOP  
+	    	   failed_to_insert := false;
+	    	   IF tolerance = 1 THEN
+				  tolerance := 0.01;
+			   ELSE 
+			   	tolerance := tolerance - 1;
+	    	   END IF; 
+
+			   IF tolerance < 0 THEN
+					tolerance := 0;			   
+	    	   END IF;
+	        		BEGIN
+		        	border_topo_info.snap_tolerance = tolerance ;
+					perform topo_update.create_nocutline_edge_domain_try_one( border_topo_info, json_input_structure_tmp);
+	        		exit;
+	    			EXCEPTION WHEN OTHERS THEN
+	        			RAISE NOTICE 'failed with with % : %', ST_AsText(g), tolerance;
+	        			failed_to_insert := true;
+	    			END;
+	    	   END LOOP;
+	    	   IF failed_to_insert THEN
+	    	   	done_time  := clock_timestamp();
+				used_time :=  (EXTRACT(EPOCH FROM (done_time - start_time)));
+	        	RAISE NOTICE 'ERROR failed to use %, length: % tolerance : %', ST_AsText(g), ST_length(g), tolerance;
+				insert into topo_update.no_cut_line_failed(error_info,geo) 
+				values('Failed with exception time used ' || used_time::varchar || ' length ' || ST_length(g), g);
+	    	   END IF;
+	  		END;
+	    END LOOP;
+
+	
+	END;
+
+	done_time  := clock_timestamp();
+	used_time :=  (EXTRACT(EPOCH FROM (done_time - start_time)));
+--	RAISE NOTICE 'work done proc :% border_layer_id %, using % secs, num of % rows', done_time, border_topo_info.border_layer_id, used_time,  ST_NumPoints(json_input_structure.input_geo);
+
+	IF used_time > 10 THEN
+		RAISE NOTICE 'very long single line % time with geo for % ', used_time, json_input_structure.input_geo;
+		insert into topo_update.long_time_log1(execute_time,info,geo) 
+		values(used_time,'long ' || used_time::varchar || ' num points ' || ST_NumPoints(json_input_structure.input_geo), json_input_structure.input_geo);
+	END IF;
+	
+	return;
+
+    
+END;
+$$ LANGUAGE plpgsql;
+--}
+
+
 -- This a function that will be called from the client when user is drawing a line
 -- This line will be applied the data in the line layer
 
 -- The result is a set of id's of the new line objects created
 
 -- TODO set attributtes for the line
-
-  drop FUNCTION if exists 
-topo_update.create_nocutline_edge_domain_try_one(json_feature text,
-  layer_schema text, layer_table text, layer_column text,
-  snap_tolerance float8,
-  server_json_feature text);
-
-drop FUNCTION if exists 
-topo_update.create_nocutline_edge_domain_try_one(json_feature text,
-  layer_schema text, layer_table text, layer_column text,
-  snap_tolerance float8,
-  border_topo_info text,
-  server_json_feature text);
-
-
-  drop FUNCTION if exists 
-topo_update.create_nocutline_edge_domain_try_one(json_feature text,
-  layer_schema text, layer_table text, layer_column text,
-  snap_tolerance float8,
-  border_topo_info topo_update.input_meta_info,
-  server_json_feature text);
 
   drop FUNCTION if exists 
 topo_update.create_nocutline_edge_domain_try_one(json_feature text,
@@ -2454,6 +2399,969 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 --}
+
+-- CREATE : OK 07/09/2017
+-- TEST :
+
+DROP FUNCTION IF EXISTS  topo_update.simplefeature_2_topo_surface_border_retry(
+  input_table_name varchar,
+input_table_geo_column_name varchar,
+input_table_pk_column_name varchar,
+layer_schema text, 
+  border_layer_table text, border_layer_column text,
+  snap_tolerance float8,
+  _job_list_name varchar,
+  bb geometry,
+  inside_cell_data boolean
+); 
+
+
+CREATE FUNCTION topo_update.simplefeature_2_topo_surface_border_retry(
+  input_table_name varchar,
+input_table_geo_column_name varchar,
+input_table_pk_column_name varchar,
+layer_schema text, 
+  border_layer_table text, border_layer_column text,
+  snap_tolerance float8,
+  _job_list_name varchar,
+  bb geometry,
+  inside_cell_data boolean
+) 
+  RETURNS integer AS $$
+  
+  DECLARE
+
+  surface_topo_info topo_update.input_meta_info ;
+	border_topo_info topo_update.input_meta_info ;
+	
+	-- holde the computed value for json input reday to use
+	json_input_structure topo_update.json_input_structure;  
+
+	server_json_feature text;
+	
+  -- holds dynamic sql to be able to use the same code for different
+	command_string text;
+    added_rows int;
+
+        start_time timestamp with time zone;
+    done_time timestamp with time zone;
+    used_time real;
+
+    BEGIN
+
+	start_time  := clock_timestamp();
+
+	RAISE NOTICE 'timeofday:% ,start job nocutline', timeofday();
+
+
+	IF bb is NULL and input_table_name is not null  THEN
+		command_string := format('select ST_Envelope(ST_Collect(geo)) from %s',input_table_name);
+		EXECUTE command_string into bb;
+	END IF;
+    
+	
+	-- get meta data the border line for the surface
+	border_topo_info := topo_update.make_input_meta_info(layer_schema, border_layer_table , border_layer_column );
+	
+	border_topo_info.snap_tolerance :=  snap_tolerance;
+
+	-- TODO totally rewrite this code
+	--json_input_structure := topo_update.handle_input_json_props(json_input_structure::json,server_json_feature::json,border_topo_info.srid);
+
+	-- RAISE NOTICE 'DONE with  topo_update.make_input_meta_info  %' , border_topo_info;
+	
+	command_string := format(
+	'SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::text, %L) 
+	FROM topo_update.view_split_distinct_func(%L,%L,%L,%L,%L,%L) g',
+	border_topo_info, input_table_name,input_table_geo_column_name,input_table_pk_column_name,bb,inside_cell_data,_job_list_name);
+	
+	--RAISE NOTICE 'command_string %' , command_string;
+	----
+--SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::text, '(topo_ar5_forest_sysdata,topo_ar5_forest,ar5_forest_grense,grense,2,1,1,25832)'::topo_update.input_meta_info)
+--FROM topo_update.view_split_distinct_func('tmp_sf_ar5_forest_input.existing_forest_surface','0103000020E86400000100000005000000DA1E85F79D77224154EDA158F2085941DA1E85F79D7722411ABBC026830A59414433337BE78022411ABBC026830A59414433337BE780224154EDA158F2085941DA1E85F79D77224154EDA158F2085941','t')
+
+	EXECUTE command_string;
+			
+	RAISE NOTICE 'timeofday:% ,done job nocutline ready to start next', timeofday();
+
+	done_time  := clock_timestamp();
+	used_time :=  (EXTRACT(EPOCH FROM (done_time - start_time)));
+	RAISE NOTICE 'work done proc :% border_layer_id %, using % sec', done_time, border_topo_info.border_layer_id, used_time;
+
+-- This is a list of lines that fails
+-- this is used for debug
+
+	IF used_time > 10 THEN
+		RAISE NOTICE 'very long a set of lines % time with geo for bb % ', used_time, bb;
+		insert into topo_update.long_time_log2(execute_time,info,sql,geo) 
+		values(used_time,'simplefeature_2_topo_surface_border_retry',command_string, bb);
+	END IF;
+
+	command_string := format(
+	'SELECT count(*) from %I.%I',layer_schema,  border_layer_table);
+
+    EXECUTE command_string INTO added_rows;
+    
+    return added_rows;
+    
+    END;
+
+$$ LANGUAGE plpgsql;
+
+
+
+--psql -h localhost -U postgres sl -c "SELECT topo_update.simplefeature_2_topo_surface_border_retry('topo_ar5_forest','ar5_forest_grense','grense','topo_update.topo_ar5_forest_org_from_sf_2_json_grense_v','false',1,'0103000020E86400000100000005000000248BC215F70624410A6E11E197F45841248BC215F70624417ADA07521E015941292E3333435124417ADA07521E015941292E3333435124410A6E11E197F45841248BC215F70624410A6E11E197F45841')"--https://gis.stackexchange.com/questions/94049/how-to-get-the-data-type-of-each-column-from-a-postgis-table
+
+CREATE OR REPLACE FUNCTION "vsr_get_data_type"(_t regclass, _c text)
+  RETURNS text AS
+$body$
+DECLARE
+    _schema text;
+    _table text;
+    data_type text;
+BEGIN
+-- Prepare names to use in index and trigger names
+IF _t::text LIKE '%.%' THEN
+    _schema := regexp_replace (split_part(_t::text, '.', 1),'"','','g');
+    _table := regexp_replace (split_part(_t::text, '.', 2),'"','','g');
+    ELSE
+        _schema := 'public';
+        _table := regexp_replace(_t::text,'"','','g');
+    END IF;
+
+    data_type := 
+    (
+        SELECT format_type(a.atttypid, a.atttypmod)
+        FROM pg_attribute a 
+        JOIN pg_class b ON (a.attrelid = b.oid)
+        JOIN pg_namespace c ON (c.oid = b.relnamespace)
+        WHERE
+            b.relname = _table AND
+            c.nspname = _schema AND
+            a.attname = _c
+     );
+
+    RETURN data_type;
+END
+$body$ LANGUAGE plpgsql;
+
+DROP FUNCTION IF EXISTS topo_update.view_split_distinct_func(
+  input_table_name varchar,
+input_table_geo_column_name varchar,
+  bb geometry,
+  inside_cell_data boolean
+);
+
+DROP FUNCTION IF EXISTS topo_update.view_split_distinct_func(
+  input_table_name varchar,
+input_table_geo_column_name varchar,
+  bb geometry,
+  inside_cell_data boolean,
+_job_list_name varchar
+);
+
+CREATE OR REPLACE FUNCTION topo_update.view_split_distinct_func(
+input_table_name varchar,
+input_table_geo_column_name varchar,
+input_table_pk_column_name varchar,
+bb geometry,
+inside_cell_data boolean,
+_job_list_name varchar
+) RETURNS TABLE (
+  json text, 
+  geo geometry(LineString, 25832), 
+  objectid integer
+) LANGUAGE 'plpgsql' AS $function$ 
+DECLARE
+ grid_lines  geometry(LineString,25832);
+  command_string text;
+  
+  get_boundery_function text = 'ST_Multi';
+  
+
+BEGIN 
+	
+	if strpos((vsr_get_data_type(input_table_name,input_table_geo_column_name)),'Polygon') > 0 then 
+	  get_boundery_function := 'ST_Boundary';
+	end if;
+	
+	drop table if exists tmp_data_border_lines; 
+
+	IF NOT inside_cell_data THEN
+	
+	
+	grid_lines := ST_ExteriorRing(bb) as geo;
+
+	command_string := format('LOCK TABLE %s IN SHARE ROW EXCLUSIVE MODE',_job_list_name);
+	execute command_string;
+
+	command_string := format('create temp table tmp_data_border_lines as 
+	 	( SELECT lg.geo as geo
+     FROM 
+      (
+        WITH sample(geom, id) AS (
+          SELECT DISTINCT
+            (
+              ST_Dump(
+                %6$s(
+                  (
+                    ST_Dump(g.%4$s)
+                  ).geom
+                )
+              )
+            ).geom as geom, 
+            g.%5$s as id 
+          FROM 
+            %3$s g
+         WHERE g.%4$s && %1$L and ST_intersects(g.%4$s,%1$L)
+        ), 
+        line_counts (cts, id) AS (
+          SELECT 
+            ST_NPoints(geom) -1, 
+            id 
+          FROM 
+            sample
+        ), 
+        series (num, id) AS (
+          SELECT 
+            generate_series(1, cts), 
+            id 
+          FROM 
+            line_counts
+        ) 
+        SELECT 
+          case when ST_intersects(ST_PointN(sample.geom, num),%2$L)
+	      AND ST_LineCrossingDirection(ST_MakeLine(
+	            ST_PointN(geom, num), 
+	            ST_PointN(geom, num + 1)
+	          ) , %1$L) = 1
+          THEN
+	          ST_MakeLine(
+	            ST_PointN(geom, num), 
+	            ST_PointN(geom, num + 1)
+	          ) 
+ 		  WHEN ST_intersects(ST_PointN(sample.geom, num+1),%2$L)
+	      AND ST_LineCrossingDirection(ST_MakeLine(
+	            ST_PointN(geom, num), 
+	            ST_PointN(geom, num + 1)
+	          ) , %1$L) = 1
+          THEN
+	          ST_MakeLine(
+	            ST_PointN(geom, num), 
+	            ST_PointN(geom, num + 1)
+	          ) 
+	      else
+	          null
+	      END as geo
+	      
+	      FROM 
+          series, sample 
+        WHERE series.id = sample.id 
+      ) AS lg 
+      LEFT JOIN  %7$s gt ON gt.cell_geo && lg.geo
+      and ST_equals(gt.cell_geo,%2$L) 
+     WHERE lg.geo is not null
+--     AND  (gt.border_lines is null OR ST_intersects(gt.border_lines,lg.geo) = false)
+)'
+	,grid_lines
+	,bb
+	,input_table_name
+	,input_table_geo_column_name
+	,input_table_pk_column_name
+	,get_boundery_function
+	,_job_list_name
+	
+	);
+
+	execute command_string;
+	
+      command_string := format('update %s as gt
+      set border_lines = (SELECT ST_Multi(ST_Union(nbl.geo)) from tmp_data_border_lines as nbl)
+      where gt.cell_geo && %2$L and ST_equals(gt.cell_geo,%2$L)',_job_list_name,bb);
+
+      	execute command_string;
+
+ELSE	
+
+	command_string := format('create temp table tmp_data_border_lines as 
+	 	( SELECT lg.geo as geo
+     FROM 
+      (
+        WITH sample(geom, id) AS (
+          SELECT DISTINCT
+            (
+              ST_Dump(
+                %5$s(
+                  (
+                    ST_Dump(g.%3$s)
+                  ).geom
+                )
+              )
+            ).geom as geom, 
+            g.%4$s as id 
+          FROM 
+            %2$s g
+         WHERE g.%3$s && %1$L
+        ), 
+        line_counts (cts, id) AS (
+          SELECT 
+            ST_NPoints(geom) -1, 
+            id 
+          FROM 
+            sample
+        ), 
+        series (num, id) AS (
+          SELECT 
+            generate_series(1, cts), 
+            id 
+          FROM 
+            line_counts
+        ) 
+        SELECT 
+          case when 
+          ST_intersects(ST_PointN(sample.geom, num),%1$L) and ST_intersects(ST_PointN(sample.geom, num+1),%1$L) 
+          THEN
+	          ST_MakeLine(
+	            ST_PointN(geom, num), 
+	            ST_PointN(geom, num + 1)
+	          ) 
+	          else
+	          null
+	      END as geo
+	      
+	      FROM 
+          series, sample 
+        WHERE series.id = sample.id 
+      ) AS lg 
+)'
+,bb
+,input_table_name
+,input_table_geo_column_name
+,input_table_pk_column_name
+,get_boundery_function);
+
+	execute command_string;
+      
+      END IF;
+
+      	RETURN QUERY 
+SELECT 
+  * 
+FROM 
+  (
+    SELECT 
+      '{"type": "Feature",' || '"geometry":' || ST_AsGeoJSON(lg3.geo, 10, 2):: json || ',' || '"properties":' || row_to_json(
+        (
+          SELECT 
+            l 
+          FROM 
+            (
+              SELECT 
+                "oppdateringsdato"
+            ) As l
+        )
+      ) || '}' as json, 
+      lg3.geo, 
+      lg3.objectid 
+      FROM (
+    SELECT distinct lg2.geo, now() as "oppdateringsdato", 1 as "objectid" FROM
+    	 	( SELECT (ST_Dump(ST_LineMerge(ST_Union(lg.geo)))).geom as geo
+from tmp_data_border_lines lg)  lg2
+      ) As lg3
+      ) As f;
+
+END $function$;
+
+
+--\timing
+--select count(*) from topo_update.view_split_distinct_func('tmp_sf_ar5_forest_input.existing_forest_surface','wkb_geometry','ogc_fid','0103000020E86400000100000005000000248BC215F70624410A6E11E197F45841248BC215F70624417ADA07521E015941292E3333435124417ADA07521E015941292E3333435124410A6E11E197F45841248BC215F70624410A6E11E197F45841',true,'topo_update.job_list_c');
+--select count(*) from topo_update.view_split_distinct_func('tmp_sf_ar5_forest_input.existing_forest_surface','wkb_geometry','ogc_fid','0103000020E86400000100000005000000248BC215F70624410A6E11E197F45841248BC215F70624417ADA07521E015941292E3333435124417ADA07521E015941292E3333435124410A6E11E197F45841248BC215F70624410A6E11E197F45841',false,'topo_update.job_list_c');
+
+DROP FUNCTION IF EXISTS topo_update.set_blocked_area(
+input_table_name varchar,
+input_table_geo_column_name varchar,
+input_table_pk_column_name varchar,
+bb geometry,
+_job_list_name varchar);
+
+CREATE OR REPLACE FUNCTION topo_update.set_blocked_area(
+input_table_name varchar,
+input_table_geo_column_name varchar,
+input_table_pk_column_name varchar,
+_job_list_name varchar,
+bb geometry
+) RETURNS geometry 
+LANGUAGE 'plpgsql' AS $function$ 
+DECLARE
+  command_string text;
+  
+  get_boundery_function text = 'ST_Boundary';
+  data_env geometry;  
+  num_rows int;
+  -- we extra distace outside this box
+  -- 0.2
+  extra_block_dist float = 1;
+  
+  is_done integer = 0;
+
+BEGIN 
+
+	-- check if job is done already
+	command_string := format('select count(*) from %s as gt, %s as done
+  where gt.cell_geo && ST_PointOnSurface(%3$L) and gt.id = done.id',_job_list_name,_job_list_name||'_donejobs',bb);
+	execute command_string into is_done;
+	
+	IF is_done = 1 THEN
+	     RAISE NOTICE 'Job is_done for  : %', ST_astext(bb);
+	     RETURN null;
+	END IF;
+	
+	-- get area to block for update
+	
+
+	-- geometry(LineString
+	RAISE NOTICE 'Get area to lock for : %', ST_Centroid(bb);
+
+	drop table if exists tmp_data_border_lines; 
+
+
+	if strpos((vsr_get_data_type(input_table_name,input_table_geo_column_name)),'LineString') > 0 then 
+		  	command_string := format('create temp table tmp_data_border_lines as 
+	 	( SELECT DISTINCT 
+            (
+              ST_Dump(
+                %5$s(
+                  (
+                    ST_Dump(g.%3$s)
+                  ).geom
+                )
+              )
+            ).geom as geo, 
+            g.%4$s as id 
+          FROM 
+            %2$s g
+         WHERE g.%3$s && %1$L 
+        )'
+	,bb
+	,input_table_name
+	,input_table_geo_column_name
+	,input_table_pk_column_name
+	,get_boundery_function
+	);
+
+	else 	
+	  	command_string := format('create temp table tmp_data_border_lines as 
+	 	( SELECT DISTINCT 
+            (
+              ST_Dump(
+                %5$s(
+                  (
+                    ST_Dump(g.%3$s)
+                  ).geom
+                )
+              )
+            ).geom as geo, 
+            g.%4$s as id 
+          FROM 
+            %2$s g
+         WHERE g.%3$s && %1$L
+        )'
+	,bb
+	,input_table_name
+	,input_table_geo_column_name
+	,input_table_pk_column_name
+	,get_boundery_function
+	);
+
+	end if;
+
+
+--	RAISE NOTICE 'execute command_string; %', command_string;
+	  execute command_string;
+	  
+	 GET DIAGNOSTICS num_rows = ROW_COUNT; 
+
+
+	 IF num_rows > 0 THEN
+	 
+
+	 
+	  command_string := format('select ST_Buffer(ST_Envelope(ST_Collect(nbl.geo,ng.cell_geo)),%3$L) from tmp_data_border_lines nbl, %1$s ng  
+      where ng.cell_geo && ST_PointOnSurface(%2$L)',_job_list_name,bb,extra_block_dist);
+     execute command_string into  data_env;
+
+     RAISE NOTICE 'Found area to lock with size  : %', ST_area(data_env);
+
+     
+--	 command_string := format('ANALYZE ',_job_list_name);
+--	execute command_string;
+	  ELSE
+	  
+	     RAISE NOTICE 'No area to lock found for  : %', ST_astext(bb);
+
+	  END IF;
+	  
+	  return data_env;
+
+END $function$;
+
+
+--\timing
+--select topo_update.set_blocked_area('tmp_sf_ar5_forest_input.existing_forest_surface','wkb_geometry','ogc_fid','topo_update.job_list_block',
+--'0103000020E864000001000000050000000000004035BD2341000000A0A6EB58410000004035BD23410000001419EC5841000000A093C223410000001419EC5841000000A093C22341000000A0A6EB58410000004035BD2341000000A0A6EB5841');
+
+--update topo_update.job_list_block SET block_bb = null;
+
+--select topo_update.set_blocked_area('tmp_sf_ar5_forest_input.selected_forest_area','wkb_geometry','ogc_fid','topo_update.job_list_block',
+--'0103000020E8640000010000000500000040F1FF7F101C2241BCFAFF272632594140F1FF7F101C2241D8F9FF2FA437594114EFFFFF23232241D8F9FF2FA437594114EFFFFF23232241BCFAFF272632594140F1FF7F101C2241BCFAFF2726325941');
+
+--select topo_update.set_blocked_area('tmp_sf_ar5_forest_input.selected_forest_area','wkb_geometry','ogc_fid','topo_update.job_list_block',
+--'0103000020E8640000010000000500000000000000815C2341000000D0D20C594100000000815C234100000020E810594100000040FC6D234100000020E810594100000040FC6D2341000000D0D20C594100000000815C2341000000D0D20C5941');
+-- CREATE : OK 07/09/2017
+-- TEST :
+
+-- This is a function used to import data from simple feature to topplogy for surface laers
+
+DROP FUNCTION IF EXISTS topo_update.create_job_list_using_block(
+table_name_column_name_array varchar,
+input_table_pk_column_name varchar,
+max_cell_rows integer,
+layer_schema text, 
+border_layer_table text, 
+border_layer_column text,  
+_simplify_tolerance float8,
+snap_tolerance float8,
+_do_chaikins boolean,
+create_new_grid boolean, 
+_job_list_name varchar,
+inside_cell_data boolean
+); 
+
+CREATE FUNCTION topo_update.create_job_list_using_block(
+table_name_column_name_array varchar,
+input_table_pk_column_name varchar,
+max_cell_rows integer,
+layer_schema text, 
+border_layer_table text, 
+border_layer_column text,  
+_simplify_tolerance float8,
+snap_tolerance float8,
+_do_chaikins boolean,
+create_new_grid boolean, 
+_job_list_name varchar,
+inside_cell_data boolean
+) 
+  RETURNS integer AS $$
+  
+DECLARE
+command_string text;
+command_string_var text;
+num_rows int;
+grid_geom geometry = ST_GeomFromText('POINT(0 0)');
+min_distance integer = 100;
+
+line_values VARCHAR[];
+input_table_name VARCHAR;
+input_table_geo_column_name VARCHAR;
+sql_to_block_cmd VARCHAR;
+topo_ar5_forest VARCHAR = 'topo_ar5_forest_sysdata';
+BEGIN
+
+	
+SELECT string_to_array(table_name_column_name_array, ' ') INTO line_values; 
+input_table_name := line_values[1];
+input_table_geo_column_name := line_values[2];
+
+-- create grid
+IF create_new_grid=true THEN
+
+DROP table if exists grid_tmp;
+
+command_string := FORMAT('
+CREATE TABLE grid_tmp AS (
+SELECT q_grid.cell::geometry(geometry,25832)  as geo 
+FROM (
+SELECT(ST_Dump(
+cbg_content_based_balanced_grid(ARRAY[%s],%L,%s,%s))
+).geom AS cell)
+AS q_grid
+)', 
+quote_literal(table_name_column_name_array),
+grid_geom,
+min_distance,
+max_cell_rows
+);
+RAISE NOTICE 'command_string %', command_string;
+execute command_string;
+
+CREATE INDEX ON grid_tmp USING GIST (geo);
+
+alter table grid_tmp add id serial;
+
+END IF;
+
+-- create jobList table
+command_string := FORMAT('DROP table if exists %s',_job_list_name);
+RAISE NOTICE 'command_string %', command_string;
+execute command_string;
+
+command_string := FORMAT('CREATE table %s(id serial, start_time timestamp with time zone, sql_to_block varchar, sql_to_run varchar, cell_geo geometry(geometry,25832),block_bb Geometry(geometry,25832))',_job_list_name);
+RAISE NOTICE 'command_string %', command_string;
+execute command_string;
+
+-- create jobList table
+command_string := FORMAT('DROP table if exists %s',_job_list_name||'_donejobs');
+RAISE NOTICE 'command_string %', command_string;
+execute command_string;
+
+command_string := FORMAT('CREATE table %s(id int, done_time timestamp with time zone default clock_timestamp())'
+,_job_list_name||'_donejobs');
+RAISE NOTICE 'command_string %', command_string;
+execute command_string;
+
+
+
+sql_to_block_cmd := FORMAT('select topo_update.set_blocked_area(%s,%s,%s,%s,',
+quote_literal(input_table_name),
+quote_literal(input_table_geo_column_name),
+quote_literal(input_table_pk_column_name),
+quote_literal(_job_list_name)
+);
+
+	command_string_var := FORMAT('SELECT topo_update.simplefeature_c2_topo_surface_border_retry(%s,%s,%s,%s,%s,%s,%s,%s,', 
+	quote_literal(input_table_name),
+	quote_literal(input_table_geo_column_name),
+	quote_literal(input_table_pk_column_name),
+	quote_literal(topo_ar5_forest),
+	_simplify_tolerance,
+	snap_tolerance,
+	quote_literal(_do_chaikins),
+	quote_literal(_job_list_name)
+	);
+	
+	RAISE NOTICE 'command_string_var %', command_string_var;
+	
+	-- add inside cell polygons
+	command_string := FORMAT('
+	INSERT INTO %s(sql_to_run,cell_geo,sql_to_block) 
+	SELECT %s||quote_literal(r.geo::varchar)||%s as sql_to_run, r.geo as cell_geo, %s||quote_literal(r.geo::varchar)||%s as sql_to_block
+	FROM grid_tmp r',
+	_job_list_name,
+	quote_literal(command_string_var),
+	quote_literal(','||inside_cell_data||');'),
+	quote_literal(sql_to_block_cmd),
+	quote_literal(');')
+	);
+	RAISE NOTICE 'command_string %', command_string;
+	execute command_string;
+
+
+command_string := FORMAT('CREATE INDEX ON %s USING GIST (cell_geo);',_job_list_name);
+RAISE NOTICE 'command_string %', command_string;
+execute command_string;
+
+command_string := FORMAT('CREATE INDEX ON %s USING GIST (block_bb);',_job_list_name);
+RAISE NOTICE 'command_string %', command_string;
+execute command_string;
+
+command_string := FORMAT('CREATE INDEX ON %s (id);',_job_list_name);
+RAISE NOTICE 'command_string %', command_string;
+execute command_string;
+
+command_string := FORMAT('CREATE INDEX ON %s (id);',_job_list_name||'_donejobs');
+RAISE NOTICE 'command_string %', command_string;
+execute command_string;
+
+command_string := FORMAT('select count(*) from %s',_job_list_name);
+RAISE NOTICE 'command_string %', command_string;
+execute command_string into num_rows;
+
+return num_rows;
+  
+END;
+
+$$ LANGUAGE plpgsql;
+
+
+--SELECT topo_update.create_job_list_using_block(
+--'tmp_sf_ar5_forest_input.existing_forest_surface wkb_geometry','ogc_fid',100,
+--'topo_ar5_forest','ar5_forest_grense','grense',1,false,true,'topo_update.job_list_block',true);
+
+-- this is internal helper function
+-- this is a function that creates unlogged tables and the the grid neeed when later checking this table for overlap and gaps. 
+ 
+DROP FUNCTION IF EXISTS resolve_overlap_gap_init(
+table_to_resolve_ varchar, -- The schema.table name with polygons to analyze for gaps and intersects
+geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
+srid_ int, -- the srid for the given geo column on the table analyze
+max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes 
+overlapgap_grid_ varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
+topology_schema_name_ varchar -- The topology schema name where we store store sufaces and lines from the simple feature dataset
+);
+
+CREATE OR REPLACE FUNCTION resolve_overlap_gap_init(
+table_to_resolve_ varchar, -- The schema.table name with polygons to analyze for gaps and intersects
+geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
+srid_ int, -- the srid for the given geo column on the table analyze
+max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes 
+overlapgap_grid_ varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
+topology_schema_name_ varchar -- The topology schema name where we store store sufaces and lines from the simple feature dataset
+)
+    RETURNS INTEGER
+AS $$DECLARE
+
+	-- used to run commands
+	command_string text;
+	
+	-- the number of cells created in the grid
+	num_cells int;
+	
+	-- drop result tables
+	drop_result_tables_ boolean = true;
+	
+	
+BEGIN
+
+	-- ############################# Handle Topology 
+	-- drop schema if exists
+	IF (drop_result_tables_ = true AND (SELECT count(*) from topology.topology WHERE name = quote_literal(topology_schema_name_)) = 1 ) THEN
+		EXECUTE FORMAT('SELECT topology.droptopology(%s)',quote_literal(topology_schema_name_));
+	END IF;
+	
+	-- drop this schema in case it exists
+	EXECUTE FORMAT('DROP SCHEMA IF EXISTS %s CASCADE',topology_schema_name_);
+
+	-- create topology 
+	EXECUTE FORMAT('SELECT topology.createtopology(%s)',quote_literal(topology_schema_name_));
+	
+	-- Set unlogged to increase performance 
+	EXECUTE FORMAT('ALTER TABLE %s.edge_data SET unlogged',topology_schema_name_);
+	EXECUTE FORMAT('ALTER TABLE %s.node SET unlogged',topology_schema_name_);
+	EXECUTE FORMAT('ALTER TABLE %s.face SET unlogged',topology_schema_name_);
+	EXECUTE FORMAT('ALTER TABLE %s.relation SET unlogged',topology_schema_name_);
+	
+	-- Create indexes
+	EXECUTE FORMAT('CREATE INDEX ON %s.relation(layer_id)',topology_schema_name_);
+	EXECUTE FORMAT('CREATE INDEX ON %s.relation(abs(element_id))',topology_schema_name_);
+	EXECUTE FORMAT('CREATE INDEX ON %s.edge_data USING GIST (geom)',topology_schema_name_);
+	EXECUTE FORMAT('CREATE INDEX ON %s.relation(element_id)',topology_schema_name_);
+	EXECUTE FORMAT('CREATE INDEX ON %s.relation(topogeo_id)',topology_schema_name_);
+
+
+
+	-- TODO find out what to do with help tables 
+	-- /Users/lop/dev/git/topologi/skog/src/main/sql/help_tables.sql
+	-- /Users/lop/dev/git/topologi/skog/src/main/sql/table_border_line_segments.sql
+	
+	
+	
+	-- ############################# Handle content based grid init
+	-- drop content based grid table if exits 
+	IF (drop_result_tables_ = true) THEN
+		EXECUTE FORMAT('DROP TABLE IF EXISTS %s',overlapgap_grid_);
+	END IF;
+
+	-- create a content based grid table for input data
+	EXECUTE FORMAT('CREATE TABLE %s( id serial, %s geometry(Geometry,%s))',overlapgap_grid_,geo_collumn_name_,srid_);
+	
+	command_string := FORMAT('INSERT INTO %s(%s) 
+	SELECT q_grid.cell::geometry(geometry,%s)  as %s 
+	FROM (
+	SELECT(ST_Dump(
+	cbg_content_based_balanced_grid(ARRAY[ %s],%s))
+	).geom AS cell) AS q_grid',
+	overlapgap_grid_,
+	geo_collumn_name_,
+	srid_,
+	geo_collumn_name_,
+	quote_literal(table_to_resolve_ || ' ' || geo_collumn_name_)::text,
+	max_rows_in_each_cell
+	);
+	-- display
+	RAISE NOTICE 'command_string %.', command_string;
+	-- execute the sql command
+	EXECUTE command_string;
+
+	-- count number of cells in grid
+	command_string := FORMAT('SELECT count(*) from %s',overlapgap_grid_);
+	-- display
+	RAISE NOTICE 'command_string % .', command_string;
+	-- execute the sql command
+	EXECUTE command_string  INTO num_cells;
+	
+	-- Create Index
+	EXECUTE FORMAT('CREATE INDEX ON %s USING GIST (geom)',overlapgap_grid_);
+	
+	return num_cells;
+
+END;
+$$
+LANGUAGE plpgsql;
+
+GRANT EXECUTE on FUNCTION  resolve_overlap_gap_init(
+table_to_resolve_ varchar, -- The schema.table name with polygons to analyze for gaps and intersects
+geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
+srid_ int, -- the srid for the given geo column on the table analyze
+max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes 
+overlapgap_grid_ varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
+topology_schema_name_ varchar -- The topology schema name where we store store sufaces and lines from the simple feature dataset
+) TO public;
+
+-- This is the main funtion used resolve overlap and gap
+
+DROP PROCEDURE IF EXISTS resolve_overlap_gap_run(
+table_to_resolve_ varchar, -- The table to resolve 
+geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
+srid_ int, -- the srid for the given geo column on the table analyze
+table_name_result_prefix_ varchar, -- This is table name prefix including schema used for the result tables
+-- || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell 
+-- || '_gap'; -- The schema.table name for the gaps/holes found in each cell 
+-- || '_grid'; -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
+-- || '_boundery'; -- The schema.table name the outer boundery of the data found in each cell 
+-- NB. Any exting data will related to this table names will be deleted 
+
+
+topology_name_ varchar,  -- The topology schema name where we store store sufaces and lines from the simple feature dataset.
+-- NB. Any exting data will related to topology_name will be deleted 
+
+max_parallel_jobs_ int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
+max_rows_in_each_cell_ int -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
+);
+
+CREATE OR REPLACE PROCEDURE resolve_overlap_gap_run(
+table_to_resolve_ varchar, -- The table to resolve 
+geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
+srid_ int, -- the srid for the given geo column on the table analyze
+table_name_result_prefix_ varchar, -- This is table name prefix including schema used for the result tables
+-- || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell 
+-- || '_gap'; -- The schema.table name for the gaps/holes found in each cell 
+-- || '_grid'; -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
+-- || '_boundery'; -- The schema.table name the outer boundery of the data found in each cell 
+-- NB. Any exting data will related to this table names will be deleted 
+
+
+topology_name_ varchar,  -- The topology schema name where we store store sufaces and lines from the simple feature dataset.
+-- NB. Any exting data will related to topology_name will be deleted 
+
+max_parallel_jobs_ int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
+max_rows_in_each_cell_ int -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
+) LANGUAGE plpgsql 
+AS $$
+DECLARE
+	command_string text;
+	num_rows int;
+
+	part text;	
+	id_list_tmp int[];
+	this_list_id int;
+	
+	stmts text[];
+
+	func_call text;
+	
+	
+	-- the number of cells created in the grid
+	num_cells int;
+
+	overlapgap_grid varchar  = table_name_result_prefix_ || '_grid'; -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
+	
+	call_result boolean;
+
+BEGIN
+	
+	
+	--Generate command to create grid
+	command_string := FORMAT('SELECT resolve_overlap_gap_init(%s,%s,%s,%s,%s,%s)',
+	quote_literal(table_to_resolve_),
+	quote_literal(geo_collumn_name_),
+	srid_,
+	max_rows_in_each_cell_,
+	quote_literal(overlapgap_grid),
+	quote_literal(topology_name_)
+	);
+		
+	-- display the string
+	RAISE NOTICE '%', command_string;
+	-- execute the string
+	EXECUTE command_string INTO num_cells;
+
+
+END $$;
+
+GRANT EXECUTE on PROCEDURE resolve_overlap_gap_run(
+table_to_resolve_ varchar, -- The table to resolve 
+geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
+srid_ int, -- the srid for the given geo column on the table analyze
+table_name_result_prefix_ varchar, -- This is table name prefix including schema used for the result tables
+-- || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell 
+-- || '_gap'; -- The schema.table name for the gaps/holes found in each cell 
+-- || '_grid'; -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
+-- || '_boundery'; -- The schema.table name the outer boundery of the data found in each cell 
+-- NB. Any exting data will related to this table names will be deleted 
+
+
+topology_name varchar,  -- The topology schema name where we store store sufaces and lines from the simple feature dataset.
+-- NB. Any exting data will related to topology_name will be deleted 
+
+max_parallel_jobs_ int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
+max_rows_in_each_cell_ int -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
+) TO public;
+
+
+
+
+
+DROP FUNCTION IF EXISTS resolve_overlap_gap_single_cell(
+ 	table_to_analyze_ varchar, -- The table to analyze 
+ 	geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
+ 	srid_ int, -- the srid for the given geo column on the table analyze
+ 	table_name_result_prefix_ varchar, -- This is the prefix used for the result tables
+	this_list_id int, num_cells int
+);
+
+CREATE OR REPLACE FUNCTION resolve_overlap_gap_single_cell(
+		table_to_analyze_ varchar, -- The table to analyze 
+	geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
+	srid_ int, -- the srid for the given geo column on the table analyze
+	table_name_result_prefix_ varchar, -- This is the prefix used for the result tables
+	this_list_id int, num_cells int)
+    RETURNS text
+AS $$DECLARE
+	command_string text;
+	
+	num_rows_data int;
+
+	num_rows_overlap int;
+	num_rows_gap int;
+	num_rows_overlap_area int;
+	num_rows_gap_area int;
+	
+	
+	id_list_tmp int[];
+	
+	overlapgap_overlap varchar = table_name_result_prefix_ || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell 
+	overlapgap_gap varchar = table_name_result_prefix_ || '_gap'; -- The schema.table name for the gaps/holes found in each cell 
+	overlapgap_grid varchar  = table_name_result_prefix_ || '_grid'; -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
+	overlapgap_boundery varchar = table_name_result_prefix_ || '_boundery'; -- The schema.table name the outer boundery of the data found in each cell 
+
+BEGIN
+
+	return 'num_rows_overlap:' || num_rows_overlap || ', num_rows_gap:' || num_rows_gap;
+
+
+END;
+$$
+LANGUAGE plpgsql PARALLEL SAFE COST 1;
+
+GRANT EXECUTE on FUNCTION resolve_overlap_gap_single_cell(
+	table_to_analyze_ varchar, -- The table to analyze 
+	geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analyze	
+	srid_ int, -- the srid for the given geo column on the table analyze
+	table_name_result_prefix_ varchar, -- This is the prefix used for the result tables
+	this_list_id int, num_cells int
+) TO public;
+ 
+
 
 CREATE SCHEMA test_data;
 --- give puclic access

@@ -7,27 +7,6 @@
 
   drop FUNCTION if exists 
 topo_update.create_nocutline_edge_domain_try_one(json_feature text,
-  layer_schema text, layer_table text, layer_column text,
-  snap_tolerance float8,
-  server_json_feature text);
-
-drop FUNCTION if exists 
-topo_update.create_nocutline_edge_domain_try_one(json_feature text,
-  layer_schema text, layer_table text, layer_column text,
-  snap_tolerance float8,
-  border_topo_info text,
-  server_json_feature text);
-
-
-  drop FUNCTION if exists 
-topo_update.create_nocutline_edge_domain_try_one(json_feature text,
-  layer_schema text, layer_table text, layer_column text,
-  snap_tolerance float8,
-  border_topo_info topo_update.input_meta_info,
-  server_json_feature text);
-
-  drop FUNCTION if exists 
-topo_update.create_nocutline_edge_domain_try_one(json_feature text,
   border_topo_info topo_update.input_meta_info,
   server_json_feature text);
 

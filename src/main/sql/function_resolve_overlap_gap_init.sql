@@ -100,8 +100,10 @@ BEGIN
 	RAISE NOTICE 'command_string % .', command_string;
 	-- execute the sql command
 	EXECUTE command_string  INTO num_cells;
-
-
+	
+	-- Create Index
+	EXECUTE FORMAT('CREATE INDEX ON %s USING GIST (geom)',overlapgap_grid_);
+	
 	return num_cells;
 
 END;

@@ -40,35 +40,33 @@ if (-d "../../../../submodule") {
 	copy_file_into('../../../../submodule/pgtopo_update_sql/src/main/sql/topo_update/function_01_get_geom_from_json.sql',$fh_out);
 	copy_file_into('../../../../submodule/pgtopo_update_sql/src/main/sql/topo_update/function_01_get_felles_egenskaper.sql',$fh_out);
 	
-	# get SQL code used by resolve for overlap gap 
-	# (Maybe move this code to https://github.com/NibioOpenSource/pgtopo_update_sql.git)
-	copy_file_into'../../../main/extern_pgtopo_update_sql/help_tables_for_logging.sql',$fh_out);
-	for my $file (glob '../../../main/extern_pgtopo_update_sql/func*') {
-		copy_file_into($file,$fh_out);
-	}
-	for my $file (glob '../../../main/extern_pgtopo_update_sql/view*') {
-		copy_file_into($file,$fh_out);
-	}
-
 	close($fh_out);	 
 
 }
 
-# Get code from this repo which always exits 
+# Create the complete file (resolve_overlap_and_gap-pre.sql) needed for the tests  
+open($fh_out, ">", 'resolve_overlap_and_gap-pre.sql');
 
-$FILE_NAME_PRE='resolve_overlap_and_gap-pre.sql';
-print "\n Output file is $FILE_NAME_PRE \n";
-open($fh_out, ">", $FILE_NAME_PRE);
+#copy resolve_overlap_and_gap-pre-def.sql into final file (if no submodule the file from git is used)
+copy_file_into('resolve_overlap_and_gap-pre-def.sql',$fh_out);
+
+# get SQL code used by resolve for overlap gap from this repo
+# (Maybe move this code to https://github.com/NibioOpenSource/pgtopo_update_sql.git)
+copy_file_into('../../../main/extern_pgtopo_update_sql/help_tables_for_logging.sql',$fh_out);
+for my $file (glob '../../../main/extern_pgtopo_update_sql/func*') {
+	copy_file_into($file,$fh_out);
+}
+for my $file (glob '../../../main/extern_pgtopo_update_sql/view*') {
+	copy_file_into($file,$fh_out);
+}
 
 # get SQL code resolve for overlap gap 
 for my $file (glob '../../../main/sql/func*') {
 	copy_file_into($file,$fh_out);
 }
 
-#copy input file
-copy_file_into('resolve_overlap_and_gap-pre-def.sql',$fh_out);
+# get SQL code for test data needed by the tests 
 copy_file_into('overlap_gap_input_t1.sql',$fh_out);
-
 
 close($fh_out);	 
 

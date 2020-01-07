@@ -31,10 +31,12 @@ AS $$DECLARE
 	-- drop result tables
 	drop_result_tables_ boolean = true;
 	
+	-- table to keep track of results 
+	
 	
 BEGIN
 
-	-- ############################# Handle Topology 
+	-- ############################# START # Create Topology master working schema
 	-- drop schema if exists
 	IF (drop_result_tables_ = true AND (SELECT count(*) from topology.topology WHERE name = quote_literal(topology_schema_name_)) = 1 ) THEN
 		EXECUTE FORMAT('SELECT topology.droptopology(%s)',quote_literal(topology_schema_name_));
@@ -58,16 +60,15 @@ BEGIN
 	EXECUTE FORMAT('CREATE INDEX ON %s.edge_data USING GIST (geom)',topology_schema_name_);
 	EXECUTE FORMAT('CREATE INDEX ON %s.relation(element_id)',topology_schema_name_);
 	EXECUTE FORMAT('CREATE INDEX ON %s.relation(topogeo_id)',topology_schema_name_);
+	-- ----------------------------- DONE - Create Topology master working schema
 
 
 
-	-- TODO find out what to do with help tables 
-	-- /Users/lop/dev/git/topologi/skog/src/main/sql/help_tables.sql
-	-- /Users/lop/dev/git/topologi/skog/src/main/sql/table_border_line_segments.sql
+	-- TODO find out what to do with help tables, they are now created in src/main/extern_pgtopo_update_sql/help_tables_for_logging.sql
+	-- TODO what to do with /Users/lop/dev/git/topologi/skog/src/main/sql/table_border_line_segments.sql
 	
 	
-	
-	-- ############################# Handle content based grid init
+	-- ############################# START # Handle content based grid init
 	-- drop content based grid table if exits 
 	IF (drop_result_tables_ = true) THEN
 		EXECUTE FORMAT('DROP TABLE IF EXISTS %s',overlapgap_grid_);
@@ -89,21 +90,19 @@ BEGIN
 	quote_literal(table_to_resolve_ || ' ' || geo_collumn_name_)::text,
 	max_rows_in_each_cell
 	);
-	-- display
-	RAISE NOTICE 'command_string %.', command_string;
 	-- execute the sql command
 	EXECUTE command_string;
 
 	-- count number of cells in grid
 	command_string := FORMAT('SELECT count(*) from %s',overlapgap_grid_);
-	-- display
-	RAISE NOTICE 'command_string % .', command_string;
+
 	-- execute the sql command
 	EXECUTE command_string  INTO num_cells;
 	
 	-- Create Index
 	EXECUTE FORMAT('CREATE INDEX ON %s USING GIST (geom)',overlapgap_grid_);
-	
+	-- ----------------------------- DONE - Handle content based grid init
+
 	return num_cells;
 
 END;

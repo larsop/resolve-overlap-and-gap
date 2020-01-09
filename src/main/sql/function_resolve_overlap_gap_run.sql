@@ -46,10 +46,15 @@ DECLARE
 	id_list_tmp int[];
 	this_list_id int;
 	
+	-- Holds the list of func_call to run
 	stmts text[];
 
+	-- Holds the sql for a functin to call
 	func_call text;
 	
+	-- Holds the reseult from paralell calls
+	call_result boolean;
+
 	
 	-- the number of cells created in the grid
 	num_cells int;
@@ -67,20 +72,17 @@ DECLARE
 	command_string_var varchar;
 	
 	-- TODO send as parameter or compute
-	input_table_pk_column_name varchar;
+	input_table_pk_column_name varchar = 'c1';
 	
 	-- TODO send as parameter or fix in another way
-	_simplify_tolerance real = 1.0;
-	snap_tolerance real = 1.0; 
+	_simplify_tolerance double precision = 0.00001;
+	snap_tolerance double precision = 0.00001; 
 	_do_chaikins boolean = false;
 	inside_cell_data boolean = true;
 
 
-	
-	call_result boolean;
-
 BEGIN
-	
+		
 	
 	-- Call init method to create content based create and main topology schema
 	command_string := FORMAT('SELECT resolve_overlap_gap_init(%s,%s,%s,%s,%s,%s)',
@@ -169,10 +171,35 @@ BEGIN
 	RAISE NOTICE 'command_string %', command_string;
 	execute command_string;
 	
-	command_string := FORMAT('select count(*) from %s',job_list_name);
-	RAISE NOTICE 'command_string %', command_string;
-
 	-- ----------------------------- DONE - create jobList tables
+
+	
+	COMMIT;
+
+	-- ############################# START # start to run jobs in list
+
+	
+	
+
+		-- create a table to hold call stack
+	DROP TABLE IF EXISTS sql_job_list;
+	CREATE TEMP TABLE sql_job_list (func_call text);
+
+		
+	command_string := FORMAT('SELECT ARRAY(SELECT sql_to_run as func_call FROM %s WHERE block_bb is null ORDER BY md5(cell_geo::text) DESC)',job_list_name);
+	RAISE NOTICE 'command_string %', command_string;
+	execute command_string INTO stmts;
+
+	
+	
+	select execute_parallel(stmts,max_parallel_jobs_) into call_result;
+	
+	IF (call_result = false) THEN 
+		RAISE EXCEPTION 'Failed to run overlap and gap for % with the following statement list %', table_to_resolve_, stmts;
+	END IF;
+	
+
+	-- ----------------------------- DONE - start to run jobs in list
 
 
 

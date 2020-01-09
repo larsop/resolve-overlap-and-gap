@@ -179,24 +179,24 @@ BEGIN
 	-- ############################# START # start to run jobs in list
 
 	
-	
+	LOOP
 
-		-- create a table to hold call stack
-	DROP TABLE IF EXISTS sql_job_list;
-	CREATE TEMP TABLE sql_job_list (func_call text);
+		command_string := FORMAT('SELECT ARRAY(SELECT sql_to_run as func_call FROM %s WHERE block_bb is null ORDER BY md5(cell_geo::text) DESC)',job_list_name);
+		RAISE NOTICE 'command_string %', command_string;
+		execute command_string INTO stmts;
+	
+		EXIT WHEN array_length(stmts,1) is NULL OR stmts IS null;
+	
+		RAISE NOTICE 'array_length(stmts,1) %, stmts %', array_length(stmts,1), stmts ;
+	
+		select execute_parallel(stmts,max_parallel_jobs_) into call_result;
+	
+		IF (call_result = false) THEN 
+			RAISE EXCEPTION 'Failed to run overlap and gap for % with the following statement list %', table_to_resolve_, stmts;
+		END IF;
+	END LOOP;
 
-		
-	command_string := FORMAT('SELECT ARRAY(SELECT sql_to_run as func_call FROM %s WHERE block_bb is null ORDER BY md5(cell_geo::text) DESC)',job_list_name);
-	RAISE NOTICE 'command_string %', command_string;
-	execute command_string INTO stmts;
-
-	
-	
-	select execute_parallel(stmts,max_parallel_jobs_) into call_result;
-	
-	IF (call_result = false) THEN 
-		RAISE EXCEPTION 'Failed to run overlap and gap for % with the following statement list %', table_to_resolve_, stmts;
-	END IF;
+	-- create a table to hold call stack
 	
 
 	-- ----------------------------- DONE - start to run jobs in list

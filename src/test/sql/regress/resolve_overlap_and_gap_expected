@@ -1,9 +1,9 @@
-1 spheroid-true|428|462600662076
-1 transform 3035|428|462594573055
 CALL
-check overlap table|1783|19348397666
-check gap table|761|880473615091
-check grid table|28|1995881723837
-check boundery table|70|452276031212
-CALL
-Topology 'test_topo' dropped
+Topology 'test_topo_t2' dropped
+Topology 'test_topo_t2_1' dropped
+Topology 'test_topo_t2_2' dropped
+Topology 'test_topo_t2_3' dropped
+Topology 'test_topo_t2_4' dropped
+Topology 'test_topo_t2_5' dropped
+Topology 'test_topo_t2_6' dropped
+Topology 'test_topo_t2_7' dropped

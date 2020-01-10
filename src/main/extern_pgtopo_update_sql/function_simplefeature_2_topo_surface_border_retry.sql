@@ -299,7 +299,7 @@ _snap_tolerance, quote_literal(border_topo_info.topology_name), border_topo_info
  
 
     perform topo_update.clear_blocked_area(bb,_job_list_name);
-    
+
         RAISE NOTICE 'leave work at timeofday:% for layer %, with inside_cell_data %', timeofday(), border_topo_info.topology_name, inside_cell_data;
 
     return added_rows;

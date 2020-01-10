@@ -85,13 +85,14 @@ BEGIN
 		
 	
 	-- Call init method to create content based create and main topology schema
-	command_string := FORMAT('SELECT resolve_overlap_gap_init(%s,%s,%s,%s,%s,%s)',
+	command_string := FORMAT('SELECT resolve_overlap_gap_init(%s,%s,%s,%s,%s,%s,%s)',
 	quote_literal(table_to_resolve_),
 	quote_literal(geo_collumn_name_),
 	srid_,
 	max_rows_in_each_cell_,
 	quote_literal(overlapgap_grid),
-	quote_literal(topology_name_)
+	quote_literal(topology_name_),
+	snap_tolerance
 	);
 	-- execute the string
 	EXECUTE command_string INTO num_cells;

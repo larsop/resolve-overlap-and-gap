@@ -33,7 +33,7 @@ BEGIN
 		select g.*, topo_update.get_face_area(%1$s,face_id) as topo_area 
 		from (
 			select g.* FROM (	
-				select ST_Area(g.%2$s) as mbr_area, g.face_id 
+				select ST_Area(g.%2$s,false) as mbr_area, g.face_id 
 				from ( 
 					select g.face_id , g.mbr from %4$s g 
 					where ST_Intersects(g.%2$s,%3$L) 
@@ -74,7 +74,7 @@ BEGIN
 		select g.*, topo_update.get_face_area(%1$s,face_id) as topo_area 
 		from (
 			select g.* FROM (	
-				select ST_Area(g.%2$s) as mbr_area, g.face_id 
+				select ST_Area(g.%2$s,false) as mbr_area, g.face_id 
 				from ( 
 					select g.face_id , g.mbr from %4$s g 
 					where g.%2$s && %3$L and ST_Intersects(g.%2$s,%3$L) 

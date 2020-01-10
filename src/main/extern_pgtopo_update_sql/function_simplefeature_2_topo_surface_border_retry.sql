@@ -191,7 +191,7 @@ BEGIN
 WITH lg as (
 SELECT 
 topology.ST_GetFaceGeometry(%2$s,lg.face_id) as geom 
-from  %3$s.face lg where ST_Area(mbr) > 100
+from  %3$s.face lg where ST_Area(mbr,false) > 100
 ),
 lg2 as (
 select (ST_DumpRings((st_dump(lg.geom)).geom)).geom from lg where lg.geom is not null and ST_area(lg.geom) > 49

@@ -14,7 +14,7 @@ DECLARE
   BEGIN                                                                                                                       
       
 	BEGIN  
-  	face_area := ST_Area(st_getFaceGeometry(_atopology, _face_id));                                   
+  	face_area := ST_Area(st_getFaceGeometry(_atopology, _face_id),false);                                   
 
 	EXCEPTION WHEN OTHERS THEN
 		RAISE NOTICE 'WARNING failed to find area for face % ',_face_id;

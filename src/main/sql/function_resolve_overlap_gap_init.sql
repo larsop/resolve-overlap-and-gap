@@ -8,7 +8,8 @@ geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analy
 srid_ int, -- the srid for the given geo column on the table analyze
 max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes 
 overlapgap_grid_ varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
-topology_schema_name_ varchar -- The topology schema name where we store store sufaces and lines from the simple feature dataset
+topology_schema_name_ varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset
+snap_tolerance_ double precision
 );
 
 CREATE OR REPLACE FUNCTION resolve_overlap_gap_init(
@@ -17,7 +18,8 @@ geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analy
 srid_ int, -- the srid for the given geo column on the table analyze
 max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes 
 overlapgap_grid_ varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
-topology_schema_name_ varchar -- The topology schema name where we store store sufaces and lines from the simple feature dataset
+topology_schema_name_ varchar,  -- The topology schema name where we store store sufaces and lines from the simple feature dataset,
+snap_tolerance_ double precision
 )
     RETURNS INTEGER
 AS $$DECLARE
@@ -38,7 +40,7 @@ BEGIN
 
 	-- ############################# START # Create Topology master working schema
 	-- drop schema if exists
-	IF (drop_result_tables_ = true AND (SELECT count(*) from topology.topology WHERE name = quote_literal(topology_schema_name_)) = 1 ) THEN
+	IF (drop_result_tables_ = true AND (SELECT count(*) from topology.topology WHERE name = topology_schema_name_) = 1 ) THEN
 		EXECUTE FORMAT('SELECT topology.droptopology(%s)',quote_literal(topology_schema_name_));
 	END IF;
 	
@@ -46,7 +48,7 @@ BEGIN
 	EXECUTE FORMAT('DROP SCHEMA IF EXISTS %s CASCADE',topology_schema_name_);
 
 	-- create topology 
-	EXECUTE FORMAT('SELECT topology.createtopology(%s)',quote_literal(topology_schema_name_));
+	EXECUTE FORMAT('SELECT topology.createtopology(%s,%s,%s)',quote_literal(topology_schema_name_),4258,snap_tolerance_);
 	
 	-- Set unlogged to increase performance 
 	EXECUTE FORMAT('ALTER TABLE %s.edge_data SET unlogged',topology_schema_name_);
@@ -115,6 +117,7 @@ geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analy
 srid_ int, -- the srid for the given geo column on the table analyze
 max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes 
 overlapgap_grid_ varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
-topology_schema_name_ varchar -- The topology schema name where we store store sufaces and lines from the simple feature dataset
+topology_schema_name_ varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset
+snap_tolerance_ double precision
 ) TO public;
 

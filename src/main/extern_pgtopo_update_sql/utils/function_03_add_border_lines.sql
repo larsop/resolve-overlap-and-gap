@@ -27,7 +27,7 @@ update_egde_id = 0;
 		from %s.edge_data e
 		where e.geom && _new_line
 		and ST_Intersects(e.geom,_new_line)
-		limit 1',quote_literal(_topology_name));
+		limit 1',_topology_name);
 		execute command_string into update_egde_id,old_egde_geom;
 
 
@@ -61,7 +61,7 @@ update_egde_id = 0;
 		
 
 		IF new_egde_geom is NOT null THEN
-			command_string := format('select TopoGeo_addLinestring(%s,%L,%s)',new_egde_geom,_snap_tolerance,quote_literal(_topology_name));
+			command_string := format('select topology.TopoGeo_addLinestring(%s,%L,%s)',new_egde_geom,_snap_tolerance,quote_literal(_topology_name));
 			execute command_string;
 		END IF;
 		
@@ -71,7 +71,7 @@ update_egde_id = 0;
 
 	EXCEPTION WHEN OTHERS THEN
 
-		RAISE NOTICE 'failed  ::::::::::::::::::::::::::::::::::::::::::::::::::: % for edge_id % ', ST_GeometryType(new_egde_geom), update_egde_id;
+		RAISE NOTICE 'failed topo_update.add_border_lines ::::::::::::::::::::::::::::::::::::::::::::::::::: % for edge_id % ', ST_GeometryType(new_egde_geom), update_egde_id;
 		    
 	-- ERROR:  XX000: SQL/MM Spatial exception - coincident node
 		BEGIN

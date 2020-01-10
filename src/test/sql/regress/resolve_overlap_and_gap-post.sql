@@ -6,7 +6,8 @@ geo_collumn_name_ varchar, 	-- the name of geometry column on the table to analy
 srid_ int, -- the srid for the given geo column on the table analyze
 max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes 
 overlapgap_grid_ varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
-topology_schema_name_ varchar -- The topology schema name where we store store sufaces and lines from the simple feature dataset
+topology_schema_name_ varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset
+snap_tolerance_ double precision
 );
 
 DROP PROCEDURE IF EXISTS resolve_overlap_gap_run(

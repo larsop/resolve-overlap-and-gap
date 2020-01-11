@@ -1,4 +1,6 @@
 CALL
+check_border_lines|38
+check_added_lines|73
 Topology 'test_topo_t2' dropped
 Topology 'test_topo_t2_1' dropped
 Topology 'test_topo_t2_2' dropped

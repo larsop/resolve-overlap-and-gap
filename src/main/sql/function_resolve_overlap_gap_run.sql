@@ -100,86 +100,29 @@ BEGIN
 	
 	-- ############################# START # create jobList tables
 
-	command_string := FORMAT('DROP table if exists %s',job_list_name);
-	RAISE NOTICE 'command_string %', command_string;
-	execute command_string;
-
-	-- TODO handle SRID
-	command_string := FORMAT('CREATE table %s(id serial, start_time timestamp with time zone, sql_to_block varchar, sql_to_run varchar, cell_geo geometry(geometry,4258),block_bb Geometry(geometry,4258))',job_list_name);
-	RAISE NOTICE 'command_string %', command_string;
-	execute command_string;
-	
-	-- create a table for don jobs
-	command_string := FORMAT('DROP table if exists %s',job_list_name||'_donejobs');
-	RAISE NOTICE 'command_string %', command_string;
-	execute command_string;
-	
-	command_string := FORMAT('CREATE table %s(id int, done_time timestamp with time zone default clock_timestamp())'
-	,job_list_name||'_donejobs');
-	RAISE NOTICE 'command_string %', command_string;
-	execute command_string;
-
-	sql_to_block_cmd := FORMAT('select topo_update.set_blocked_area(%s,%s,%s,%s,',
-	quote_literal(table_to_resolve_),
-	quote_literal(geo_collumn_name_),
-	quote_literal(input_table_pk_column_name),
-	quote_literal(job_list_name)
-	);
-
-	command_string_var := FORMAT('SELECT topo_update.simplefeature_c2_topo_surface_border_retry(%s,%s,%s,%s,%s,%s,%s,%s,', 
-	quote_literal(table_to_resolve_),
-	quote_literal(geo_collumn_name_),
-	quote_literal(input_table_pk_column_name),
-	quote_literal(topology_name_),
-	_simplify_tolerance,
-	snap_tolerance, 
-	quote_literal(_do_chaikins),
-	quote_literal(job_list_name)
-	);
-	
-	RAISE NOTICE 'command_string_var %', command_string_var;
-	
-	-- add inside cell polygons
-	-- TODO solve how to find r.geom
-	command_string := FORMAT('
-	INSERT INTO %s(sql_to_run,cell_geo,sql_to_block) 
-	SELECT %s||quote_literal(r.geom::varchar)||%s as sql_to_run, r.geom as cell_geo, %s||quote_literal(r.geom::varchar)||%s as sql_to_block
-	FROM %s r',
+	command_string := FORMAT('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%s,%L,%L)',
+	table_to_resolve_,
+	geo_collumn_name_,
+	srid_,
+	overlapgap_grid,
+	topology_name_,
 	job_list_name,
-	quote_literal(command_string_var),
-	quote_literal(','||inside_cell_data||');'),
-	quote_literal(sql_to_block_cmd),
-	quote_literal(');'),
-	overlapgap_grid
-	);
-	RAISE NOTICE 'command_string %', command_string;
-	execute command_string;
+	input_table_pk_column_name,
+	_simplify_tolerance,
+	snap_tolerance,
+	_do_chaikins,
+	inside_cell_data);
+	
+	EXECUTE command_string;
 
-
-	command_string := FORMAT('CREATE INDEX ON %s USING GIST (cell_geo);',job_list_name);
-	RAISE NOTICE 'command_string %', command_string;
-	execute command_string;
-	
-	command_string := FORMAT('CREATE INDEX ON %s USING GIST (block_bb);',job_list_name);
-	RAISE NOTICE 'command_string %', command_string;
-	execute command_string;
-	
-	command_string := FORMAT('CREATE INDEX ON %s (id);',job_list_name);
-	RAISE NOTICE 'command_string %', command_string;
-	execute command_string;
-	
-	command_string := FORMAT('CREATE INDEX ON %s (id);',job_list_name||'_donejobs');
-	RAISE NOTICE 'command_string %', command_string;
-	execute command_string;
-	
 	-- ----------------------------- DONE - create jobList tables
 
 	
 	COMMIT;
 
-	-- ############################# START # start to run jobs in list
-
-	
+	-- ############################# START # add lines inside box and cut lines and save then in separate table, 
+	-- lines maybe simplified in this process also, but not the lines that are close to a border
+	-- TODO REMOVE LOOP
 	LOOP
 
 		command_string := FORMAT('SELECT ARRAY(SELECT sql_to_run as func_call FROM %s WHERE block_bb is null ORDER BY md5(cell_geo::text) DESC)',job_list_name);
@@ -196,11 +139,10 @@ BEGIN
 			RAISE EXCEPTION 'Failed to run overlap and gap for % with the following statement list %', table_to_resolve_, stmts;
 		END IF;
 	END LOOP;
+	-- ----------------------------- DONE # add lines inside box and cut lines and save then in separate table, 
 
-	-- create a table to hold call stack
-	
 
-	-- ----------------------------- DONE - start to run jobs in list
+	-- ############################# START # add border lines saved in last run, we will here connect data from the different cell using he border lines. 
 
 
 
@@ -220,7 +162,7 @@ table_name_result_prefix_ varchar, -- This is table name prefix including schema
 -- NB. Any exting data will related to this table names will be deleted 
 
 
-topology_name varchar,  -- The topology schema name where we store store sufaces and lines from the simple feature dataset.
+topology_name_ varchar,  -- The topology schema name where we store store sufaces and lines from the simple feature dataset.
 -- NB. Any exting data will related to topology_name will be deleted 
 
 max_parallel_jobs_ int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections

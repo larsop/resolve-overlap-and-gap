@@ -15,30 +15,16 @@ create
 		) language 'plpgsql' as $function$ 
 declare 
 
-command_string text;
-bb_outer_geom geometry;
-
 begin 
---TODO fix use dynamic sql
-	command_string := FORMAT('RETURN QUERY SELECT 
+	
+	RETURN QUERY EXECUTE 'SELECT 
 	distinct lg3.geo 
 	FROM topo_update.border_line_segments lg3
-	where ST_IsValid(lg3.geo) and ST_Intersects(lg3.geo,_bb)
+	where ST_IsValid(lg3.geo) and ST_Intersects(lg3.geo,$1)
 	and (
-	ST_StartPoint(lg3.geo) && _bb or 
-	(ST_EndPoint(lg3.geo) && _bb and NOT EXISTS (SELECT 1 FROM %s gt where ST_StartPoint(lg3.geo) && gt.geom))
-	)',overlapgap_grid_);
-	
-    RAISE NOTICE 'zzzzzcommand_string %', command_string;
-	
-	RETURN QUERY SELECT 
-	distinct lg3.geo 
-	FROM topo_update.border_line_segments lg3
-	where ST_IsValid(lg3.geo) and ST_Intersects(lg3.geo,_bb)
-	and (
-	ST_StartPoint(lg3.geo) && _bb or 
-	(ST_EndPoint(lg3.geo) && _bb and NOT EXISTS (SELECT 1 FROM test_data.overlap_gap_input_t2_res_grid gt where ST_StartPoint(lg3.geo) && gt.geom))
-	);
+	ST_StartPoint(lg3.geo) && $1 or 
+	(ST_EndPoint(lg3.geo) && $1 and NOT EXISTS (SELECT 1 FROM '||overlapgap_grid_||' gt where ST_StartPoint(lg3.geo) && gt.geom))
+	)' USING _bb;
 
 end $function$;
 

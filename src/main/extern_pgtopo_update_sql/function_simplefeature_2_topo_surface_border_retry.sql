@@ -63,8 +63,13 @@ DECLARE
    snap_tolerance_fixed float = 0.000001;
    glue_snap_tolerance_fixed float = 0.0000001;
    
+   -- Move a parameter
+   overlapgap_grid varchar  = 'test_data.overlap_gap_input_t2_res_grid';
+   
 
 BEGIN 
+	 RAISE NOTICE 'start wwork at timeofday:% for layer %, with inside_cell_data %', timeofday(),  _topology_name||'_' , inside_cell_data;
+
 
         -- check if job is done already
         command_string := format('select count(*) from %s as gt, %s as done
@@ -249,6 +254,7 @@ _snap_tolerance, quote_literal(border_topo_info.topology_name), border_topo_info
                 END;
         ELSE
 
+        -- on cell border
                 -- test with  area to block like bb
         -- area_to_block := bb;
         -- count the number of rows that intersects
@@ -266,11 +272,10 @@ _snap_tolerance, quote_literal(border_topo_info.topology_name), border_topo_info
 
                 -- NB We have to use fixed snap to here to be sure that lines snapp
                 command_string := format(
-                'SELECT topo_update.do_add_border_lines(_topology_name,%L,%s)',bb,snap_tolerance_fixed);
+                'SELECT topo_update.add_border_lines(%1$L,geo,%3$s) from topo_update.get_left_over_borders(%4$L,%2$L)',_topology_name,bb,snap_tolerance_fixed,overlapgap_grid);
                 EXECUTE command_string;
 
-                
-        
+
         END IF;
 
         RAISE NOTICE 'done work at timeofday:% for layer %, with inside_cell_data %', timeofday(), border_topo_info.topology_name, inside_cell_data;

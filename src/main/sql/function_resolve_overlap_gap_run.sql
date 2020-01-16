@@ -144,8 +144,44 @@ BEGIN
 
 	-- ############################# START # add border lines saved in last run, we will here connect data from the different cell using he border lines. 
 
+	inside_cell_data := false;
+	command_string := FORMAT('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%s,%L,%L)',
+	table_to_resolve_,
+	geo_collumn_name_,
+	srid_,
+	overlapgap_grid,
+	topology_name_,
+	job_list_name,
+	input_table_pk_column_name,
+	_simplify_tolerance,
+	snap_tolerance,
+	_do_chaikins,
+	inside_cell_data);
+	
+	EXECUTE command_string;
+
+	COMMIT;
 
 
+	-- ############################# START # add lines inside box and cut lines and save then in separate table, 
+	-- lines maybe simplified in this process also, but not the lines that are close to a border
+	-- TODO REMOVE LOOP
+	LOOP
+
+		command_string := FORMAT('SELECT ARRAY(SELECT sql_to_run as func_call FROM %s WHERE block_bb is null ORDER BY md5(cell_geo::text) DESC)',job_list_name);
+		RAISE NOTICE 'command_string %', command_string;
+		execute command_string INTO stmts;
+	
+		EXIT WHEN array_length(stmts,1) is NULL OR stmts IS null;
+	
+		RAISE NOTICE 'array_length(stmts,1) %, stmts %', array_length(stmts,1), stmts ;
+	
+		select execute_parallel(stmts,max_parallel_jobs_) into call_result;
+	
+		IF (call_result = false) THEN 
+			RAISE EXCEPTION 'Failed to run overlap and gap for % with the following statement list %', table_to_resolve_, stmts;
+		END IF;
+	END LOOP;
 
 
 END $$;

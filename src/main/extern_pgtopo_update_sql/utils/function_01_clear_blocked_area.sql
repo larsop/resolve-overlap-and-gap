@@ -5,11 +5,7 @@ CREATE OR REPLACE FUNCTION topo_update.clear_blocked_area (bb geometry, _job_lis
   LANGUAGE 'plpgsql'
   AS $function$
 DECLARE
-  grid_lines Geometry(LineString, 25832);
   command_string text;
-  get_boundery_function text = 'ST_Multi';
-  data_env geometry;
-  num_rows int;
 BEGIN
   --	execute command_string;
   command_string := Format('insert into %s(id) select gt.id from %s as gt

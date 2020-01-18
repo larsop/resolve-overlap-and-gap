@@ -4,14 +4,8 @@ CREATE OR REPLACE FUNCTION topo_update.do_remove_small_areas_no_block (_atopolog
   AS $function$
 DECLARE
   command_string text;
-  data_env geometry;
   num_rows int;
   num_rows_total int = 0;
-  maxtolerance float8 = 5.0;
-  area_to_block geometry;
-  is_done integer = 0;
-  num_boxes_intersect integer;
-  num_boxes_free integer;
 BEGIN
   -- remove small poluygins if they dont't overlap
   LOOP

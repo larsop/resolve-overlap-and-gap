@@ -12,22 +12,8 @@ CREATE OR REPLACE FUNCTION topo_update.create_nocutline_edge_domain_try_one (bor
   )
   AS $$
 DECLARE
-  v_error_stack text;
-  -- this is the tolerance used for snap to
-  -- TODO use as parameter put for testing we just have here for now
-  -- border_topo_info topo_update.input_meta_info ;
-  -- holds dynamic sql to be able to use the same code for different
   command_string text;
   -- the number times the input line intersects
-  num_edge_intersects int;
-  -- holds the value for felles egenskaper from input
-  felles_egenskaper_linje topo_rein.sosi_felles_egenskaper;
-  -- array of quoted field identifiers
-  -- for attribute fields passed in by user and known (by name)
-  -- in the target table
-  not_null_fields text[];
-  -- holde the computed value for json input reday to use
-  --json_input_structure topo_update.json_input_structure;
 BEGIN
   -- Convert geometry to TopoGeometry, write it in the temp table
   command_string := Format('select topology.TopoGeo_AddLineString(%L, %L, %L)', border_topo_info.topology_name, json_input_structure.input_geo, border_topo_info.snap_tolerance);

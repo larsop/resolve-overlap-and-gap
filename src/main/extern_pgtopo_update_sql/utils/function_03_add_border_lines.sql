@@ -1,6 +1,8 @@
 -- The name is woring used for adding both border lines and other lines
 DROP FUNCTION IF EXISTS topo_update.add_border_lines (_topology_name character varying, _new_line geometry, _snap_tolerance float);
 
+-- TODO add code for simple_add_v2
+-- TODO add code for get_single_lineparts
 CREATE OR REPLACE FUNCTION topo_update.add_border_lines (_topology_name character varying, _new_line geometry, _snap_tolerance float)
   RETURNS integer
   AS $$

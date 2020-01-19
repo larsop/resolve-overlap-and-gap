@@ -1,8 +1,13 @@
 /**
- * This used is inside 
+ * This is safe to use inside a cell not connedted to other cell or using single threa on a single layer 
+ * 
  */
-CREATE OR REPLACE FUNCTION topo_update.do_remove_small_areas_no_block (_atopology varchar, input_table_name varchar, 
-input_table_geo_column_name varchar, input_table_pk_column_name varchar, _job_list_name varchar, bb geometry)
+
+-- TODO _table_name find based om topolygy name
+-- TODO add  _min_area float as parameter and use relative mbr area
+
+
+CREATE OR REPLACE FUNCTION topo_update.do_remove_small_areas_no_block (_atopology varchar, _min_area float, _table_name varchar, _bb geometry)
   RETURNS integer
   LANGUAGE 'plpgsql'
   AS $function$
@@ -10,27 +15,29 @@ DECLARE
   command_string text;
   num_rows int;
   num_rows_total int = 0;
+  -- Based on testing and it's not accurate at all
+  min_mbr_area float = _min_area * 20;
 BEGIN
   LOOP
-    command_string := Format('select sum(topo_update.removes_tiny_polygons(%1$s,face_id,topo_area,49.0)) 
+    command_string := Format('select sum(topo_update.removes_tiny_polygons(%1$s,face_id,topo_area,%2$s)) 
  	from ( 
  		select g.*, topo_update.get_face_area(%1$s,face_id) as topo_area 
  		from (
  			select g.* FROM (	
- 				select ST_Area(g.%2$s,false) as mbr_area, g.face_id 
+ 				select ST_Area(g.mbr,false) as mbr_area, g.face_id 
  				from ( 
- 					select g.face_id , g.mbr from %4$s g 
- 					where g.%2$s && %3$L and ST_Intersects(g.%2$s,%3$L) 
+ 					select g.face_id , g.mbr from %3$s g 
+ 					where g.mbr && %4$L and ST_Intersects(g.mbr,%4$L) 
  				) as g
  			) as g
- 			where  g.mbr_area < 1000 
+ 			where  g.mbr_area < %5$s 
  		) as g
  	) as g
- 	where g.topo_area < 49', Quote_literal(_atopology), input_table_geo_column_name, bb, input_table_name);
+ 	where g.topo_area < %2$s', Quote_literal(_atopology), _min_area, _table_name, _bb, min_mbr_area);
     -- with 4000 it's to slow
     RAISE NOTICE 'execute command_string; %', command_string;
     EXECUTE command_string INTO num_rows;
-    RAISE NOTICE 'removed num_rows v3 % tiny polygons from %', num_rows, input_table_name;
+    RAISE NOTICE 'removed num_rows v3 % tiny polygons from %', num_rows, _table_name;
     IF num_rows = 0 OR num_rows IS NULL THEN
       EXIT;
       -- exit loop

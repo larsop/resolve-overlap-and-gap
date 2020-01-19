@@ -1,13 +1,6 @@
 -- check if this geo ovetlaps with data in org layer
-DROP FUNCTION IF EXISTS topo_update.removes_tiny_polygons (_face_id int);
 
-DROP FUNCTION IF EXISTS topo_update.removes_tiny_polygons (_atopology varchar, _face_id int);
-
-DROP FUNCTION IF EXISTS topo_update.removes_tiny_polygons (_atopology varchar, _face_id int, topo_area float);
-
-DROP FUNCTION IF EXISTS topo_update.removes_tiny_polygons (_atopology varchar, _face_id int, topo_area float, _min_area float);
-
-CREATE OR REPLACE FUNCTION topo_update.removes_tiny_polygons (_atopology varchar, _face_id int, topo_area float, _min_area float)
+CREATE OR REPLACE FUNCTION topo_update.removes_tiny_polygons (_atopology varchar, _face_id int, _topo_area float, _min_area float)
   RETURNS int
   AS $$
 DECLARE
@@ -16,7 +9,7 @@ DECLARE
   remove_edge int;
   remove_count int = 0;
 BEGIN
-  IF (topo_area < _min_area) THEN
+  IF (_topo_area < _min_area) THEN
     BEGIN
       command_string := Format('select edge_id FROM (                                                     
    SELECT edge_id, ST_length(geom)  as edge_length from %1$s.edge_data 
@@ -41,5 +34,3 @@ END;
 $$
 LANGUAGE plpgsql;
 
---}
---select topo_update.removes_tiny_polygons('topo_ar5_forest_sysdata_35',14,100);

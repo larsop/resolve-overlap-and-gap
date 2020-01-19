@@ -39,6 +39,8 @@ DECLARE
   glue_snap_tolerance_fixed float = 0.0000001;
   -- Move a parameter
   overlapgap_grid varchar = 'test_data.overlap_gap_input_t2_res_grid';
+  -- TODO add as parameter
+  min_area float = 49;
 BEGIN
   RAISE NOTICE 'start wwork at timeofday:% for layer %, with inside_cell_data %', Timeofday(), _topology_name || '_', inside_cell_data;
   -- check if job is done already
@@ -112,8 +114,7 @@ BEGIN
     start_remove_small := Clock_timestamp();
     RAISE NOTICE 'Start clean small polygons for face_table_name % at %', face_table_name, Clock_timestamp();
     -- remove small polygons in temp
-    num_rows_removed := topo_update.do_remove_small_areas_no_block (border_topo_info.topology_name, face_table_name, 'mbr', 'face_id',
-      _job_list_name, bb);
+    num_rows_removed := topo_update.do_remove_small_areas_no_block (border_topo_info.topology_name, min_area, face_table_name,bb);
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
     RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
     -- get valid faces and thise eges that touch out biedery

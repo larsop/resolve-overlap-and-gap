@@ -1,8 +1,6 @@
--- check if this geo ovetlaps with data in org layer
-DROP FUNCTION IF EXISTS topo_update.get_face_area (_face_id int);
-
-DROP FUNCTION IF EXISTS topo_update.get_face_area (_atopology varchar, _face_id int);
-
+/**
+ * Get face area in meter, exception return 0
+ */
 CREATE OR REPLACE FUNCTION topo_update.get_face_area (_atopology varchar, _face_id int)
   RETURNS float
   AS $$
@@ -25,5 +23,3 @@ $$
 LANGUAGE plpgsql
 STABLE;
 
---}
---select topo_update.get_face_area('topo_ar5_forest_sysdata',456343);

@@ -1,5 +1,6 @@
--- check if this geo ovetlaps with data in org layer
-
+/**
+ * Remove egde make new face
+ */
 CREATE OR REPLACE FUNCTION topo_update.removes_tiny_polygons (_atopology varchar, _face_id int, _topo_area float, _min_area float)
   RETURNS int
   AS $$

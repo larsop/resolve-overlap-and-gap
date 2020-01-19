@@ -6,7 +6,7 @@ mkdir loader
 ln -s /usr/local/bin/shp2pgsql loader
 ln -s /usr/local/bin/pgsql2shp loader
 mkdir -p regress/00-regress-install/share/contrib
-ln -s /usr/local/Cellar/postgis/2.5.2_2/share/postgis regress/00-regress-install/share/contrib/
+ln -s /usr/local/Cellar/postgis/3.0.0/share/postgis regress/00-regress-install/share/contrib/
 
 You may also need to set 
 export POSTGIS_SCRIPT_DIR=/usr/local/Cellar/postgis/2.2.1/share/postgis/

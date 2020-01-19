@@ -113,7 +113,7 @@ BEGIN
     RAISE NOTICE 'Start clean small polygons for face_table_name % at %', face_table_name, Clock_timestamp();
     -- remove small polygons in temp
     num_rows_removed := topo_update.do_remove_small_areas_no_block (border_topo_info.topology_name, face_table_name, 'mbr', 'face_id',
-      _job_list_name, bb, TRUE);
+      _job_list_name, bb);
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
     RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
     -- get valid faces and thise eges that touch out biedery

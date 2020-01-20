@@ -7,7 +7,7 @@
 -- TODO add  _min_area float as parameter and use relative mbr area
 
 
-CREATE OR REPLACE FUNCTION topo_update.do_remove_small_areas_no_block (_atopology varchar, _min_area float, _table_name varchar, _bb geometry)
+CREATE OR REPLACE FUNCTION topo_update.do_remove_small_areas_no_block (_atopology varchar, _min_area float, _table_name varchar, _bb geometry, _utm boolean)
   RETURNS integer
   LANGUAGE 'plpgsql'
   AS $function$
@@ -21,10 +21,16 @@ BEGIN
   LOOP
     command_string := Format('select sum(topo_update.removes_tiny_polygons(%1$s,face_id,topo_area,%2$s)) 
  	from ( 
- 		select g.*, topo_update.get_face_area(%1$s,face_id) as topo_area 
+ 		select g.*, topo_update.get_face_area(%1$s,face_id, %6$L) as topo_area 
  		from (
- 			select g.* FROM (	
- 				select ST_Area(g.mbr,false) as mbr_area, g.face_id 
+ 			select g.* FROM (
+                SELECT CASE 
+                WHEN %6$L = false THEN 
+                  ST_Area(g.mbr,FALSE) 
+                ELSE 
+                  ST_Area(g.mbr)
+                END AS mbr_area,
+                g.face_id 
  				from ( 
  					select g.face_id , g.mbr from %3$s g 
  					where g.mbr && %4$L and ST_Intersects(g.mbr,%4$L) 
@@ -33,7 +39,7 @@ BEGIN
  			where  g.mbr_area < %5$s 
  		) as g
  	) as g
- 	where g.topo_area < %2$s', Quote_literal(_atopology), _min_area, _table_name, _bb, min_mbr_area);
+ 	where g.topo_area < %2$s', Quote_literal(_atopology), _min_area, _table_name, _bb, min_mbr_area, _utm);
     -- with 4000 it's to slow
     RAISE NOTICE 'execute command_string; %', command_string;
     EXECUTE command_string INTO num_rows;

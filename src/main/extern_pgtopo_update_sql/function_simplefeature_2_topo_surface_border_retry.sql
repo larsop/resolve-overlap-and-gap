@@ -5,6 +5,7 @@ CREATE OR REPLACE PROCEDURE topo_update.simplefeature_c2_topo_surface_border_ret
   _topology_schema_name varchar, -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,
   _topology_name character varying, 
   _srid int,
+  _utm boolean,
   _simplify_tolerance double precision, 
   _snap_tolerance double precision, 
   _do_chaikins boolean, 
@@ -35,6 +36,7 @@ DECLARE
   -- This is used when adding lines hte tolrannce is different when adding lines inside and box and the border;
   snap_tolerance_fixed float =      _snap_tolerance;
   glue_snap_tolerance_fixed float = _snap_tolerance/10000;
+  
   
 BEGIN
   RAISE NOTICE 'start wwork at timeofday:% for layer %, with inside_cell_data %', Timeofday(), _topology_name || '_', inside_cell_data;
@@ -110,7 +112,7 @@ BEGIN
     start_remove_small := Clock_timestamp();
     RAISE NOTICE 'Start clean small polygons for face_table_name % at %', face_table_name, Clock_timestamp();
     -- remove small polygons in temp
-    num_rows_removed := topo_update.do_remove_small_areas_no_block (border_topo_info.topology_name, _min_area_to_keep, face_table_name,bb);
+    num_rows_removed := topo_update.do_remove_small_areas_no_block (border_topo_info.topology_name, _min_area_to_keep, face_table_name,bb,_utm);
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
     RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
     -- get valid faces and thise eges that touch out biedery
@@ -194,8 +196,8 @@ BEGIN
   -- this is used for debug
   IF used_time > 10 THEN
     RAISE NOTICE 'very long a set of lines % time with geo for bb % ', used_time, bb;
-    INSERT INTO topo_update.long_time_log2 (execute_time, info, sql, geo)
-      VALUES (used_time, 'simplefeature_c2_topo_surface_border_retry', command_string, bb);
+    EXECUTE FORMAT('INSERT INTO %s.long_time_log2 (execute_time, info, sql, geo) VALUES (%s, %L, %L, %L)',
+    _topology_schema_name,used_time,'simplefeature_c2_topo_surface_border_retry',command_string,bb);  
   END IF;
   PERFORM topo_update.clear_blocked_area (bb, _job_list_name);
   RAISE NOTICE 'leave work at timeofday:% for layer %, with inside_cell_data %', Timeofday(), border_topo_info.topology_name, inside_cell_data;

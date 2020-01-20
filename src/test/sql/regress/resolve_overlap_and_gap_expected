@@ -1,4 +1,8 @@
 CALL
-check_border_lines|38
-check_added_lines|136
-Topology 'test_topo_t2' dropped
+degrees_check_border_lines|38
+degrees_check_added_lines|136
+degrees|Topology 'test_topo_t2' dropped
+CALL
+utm_check_border_lines|38
+utm_check_added_lines|136
+utm|Topology 'test_topo_t3' dropped

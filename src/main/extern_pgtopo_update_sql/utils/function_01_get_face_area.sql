@@ -1,7 +1,7 @@
 /**
  * Get face area in meter, exception return 0
  */
-CREATE OR REPLACE FUNCTION topo_update.get_face_area (_atopology varchar, _face_id int)
+CREATE OR REPLACE FUNCTION topo_update.get_face_area(_atopology varchar, _face_id int, utm boolean)
   RETURNS float
   AS $$
 DECLARE
@@ -10,7 +10,11 @@ DECLARE
   face_area float = 0;
 BEGIN
   BEGIN
-    face_area := ST_Area (st_getFaceGeometry (_atopology, _face_id), FALSE);
+	IF (utm = false) THEN
+      face_area := ST_Area (st_getFaceGeometry (_atopology, _face_id), FALSE);
+    ELSE
+      face_area := ST_Area (st_getFaceGeometry (_atopology, _face_id)); 
+    END IF;
     EXCEPTION
     WHEN OTHERS THEN
       RAISE NOTICE 'WARNING failed to find area for face % ', _face_id;

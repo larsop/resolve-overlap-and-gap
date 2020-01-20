@@ -54,19 +54,12 @@ BEGIN
     EXECUTE command_string INTO box_id;
     border_topo_info.topology_name := _topology_name || '_' || box_id;
     RAISE NOTICE 'use border_topo_info.topology_name %', border_topo_info.topology_name;
-    BEGIN
-      PERFORM topology.DropTopology (border_topo_info.topology_name);
-      EXECUTE command_string INTO box_id;
-      EXCEPTION
-      WHEN OTHERS THEN
-        RAISE NOTICE 'failed to drop topology % ', border_topo_info.topology_name;
-      END;
       
-    --IF ((SELECT Count(*) FROM topology.topology WHERE name = border_topo_info.topology_name) = 1) THEN
-    --  EXECUTE Format('SELECT topology.droptopology(%s)', Quote_literal(border_topo_info.topology_name));
-    --END IF;
-    -- drop this schema in case it exists
-    --EXECUTE Format('DROP SCHEMA IF EXISTS %s CASCADE', topology_schema_name_);
+    IF ((SELECT Count(*) FROM topology.topology WHERE name = border_topo_info.topology_name) = 1) THEN
+      EXECUTE Format('SELECT topology.droptopology(%s)', Quote_literal(border_topo_info.topology_name));
+    END IF;
+    --drop this schema in case it exists
+    EXECUTE Format('DROP SCHEMA IF EXISTS %s CASCADE', border_topo_info.layer_schema_name);
 
     PERFORM topology.CreateTopology (border_topo_info.topology_name, 4258, snap_tolerance_fixed);
     EXECUTE Format('ALTER table %s.edge_data set unlogged', border_topo_info.topology_name);

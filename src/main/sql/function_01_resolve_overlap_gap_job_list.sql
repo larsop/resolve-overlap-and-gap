@@ -31,8 +31,8 @@ BEGIN
   command_string := Format('DROP table if exists %s', job_list_name_);
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
-  -- TODO handle SRID
-  command_string := Format('CREATE unlogged table %s(id serial, start_time timestamp with time zone, sql_to_block varchar, sql_to_run varchar, cell_geo geometry(geometry,4258),block_bb Geometry(geometry,4258))', job_list_name_);
+  command_string := Format('CREATE unlogged table %s(id serial, start_time timestamp with time zone, sql_to_block varchar, sql_to_run varchar, cell_geo geometry(geometry,%s),block_bb Geometry(geometry,%s))',
+  job_list_name_,_srid,_srid);
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
   -- create a table for don jobs

@@ -4,7 +4,7 @@ _bb geometry,
 _topology_schema_name varchar -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,
 )
   RETURNS TABLE (
-    geo Geometry(LineString, 4258))
+    geo Geometry(LineString))
   LANGUAGE 'plpgsql'
   AS $function$
 DECLARE

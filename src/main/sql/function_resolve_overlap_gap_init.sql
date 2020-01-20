@@ -1,21 +1,15 @@
 -- this is internal helper function
 -- this is a function that creates unlogged tables and the the grid neeed when later checking this table for overlap and gaps.
 
-DROP FUNCTION IF EXISTS resolve_overlap_gap_init (table_to_resolve_ varchar, -- The schema.table name with polygons to analyze for gaps and intersects
-  geo_collumn_name_ varchar, -- the name of geometry column on the table to analyze
-  srid_ int, -- the srid for the given geo column on the table analyze
-  max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes
-  overlapgap_grid_ varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
-  topology_schema_name_ varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset
-  snap_tolerance_ double precision);
-
-CREATE OR REPLACE FUNCTION resolve_overlap_gap_init (table_to_resolve_ varchar, -- The schema.table name with polygons to analyze for gaps and intersects
+CREATE OR REPLACE FUNCTION resolve_overlap_gap_init (
+table_to_resolve_ varchar, -- The schema.table name with polygons to analyze for gaps and intersects
 geo_collumn_name_ varchar, -- the name of geometry column on the table to analyze
 srid_ int, -- the srid for the given geo column on the table analyze
 max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes
 overlapgap_grid_ varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
 topology_schema_name_ varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset,
-snap_tolerance_ double precision)
+snap_tolerance_ double precision
+)
   RETURNS INTEGER
   AS $$
 DECLARE

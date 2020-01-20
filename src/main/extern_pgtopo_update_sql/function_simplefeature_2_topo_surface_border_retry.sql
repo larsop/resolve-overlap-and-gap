@@ -6,6 +6,7 @@ CREATE OR REPLACE PROCEDURE topo_update.simplefeature_c2_topo_surface_border_ret
   _simplify_tolerance double precision, 
   _snap_tolerance double precision, 
   _do_chaikins boolean, 
+  _min_area_to_keep float,
   _job_list_name character varying, 
   overlapgap_grid varchar,
   bb geometry,
@@ -33,7 +34,7 @@ DECLARE
   snap_tolerance_fixed float = 0.000001;
   glue_snap_tolerance_fixed float = 0.0000001;
   -- TODO add as parameter
-  min_area float = 49;
+  _min_area_to_keep float = 49;
 BEGIN
   RAISE NOTICE 'start wwork at timeofday:% for layer %, with inside_cell_data %', Timeofday(), _topology_name || '_', inside_cell_data;
   -- check if job is done already
@@ -107,7 +108,7 @@ BEGIN
     start_remove_small := Clock_timestamp();
     RAISE NOTICE 'Start clean small polygons for face_table_name % at %', face_table_name, Clock_timestamp();
     -- remove small polygons in temp
-    num_rows_removed := topo_update.do_remove_small_areas_no_block (border_topo_info.topology_name, min_area, face_table_name,bb);
+    num_rows_removed := topo_update.do_remove_small_areas_no_block (border_topo_info.topology_name, _min_area_to_keep, face_table_name,bb);
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
     RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
     -- get valid faces and thise eges that touch out biedery

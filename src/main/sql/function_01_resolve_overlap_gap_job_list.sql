@@ -1,18 +1,6 @@
 -- This is the main funtion used resolve overlap and gap
-DROP FUNCTION IF EXISTS resolve_overlap_gap_job_list (table_to_resolve_ varchar, -- The table to resolve
-  geo_collumn_name_ varchar, -- the name of geometry column on the table to analyze
-  srid_ int, -- the srid for the given geo column on the table analyze
-  overlapgap_grid_ varchar, -- the name of the content based grid table
-  topology_name_ varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset. -- NB. Any exting data will related to topology_name will be deleted
-  job_list_name_ varchar, -- the name of job_list table, this table is ued to track of done jobs
-  input_table_pk_column_name_ varchar, -- the nam eof the promary collum
-  simplify_tolerance_ double precision, -- the tolerance to be used when creating topolayer
-  snap_tolerance_ double precision, -- the tolrence to be used when add data
-  do_chaikins_ boolean, -- simlyfy lines by using chaikins and simlify
-  inside_cell_data_ boolean -- add lines inside cell, or boderlines
-);
-
-CREATE OR REPLACE FUNCTION resolve_overlap_gap_job_list (table_to_resolve_ varchar, -- The table to resolve
+CREATE OR REPLACE FUNCTION resolve_overlap_gap_job_list (
+table_to_resolve_ varchar, -- The table to resolve
 geo_collumn_name_ varchar, -- the name of geometry column on the table to analyze
 srid_ int, -- the srid for the given geo column on the table analyze
 overlapgap_grid_ varchar, -- the name of the content based grid table
@@ -22,6 +10,7 @@ input_table_pk_column_name_ varchar, -- the nam eof the promary collum
 simplify_tolerance_ double precision, -- the tolerance to be used when creating topolayer
 snap_tolerance_ double precision, -- the tolrence to be used when add data
 do_chaikins_ boolean, -- simlyfy lines by using chaikins and simlify
+_min_area_to_keep float, -- surfaces with area less than this will merge with a neightbor
 inside_cell_data_ boolean -- add lines inside cell, or boderlines
 )
   RETURNS void
@@ -36,6 +25,7 @@ DECLARE
   sql_to_block_cmd varchar;
   -- the sql resilve simple feature data
   sql_to_run_grid varchar;
+  
 BEGIN
   -- ############################# START # create jobList tables
   command_string := Format('DROP table if exists %s', job_list_name_);
@@ -53,9 +43,10 @@ BEGIN
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
 
-  sql_to_run_grid := Format('CALL topo_update.simplefeature_c2_topo_surface_border_retry(%s,%s,%s,%s,%s,%s,%s,%s,%s,', 
+  sql_to_run_grid := Format('CALL topo_update.simplefeature_c2_topo_surface_border_retry(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,', 
   Quote_literal(table_to_resolve_), Quote_literal(geo_collumn_name_), Quote_literal(input_table_pk_column_name_), 
-  Quote_literal(topology_name_), simplify_tolerance_, snap_tolerance_, Quote_literal(do_chaikins_), Quote_literal(job_list_name_), Quote_literal(overlapgap_grid_));
+  Quote_literal(topology_name_), simplify_tolerance_, snap_tolerance_, Quote_literal(do_chaikins_), _min_area_to_keep ,
+  Quote_literal(job_list_name_), Quote_literal(overlapgap_grid_));
   RAISE NOTICE 'sql_to_run_grid %', sql_to_run_grid;
 
   sql_to_block_cmd := Format('select topo_update.set_blocked_area(%s,%s,%s,%s,', 
@@ -93,19 +84,4 @@ BEGIN
 END;
 $$
 LANGUAGE plpgsql;
-
-;
-
-GRANT EXECUTE ON FUNCTION resolve_overlap_gap_job_list (table_to_resolve_ varchar, -- The table to resolve
-  geo_collumn_name_ varchar, -- the name of geometry column on the table to analyze
-  srid_ int, -- the srid for the given geo column on the table analyze
-  overlapgap_grid_ varchar, -- the name of the content based grid table
-  topology_name_ varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset. -- NB. Any exting data will related to topology_name will be deleted
-  job_list_name_ varchar, -- the name of job_list table, this table is ued to track of done jobs
-  input_table_pk_column_name_ varchar, -- the nam eof the promary collum
-  simplify_tolerance_ double precision, -- the tolerance to be used when creating topolayer
-  snap_tolerance_ double precision, -- the tolrence to be used when add data
-  do_chaikins_ boolean, -- simlyfy lines by using chaikins and simlify
-  inside_cell_data_ boolean -- add lines inside cell, or boderlines
-) TO public;
 

@@ -2,7 +2,7 @@
 CREATE OR REPLACE FUNCTION resolve_overlap_gap_job_list (
 table_to_resolve_ varchar, -- The table to resolve
 geo_collumn_name_ varchar, -- the name of geometry column on the table to analyze
-srid_ int, -- the srid for the given geo column on the table analyze
+_srid int, -- the srid for the given geo column on the table analyze
 overlapgap_grid_ varchar, -- the name of the content based grid table
 topology_name_ varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset. -- NB. Any exting data will related to topology_name will be deleted
 job_list_name_ varchar, -- the name of job_list table, this table is ued to track of done jobs
@@ -43,9 +43,9 @@ BEGIN
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
 
-  sql_to_run_grid := Format('CALL topo_update.simplefeature_c2_topo_surface_border_retry(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,', 
+  sql_to_run_grid := Format('CALL topo_update.simplefeature_c2_topo_surface_border_retry(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,', 
   Quote_literal(table_to_resolve_), Quote_literal(geo_collumn_name_), Quote_literal(input_table_pk_column_name_), 
-  Quote_literal(topology_name_), simplify_tolerance_, snap_tolerance_, Quote_literal(do_chaikins_), _min_area_to_keep ,
+  Quote_literal(topology_name_), _srid, simplify_tolerance_, snap_tolerance_, Quote_literal(do_chaikins_), _min_area_to_keep ,
   Quote_literal(job_list_name_), Quote_literal(overlapgap_grid_));
   RAISE NOTICE 'sql_to_run_grid %', sql_to_run_grid;
 

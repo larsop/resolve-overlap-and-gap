@@ -3,6 +3,7 @@ CREATE OR REPLACE PROCEDURE topo_update.simplefeature_c2_topo_surface_border_ret
   input_table_geo_column_name character varying, 
   input_table_pk_column_name character varying, 
   _topology_name character varying, 
+  _srid int,
   _simplify_tolerance double precision, 
   _snap_tolerance double precision, 
   _do_chaikins boolean, 
@@ -69,7 +70,7 @@ BEGIN
     --drop this schema in case it exists
 --    EXECUTE Format('DROP SCHEMA IF EXISTS %s CASCADE', border_topo_info.layer_schema_name);
 
-    PERFORM topology.CreateTopology (border_topo_info.topology_name, 4258, snap_tolerance_fixed);
+    PERFORM topology.CreateTopology (border_topo_info.topology_name, _srid, snap_tolerance_fixed);
     EXECUTE Format('ALTER table %s.edge_data set unlogged', border_topo_info.topology_name);
     EXECUTE Format('ALTER table %s.node set unlogged', border_topo_info.topology_name);
     EXECUTE Format('ALTER table %s.face set unlogged', border_topo_info.topology_name);

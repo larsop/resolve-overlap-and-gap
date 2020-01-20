@@ -1,4 +1,4 @@
-CREATE OR REPLACE PROCEDURE topo_update.simplefeature_c2_topo_surface_border_retry (
+CREATE OR REPLACE PROCEDURE resolve_overlap_gap_single_cell (
   input_table_name character varying, 
   input_table_geo_column_name character varying, 
   input_table_pk_column_name character varying, 

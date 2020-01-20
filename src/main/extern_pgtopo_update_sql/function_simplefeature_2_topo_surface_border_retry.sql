@@ -33,8 +33,8 @@ DECLARE
   box_id integer;
   face_table_name varchar;
   -- This is used when adding lines hte tolrannce is different when adding lines inside and box and the border;
-  snap_tolerance_fixed float = 0.000001;
-  glue_snap_tolerance_fixed float = 0.0000001;
+  snap_tolerance_fixed float =      _snap_tolerance;
+  glue_snap_tolerance_fixed float = _snap_tolerance/10000;
   
 BEGIN
   RAISE NOTICE 'start wwork at timeofday:% for layer %, with inside_cell_data %', Timeofday(), _topology_name || '_', inside_cell_data;

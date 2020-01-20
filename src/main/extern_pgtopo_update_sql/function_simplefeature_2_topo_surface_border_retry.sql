@@ -1,4 +1,15 @@
-CREATE OR REPLACE PROCEDURE topo_update.simplefeature_c2_topo_surface_border_retry (input_table_name character varying, input_table_geo_column_name character varying, input_table_pk_column_name character varying, _topology_name character varying, _simplify_tolerance double precision, _snap_tolerance double precision, _do_chaikins boolean, _job_list_name character varying, bb geometry, inside_cell_data boolean
+CREATE OR REPLACE PROCEDURE topo_update.simplefeature_c2_topo_surface_border_retry (
+  input_table_name character varying, 
+  input_table_geo_column_name character varying, 
+  input_table_pk_column_name character varying, 
+  _topology_name character varying, 
+  _simplify_tolerance double precision, 
+  _snap_tolerance double precision, 
+  _do_chaikins boolean, 
+  _job_list_name character varying, 
+  overlapgap_grid varchar,
+  bb geometry,
+  inside_cell_data boolean
 )
 LANGUAGE plpgsql
 AS $$
@@ -21,8 +32,6 @@ DECLARE
   -- This is used when adding lines hte tolrannce is different when adding lines inside and box and the border;
   snap_tolerance_fixed float = 0.000001;
   glue_snap_tolerance_fixed float = 0.0000001;
-  -- Move a parameter
-  overlapgap_grid varchar = 'test_data.overlap_gap_input_t2_res_grid';
   -- TODO add as parameter
   min_area float = 49;
 BEGIN

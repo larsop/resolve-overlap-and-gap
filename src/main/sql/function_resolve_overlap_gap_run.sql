@@ -2,8 +2,9 @@
 
 CREATE OR REPLACE PROCEDURE resolve_overlap_gap_run (
 _table_to_resolve varchar, -- The table to resolve
-_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
-_srid int, -- the srid for the given geo column on the table analyze
+_table_pk_column_name varchar, -- The primary of the input table
+_table_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
+_table_srid int, -- the srid for the given geo column on the table analyze
 _table_name_result_prefix varchar, -- This is table name prefix including schema used for the result tables
 -- || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell
 -- || '_gap'; -- The schema.table name for the gaps/holes found in each cell
@@ -42,7 +43,7 @@ DECLARE
   -- just to create sql
   command_string_var varchar;
   -- TODO send as parameter or compute
-  input_table_pk_column_name varchar = 'c1';
+  
   -- TODO send as parameter or fix in another way
   simplify_tolerance double precision = (_tolerance*2); -- this is the tolerance used when adding new lines s
   snap_tolerance double precision = _tolerance; -- this is the tolerance used when creating the topo layer 
@@ -56,12 +57,12 @@ DECLARE
 BEGIN
 	
   -- Call init method to create content based create and main topology schema
-  command_string := Format('SELECT resolve_overlap_gap_init(%s,%s,%s,%s,%s,%s,%s)', Quote_literal(_table_to_resolve), Quote_literal(_geo_collumn_name), _srid, _max_rows_in_each_cell, Quote_literal(overlapgap_grid), Quote_literal(_topology_name), snap_tolerance);
+  command_string := Format('SELECT resolve_overlap_gap_init(%s,%s,%s,%s,%s,%s,%s)', Quote_literal(_table_to_resolve), Quote_literal(_table_geo_collumn_name), _table_srid, _max_rows_in_each_cell, Quote_literal(overlapgap_grid), Quote_literal(_topology_name), snap_tolerance);
   -- execute the string
   EXECUTE command_string INTO num_cells;
   -- ############################# START # create jobList tables
   command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%L,%s,%s,%L,%L,%L)', 
-  _table_to_resolve, _geo_collumn_name, _srid, overlapgap_grid, topology_schema_name, _topology_name, job_list_name, input_table_pk_column_name, simplify_tolerance, snap_tolerance, _do_chaikins, _min_area_to_keep, inside_cell_data);
+  _table_to_resolve, _table_geo_collumn_name, _table_srid, overlapgap_grid, topology_schema_name, _topology_name, job_list_name, _table_pk_column_name, simplify_tolerance, snap_tolerance, _do_chaikins, _min_area_to_keep, inside_cell_data);
   EXECUTE command_string;
   -- ----------------------------- DONE - create jobList tables
   COMMIT;
@@ -85,7 +86,7 @@ BEGIN
   -- ############################# START # add border lines saved in last run, we will here connect data from the different cell using he border lines.
   inside_cell_data := FALSE;
   command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%L,%s,%s,%L,%L, %L)', 
-  _table_to_resolve, _geo_collumn_name, _srid, overlapgap_grid, topology_schema_name, _topology_name, job_list_name, input_table_pk_column_name, simplify_tolerance, snap_tolerance, _do_chaikins, _min_area_to_keep,inside_cell_data);
+  _table_to_resolve, _table_geo_collumn_name, _table_srid, overlapgap_grid, topology_schema_name, _topology_name, job_list_name, _table_pk_column_name, simplify_tolerance, snap_tolerance, _do_chaikins, _min_area_to_keep,inside_cell_data);
   EXECUTE command_string;
   COMMIT;
   -- ############################# START # add lines inside box and cut lines and save then in separate table,

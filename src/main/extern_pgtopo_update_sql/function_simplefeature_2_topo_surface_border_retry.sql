@@ -1,23 +1,7 @@
--- CREATE : OK 07/09/2017
--- TEST :
-
-DROP FUNCTION IF EXISTS topo_update.simplefeature_2_topo_surface_border_retry (input_table_name character varying, input_table_geo_column_name character varying, input_table_pk_column_name character varying, _topology_name character varying, _simplify_tolerance double precision, _snap_tolerance double precision, _do_chaikins boolean, _job_list_name character varying, bb geometry, inside_cell_data boolean);
-
--- "SELECT topo_update.simplefeature_c2_topo_surface_border_retry(
----'test_data.overlap_gap_input_t1',
---'geom',
---'t1',
---'test_topo',
---1,
---1,
---'false'
---,'test_data.overlap_gap_input_t1_res_job_list'
---,'0103000020A210000001000000050000001C6A3831245D1040AA67C75EA8274E401C6A3831245D10405E4A05E660944E4032D869330E4817405E4A05E660944E4032D869330E481740AA67C75EA8274E401C6A3831245D1040AA67C75EA8274E40'
---,true);
-
-CREATE OR REPLACE FUNCTION topo_update.simplefeature_c2_topo_surface_border_retry (input_table_name character varying, input_table_geo_column_name character varying, input_table_pk_column_name character varying, _topology_name character varying, _simplify_tolerance double precision, _snap_tolerance double precision, _do_chaikins boolean, _job_list_name character varying, bb geometry, inside_cell_data boolean)
-  RETURNS integer
-  AS $$
+CREATE OR REPLACE PROCEDURE topo_update.simplefeature_c2_topo_surface_border_retry (input_table_name character varying, input_table_geo_column_name character varying, input_table_pk_column_name character varying, _topology_name character varying, _simplify_tolerance double precision, _snap_tolerance double precision, _do_chaikins boolean, _job_list_name character varying, bb geometry, inside_cell_data boolean
+)
+LANGUAGE plpgsql
+AS $$
 DECLARE
   border_topo_info topo_update.input_meta_info;
   -- holds dynamic sql to be able to use the same code for different
@@ -49,7 +33,7 @@ BEGIN
   EXECUTE command_string INTO is_done;
   IF is_done = 1 THEN
     RAISE NOTICE 'Job is_done for  : %', ST_astext (bb);
-    RETURN 0;
+    RETURN;
   END IF;
   start_time := Clock_timestamp();
   RAISE NOTICE 'enter work at timeofday:% for layer %, with inside_cell_data %', Timeofday(), _topology_name || '_' || box_id, inside_cell_data;
@@ -77,6 +61,13 @@ BEGIN
       WHEN OTHERS THEN
         RAISE NOTICE 'failed to drop topology % ', border_topo_info.topology_name;
       END;
+      
+    --IF ((SELECT Count(*) FROM topology.topology WHERE name = border_topo_info.topology_name) = 1) THEN
+    --  EXECUTE Format('SELECT topology.droptopology(%s)', Quote_literal(border_topo_info.topology_name));
+    --END IF;
+    -- drop this schema in case it exists
+    --EXECUTE Format('DROP SCHEMA IF EXISTS %s CASCADE', topology_schema_name_);
+
     PERFORM topology.CreateTopology (border_topo_info.topology_name, 4258, snap_tolerance_fixed);
     EXECUTE Format('ALTER table %s.edge_data set unlogged', border_topo_info.topology_name);
     EXECUTE Format('ALTER table %s.node set unlogged', border_topo_info.topology_name);
@@ -165,13 +156,8 @@ BEGIN
     -- remove small polygons in main table
     --              num_rows_removed := topo_update.do_remove_small_areas_no_block(border_topo_info.topology_name,'topo_ar5_forest_sysdata.face' ,'mbr','face_id',_job_list_name ,bb );
     --              RAISE NOTICE 'Removed % small polygons in face_table_name %', num_rows_removed, 'topo_ar5_forest_sysdata.face';
-    BEGIN
-      PERFORM topology.DropTopology (border_topo_info.topology_name);
-      EXECUTE command_string INTO box_id;
-      EXCEPTION
-      WHEN OTHERS THEN
-        RAISE NOTICE 'failed to drop topology % ', border_topo_info.topology_name;
-      END;
+    COMMIT;
+    PERFORM topology.DropTopology (border_topo_info.topology_name);
   ELSE
     -- on cell border
     -- test with  area to block like bb
@@ -182,7 +168,7 @@ BEGIN
     command_string := Format('select count(*) from (select * from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L) for update SKIP LOCKED) as r;', _job_list_name, area_to_block);
     EXECUTE command_string INTO num_boxes_free;
     IF num_boxes_intersect != num_boxes_free THEN
-      RETURN - 1;
+      RETURN ;
     END IF;
     border_topo_info.topology_name := _topology_name;
     -- NB We have to use fixed snap to here to be sure that lines snapp
@@ -195,6 +181,7 @@ BEGIN
   EXECUTE command_string;
   RAISE NOTICE 'timeofday:% ,done job nocutline ready to start next', Timeofday();
   done_time := Clock_timestamp();
+  
   used_time := (Extract(EPOCH FROM (done_time - start_time)));
   RAISE NOTICE 'work done proc :% border_layer_id %, using % sec', done_time, border_topo_info.border_layer_id, used_time;
   -- This is a list of lines that fails
@@ -206,29 +193,8 @@ BEGIN
   END IF;
   PERFORM topo_update.clear_blocked_area (bb, _job_list_name);
   RAISE NOTICE 'leave work at timeofday:% for layer %, with inside_cell_data %', Timeofday(), border_topo_info.topology_name, inside_cell_data;
-  RETURN added_rows;
-END;
+  --RETURN added_rows;
+END
+$$;
 
-$$
-LANGUAGE plpgsql;
 
---some testing
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A210000001000000050000001C6A3831245D1040AA67C75EA8274E401C6A3831245D10405E4A05E660944E4032D869330E4817405E4A05E660944E4032D869330E481740AA67C75EA8274E401C6A3831245D1040AA67C75EA8274E40',true);
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A210000001000000050000001C6A3831245D1040AA67C75EA8274E401C6A3831245D10405E4A05E660944E4032D869330E4817405E4A05E660944E4032D869330E481740AA67C75EA8274E401C6A3831245D1040AA67C75EA8274E40',true);
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A210000001000000050000003911FF1C66042640AA67C75EA8274E403911FF1C660426405E4A05E660944E4044C8171EDB7929405E4A05E660944E4044C8171EDB792940AA67C75EA8274E403911FF1C66042640AA67C75EA8274E40',true);
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A21000000100000005000000B4B5729CAB492440F68489D7EFBA4D40B4B5729CAB492440A3FD58F91DD64D4076E3B8DC08272540A3FD58F91DD64D4076E3B8DC08272540F68489D7EFBA4D40B4B5729CAB492440F68489D7EFBA4D40',true);
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A210000001000000050000003C8F823483BD1A406C1EE2B075374F403C8F823483BD1A40C60F81F4D16D4F4047469B35F8321E40C60F81F4D16D4F4047469B35F8321E406C1EE2B075374F403C8F823483BD1A406C1EE2B075374F40',true);
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A21000000100000005000000BE6C8B9D20BF2740F68489D7EFBA4D40BE6C8B9D20BF27405076281B4CF14D4044C8171EDB7929405076281B4CF14D4044C8171EDB792940F68489D7EFBA4D40BE6C8B9D20BF2740F68489D7EFBA4D40',true);
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A21000000100000005000000C864E21207D83840976A7E81A1235040C864E21207D83840FF2FFA8F12FD5040DED21315F1C23F40FF2FFA8F12FD5040DED21315F1C23F40976A7E81A1235040C864E21207D83840976A7E81A1235040',true);
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A210000001000000050000004E7F301F50EF2C40B3123817CB6951404E7F301F50EF2C4067F5759E83D65140B2F6B0101DED314067F5759E83D65140B2F6B0101DED3140B3123817CB6951404E7F301F50EF2C40B3123817CB695140',true);
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A2100000010000000500000076E3B8DC08272540F68489D7EFBA4D4076E3B8DC08272540A3FD58F91DD64D403911FF1C66042640A3FD58F91DD64D403911FF1C66042640F68489D7EFBA4D4076E3B8DC08272540F68489D7EFBA4D40',true);
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A2100000010000000500000032D869330E4817406C1EE2B075374F4032D869330E481740C60F81F4D16D4F403C8F823483BD1A40C60F81F4D16D4F403C8F823483BD1A406C1EE2B075374F4032D869330E4817406C1EE2B075374F40',true);
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A210000001000000050000002E5AE61BF18E22409C93EA9393844D402E5AE61BF18E2240F68489D7EFBA4D40B4B5729CAB492440F68489D7EFBA4D40B4B5729CAB4924409C93EA9393844D402E5AE61BF18E22409C93EA9393844D40',true);
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A21000000100000005000000B2F6B0101DED3140976A7E81A1235040B2F6B0101DED3140FF2FFA8F12FD5040C864E21207D83840FF2FFA8F12FD5040C864E21207D83840976A7E81A1235040B2F6B0101DED3140976A7E81A1235040',true);
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A2100000010000000500000044C8171EDB792940976A7E81A123504044C8171EDB792940F15B1DC5FD5950404E7F301F50EF2C40F15B1DC5FD5950404E7F301F50EF2C40976A7E81A123504044C8171EDB792940976A7E81A1235040',true);
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A2100000010000000500000047469B35F8321E407AF2BE7B8ADA4F4047469B35F8321E40976A7E81A12350402E5AE61BF18E2240976A7E81A12350402E5AE61BF18E22407AF2BE7B8ADA4F4047469B35F8321E407AF2BE7B8ADA4F40',true);
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A210000001000000050000004E7F301F50EF2C404B4DBC085A9050404E7F301F50EF2C40FF2FFA8F12FD5040B2F6B0101DED3140FF2FFA8F12FD5040B2F6B0101DED31404B4DBC085A9050404E7F301F50EF2C404B4DBC085A905040',true);
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A2100000010000000500000032D869330E481740AA67C75EA8274E4032D869330E4817405E4A05E660944E4047469B35F8321E405E4A05E660944E4047469B35F8321E40AA67C75EA8274E4032D869330E481740AA67C75EA8274E40',true);
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A2100000010000000500000047469B35F8321E405E4A05E660944E4047469B35F8321E40122D436D19014F402E5AE61BF18E2240122D436D19014F402E5AE61BF18E22405E4A05E660944E4047469B35F8321E405E4A05E660944E40',true);
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A210000001000000050000004E7F301F50EF2C40FF2FFA8F12FD50404E7F301F50EF2C40592199D36E3351402C9B249062323040592199D36E3351402C9B249062323040FF2FFA8F12FD50404E7F301F50EF2C40FF2FFA8F12FD5040',true);
---SELECT topo_update.simplefeature_c2_topo_surface_border_retry('test_data.overlap_gap_input_t1','geom','c1','test_topo',1e-05,1e-05,'false','test_data.overlap_gap_input_t1_res_job_list','0103000020A210000001000000050000004E7F301F50EF2C40976A7E81A12350404E7F301F50EF2C404B4DBC085A905040B2F6B0

@@ -12,11 +12,3 @@ SELECT 'check_border_lines', count(geo) from topo_update.border_line_segments;
 SELECT 'check_added_lines', count(geom) from test_topo_t2.edge;
 
 SELECT topology.droptopology('test_topo_t2');
-SELECT topology.droptopology('test_topo_t2_1');
-SELECT topology.droptopology('test_topo_t2_2');
-SELECT topology.droptopology('test_topo_t2_3');
-SELECT topology.droptopology('test_topo_t2_4');
-SELECT topology.droptopology('test_topo_t2_5');
-SELECT topology.droptopology('test_topo_t2_6');
-SELECT topology.droptopology('test_topo_t2_7');
-

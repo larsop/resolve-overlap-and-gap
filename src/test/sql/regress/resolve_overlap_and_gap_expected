@@ -2,10 +2,3 @@ CALL
 check_border_lines|38
 check_added_lines|136
 Topology 'test_topo_t2' dropped
-Topology 'test_topo_t2_1' dropped
-Topology 'test_topo_t2_2' dropped
-Topology 'test_topo_t2_3' dropped
-Topology 'test_topo_t2_4' dropped
-Topology 'test_topo_t2_5' dropped
-Topology 'test_topo_t2_6' dropped
-Topology 'test_topo_t2_7' dropped

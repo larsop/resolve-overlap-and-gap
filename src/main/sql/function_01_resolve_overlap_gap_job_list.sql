@@ -4,6 +4,7 @@ table_to_resolve_ varchar, -- The table to resolve
 geo_collumn_name_ varchar, -- the name of geometry column on the table to analyze
 _srid int, -- the srid for the given geo column on the table analyze
 overlapgap_grid_ varchar, -- the name of the content based grid table
+_topology_schema_name varchar, -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,  
 topology_name_ varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset. -- NB. Any exting data will related to topology_name will be deleted
 job_list_name_ varchar, -- the name of job_list table, this table is ued to track of done jobs
 input_table_pk_column_name_ varchar, -- the nam eof the promary collum
@@ -25,7 +26,6 @@ DECLARE
   sql_to_block_cmd varchar;
   -- the sql resilve simple feature data
   sql_to_run_grid varchar;
-  
 BEGIN
   -- ############################# START # create jobList tables
   command_string := Format('DROP table if exists %s', job_list_name_);
@@ -43,9 +43,9 @@ BEGIN
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
 
-  sql_to_run_grid := Format('CALL topo_update.simplefeature_c2_topo_surface_border_retry(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,', 
+  sql_to_run_grid := Format('CALL topo_update.simplefeature_c2_topo_surface_border_retry(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,', 
   Quote_literal(table_to_resolve_), Quote_literal(geo_collumn_name_), Quote_literal(input_table_pk_column_name_), 
-  Quote_literal(topology_name_), _srid, simplify_tolerance_, snap_tolerance_, Quote_literal(do_chaikins_), _min_area_to_keep ,
+  Quote_literal(_topology_schema_name), Quote_literal(topology_name_), _srid, simplify_tolerance_, snap_tolerance_, Quote_literal(do_chaikins_), _min_area_to_keep ,
   Quote_literal(job_list_name_), Quote_literal(overlapgap_grid_));
   RAISE NOTICE 'sql_to_run_grid %', sql_to_run_grid;
 

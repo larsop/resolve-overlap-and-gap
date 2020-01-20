@@ -52,7 +52,6 @@ copy_file_into('resolve_overlap_and_gap-pre-def.sql',$fh_out);
 
 # get SQL code used by resolve for overlap gap from this repo
 # (Maybe move this code to https://github.com/NibioOpenSource/pgtopo_update_sql.git)
-copy_file_into('../../../main/extern_pgtopo_update_sql/help_tables_for_logging.sql',$fh_out);
 for my $file (glob '../../../main/extern_pgtopo_update_sql/func*') {
 	copy_file_into($file,$fh_out);
 }

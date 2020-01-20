@@ -29,8 +29,9 @@ max_rows_in_each_cell_ int -- this is the max number rows that intersects with b
 DROP FUNCTION IF EXISTS resolve_overlap_gap_job_list(
 table_to_resolve_ varchar, -- The table to resolve
 geo_collumn_name_ varchar, -- the name of geometry column on the table to analyze
-srid_ int, -- the srid for the given geo column on the table analyze
+_srid int, -- the srid for the given geo column on the table analyze
 overlapgap_grid_ varchar, -- the name of the content based grid table
+_topology_schema_name varchar, -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,  
 topology_name_ varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset. -- NB. Any exting data will related to topology_name will be deleted
 job_list_name_ varchar, -- the name of job_list table, this table is ued to track of done jobs
 input_table_pk_column_name_ varchar, -- the nam eof the promary collum

@@ -48,13 +48,16 @@ DECLARE
   _do_chaikins boolean = FALSE;
   inside_cell_data boolean = TRUE;
   _min_area_to_keep float = 49.0;
+  _topology_schema_name varchar = topology_name_; -- for now we use the same schema as the topology structure
+
 BEGIN
   -- Call init method to create content based create and main topology schema
   command_string := Format('SELECT resolve_overlap_gap_init(%s,%s,%s,%s,%s,%s,%s)', Quote_literal(table_to_resolve_), Quote_literal(geo_collumn_name_), srid_, max_rows_in_each_cell_, Quote_literal(overlapgap_grid), Quote_literal(topology_name_), snap_tolerance);
   -- execute the string
   EXECUTE command_string INTO num_cells;
   -- ############################# START # create jobList tables
-  command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%s,%L,%L,%L)', table_to_resolve_, geo_collumn_name_, srid_, overlapgap_grid, topology_name_, job_list_name, input_table_pk_column_name, _simplify_tolerance, snap_tolerance, _do_chaikins, _min_area_to_keep, inside_cell_data);
+  command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%L,%s,%s,%L,%L,%L)', 
+  table_to_resolve_, geo_collumn_name_, srid_, overlapgap_grid, _topology_schema_name, topology_name_, job_list_name, input_table_pk_column_name, _simplify_tolerance, snap_tolerance, _do_chaikins, _min_area_to_keep, inside_cell_data);
   EXECUTE command_string;
   -- ----------------------------- DONE - create jobList tables
   COMMIT;
@@ -77,7 +80,8 @@ BEGIN
   -- ----------------------------- DONE # add lines inside box and cut lines and save then in separate table,
   -- ############################# START # add border lines saved in last run, we will here connect data from the different cell using he border lines.
   inside_cell_data := FALSE;
-  command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%s,%L,%L, %L)', table_to_resolve_, geo_collumn_name_, srid_, overlapgap_grid, topology_name_, job_list_name, input_table_pk_column_name, _simplify_tolerance, snap_tolerance, _do_chaikins, _min_area_to_keep,inside_cell_data);
+  command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%L,%s,%s,%L,%L, %L)', 
+  table_to_resolve_, geo_collumn_name_, srid_, overlapgap_grid, _topology_schema_name, topology_name_, job_list_name, input_table_pk_column_name, _simplify_tolerance, snap_tolerance, _do_chaikins, _min_area_to_keep,inside_cell_data);
   EXECUTE command_string;
   COMMIT;
   -- ############################# START # add lines inside box and cut lines and save then in separate table,

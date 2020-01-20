@@ -1,6 +1,10 @@
-DROP FUNCTION IF EXISTS topo_update.get_simplified_border_lines (input_table_name varchar, input_table_geo_column_name varchar, _bb geometry, _snap_tolerance float8, _do_chaikins boolean);
-
-CREATE OR REPLACE FUNCTION topo_update.get_simplified_border_lines (input_table_name varchar, input_table_geo_column_name varchar, _bb geometry, _snap_tolerance float8, _do_chaikins boolean)
+CREATE OR REPLACE FUNCTION topo_update.get_simplified_border_lines (
+_input_table_name varchar, 
+_input_table_geo_column_name varchar, 
+_bb geometry, _snap_tolerance float8, 
+_do_chaikins boolean,
+_topology_schema_name varchar -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,
+)
   RETURNS TABLE (
     json text,
     geo geometry,
@@ -49,7 +53,7 @@ BEGIN
  	),
  	lines as (select distinct (ST_Dump(geom)).geom as geom from rings)
  	select geom from lines 
- 	where  ST_IsEmpty(geom) is false', input_table_name, bb_boundary_outer, input_table_geo_column_name);
+ 	where  ST_IsEmpty(geom) is false', _input_table_name, bb_boundary_outer, _input_table_geo_column_name);
   EXECUTE command_string;
   command_string := Format('create index %1$s on tmp_data_all_lines using gist(geom)', 'idx1' || Md5(ST_AsBinary (_bb)));
   EXECUTE command_string;
@@ -86,10 +90,10 @@ BEGIN
     --	set geo = ST_Segmentize(geo, 1);
   END IF;
   -- log error lines
-  INSERT INTO topo_update.no_cut_line_failed (error_info, geo)
-  SELECT 'Failed to make valid input line ' AS error_info, r.geo
+  EXECUTE Format('INSERT INTO %s.no_cut_line_failed (error_info, geo)
+  SELECT %L AS error_info, r.geo
   FROM tmp_inner_lines_merged r
-  WHERE ST_IsValid (r.geo) = FALSE;
+  WHERE ST_IsValid (r.geo) = FALSE',_topology_schema_name,'Failed to make valid input line ');
   -- make linns for glue parts.
   --#############################
   DROP TABLE IF EXISTS tmp_boundary_line_type_parts;
@@ -109,10 +113,12 @@ SELECT r.geo, 1 AS line_type
 FROM tmp_boundary_line_types_merged r
 WHERE ST_ISvalid (r.geo);
   -- log error lines
-  INSERT INTO topo_update.no_cut_line_failed (error_info, geo)
-  SELECT 'Failed to make valid input border line ' AS error_info, r.geo
+  EXECUTE Format('INSERT INTO %s.no_cut_line_failed (error_info, geo)
+  SELECT %L AS error_info, r.geo
   FROM tmp_boundary_line_types_merged r
-  WHERE ST_IsValid (r.geo) = FALSE;
+  WHERE ST_IsValid (r.geo) = FALSE',_topology_schema_name,'Failed to make valid input border line ');
+  
+  
   -- make line part for outer box, that contains the line parts will be added add the final stage when all the cell are done.
   --#############################
   DROP TABLE IF EXISTS tmp_boundary_line_parts;
@@ -125,17 +131,20 @@ WHERE ST_ISvalid (r.geo);
     SELECT (ST_Dump (ST_LineMerge (ST_Union (lg.geo ) ) ) ).geom AS geo
     FROM tmp_boundary_line_parts AS lg
     );
-INSERT INTO topo_update.border_line_segments (geo, point_geo)
-SELECT r.geo, NULL AS point_geo
-FROM (
+    
+  EXECUTE Format('INSERT INTO %s.border_line_segments (geo, point_geo)
+  SELECT r.geo, NULL AS point_geo
+  FROM (
   SELECT r.geo
   FROM tmp_boundary_lines_merged r
-  WHERE ST_IsValid (r.geo) IS TRUE) AS r;
+  WHERE ST_IsValid (r.geo) IS TRUE) AS r',_topology_schema_name);
+
   -- log error lines
-  INSERT INTO topo_update.no_cut_line_failed (error_info, geo)
-  SELECT 'Failed to make valid input border line ' AS error_info, r.geo
+  EXECUTE Format('INSERT INTO %s.no_cut_line_failed (error_info, geo)
+  SELECT %L AS error_info, r.geo
   FROM tmp_boundary_lines_merged r
-  WHERE ST_IsValid (r.geo) = FALSE;
+  WHERE ST_IsValid (r.geo) = FALSE',_topology_schema_name,'Failed to make valid input border line ' );
+  
   -- return the result of inner geos to handled imediatly
   RETURN QUERY
   SELECT *

@@ -55,7 +55,7 @@ BEGIN
     EXECUTE command_string INTO bb;
   END IF;
   -- get area to block and set
-  area_to_block := topo_update.set_blocked_area (input_table_name, input_table_geo_column_name, input_table_pk_column_name, _job_list_name,
+  area_to_block := resolve_overlap_gap_block_cell(input_table_name, input_table_geo_column_name, input_table_pk_column_name, _job_list_name,
     bb);
   RAISE NOTICE 'area to block:% ', area_to_block;
   border_topo_info.snap_tolerance := _simplify_tolerance;

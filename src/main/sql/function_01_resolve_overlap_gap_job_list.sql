@@ -54,7 +54,7 @@ BEGIN
   Quote_literal(job_list_name_), Quote_literal(overlapgap_grid_));
   RAISE NOTICE 'sql_to_run_grid %', sql_to_run_grid;
 
-  sql_to_block_cmd := Format('select topo_update.set_blocked_area(%s,%s,%s,%s,', 
+  sql_to_block_cmd := Format('select resolve_overlap_gap_block_cell(%s,%s,%s,%s,', 
   Quote_literal(table_to_resolve_), Quote_literal(geo_collumn_name_), Quote_literal(input_table_pk_column_name_), Quote_literal(job_list_name_));
   
   -- add inside cell polygons

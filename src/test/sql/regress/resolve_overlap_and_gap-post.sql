@@ -63,6 +63,15 @@ _min_area_to_keep float, -- surfaces with area less than this will merge with a 
 inside_cell_data_ boolean -- add lines inside cell, or boderlines
 );
 
+DROP FUNCTION IF EXISTS resolve_overlap_gap_block_cell(
+input_table_name varchar, 
+input_table_geo_column_name varchar, 
+input_table_pk_column_name varchar, 
+_job_list_name varchar, 
+bb geometry
+);
+
+
 
 -- Drop helper function from other packages 
 -- ###############################################

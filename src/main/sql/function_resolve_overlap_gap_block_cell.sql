@@ -1,6 +1,11 @@
-DROP FUNCTION IF EXISTS topo_update.set_blocked_area (input_table_name varchar, input_table_geo_column_name varchar, input_table_pk_column_name varchar, bb geometry, _job_list_name varchar);
 
-CREATE OR REPLACE FUNCTION topo_update.set_blocked_area (input_table_name varchar, input_table_geo_column_name varchar, input_table_pk_column_name varchar, _job_list_name varchar, bb geometry)
+CREATE OR REPLACE FUNCTION resolve_overlap_gap_block_cell(
+input_table_name varchar, 
+input_table_geo_column_name varchar, 
+input_table_pk_column_name varchar, 
+_job_list_name varchar, 
+bb geometry
+)
   RETURNS geometry
   LANGUAGE 'plpgsql'
   AS $function$
@@ -76,11 +81,3 @@ BEGIN
 END
 $function$;
 
---\timing
---select topo_update.set_blocked_area('tmp_sf_ar5_forest_input.existing_forest_surface','wkb_geometry','ogc_fid','topo_update.job_list_block',
---'0103000020E864000001000000050000000000004035BD2341000000A0A6EB58410000004035BD23410000001419EC5841000000A093C223410000001419EC5841000000A093C22341000000A0A6EB58410000004035BD2341000000A0A6EB5841');
---update topo_update.job_list_block SET block_bb = null;
---select topo_update.set_blocked_area('tmp_sf_ar5_forest_input.selected_forest_area','wkb_geometry','ogc_fid','topo_update.job_list_block',
---'0103000020E8640000010000000500000040F1FF7F101C2241BCFAFF272632594140F1FF7F101C2241D8F9FF2FA437594114EFFFFF23232241D8F9FF2FA437594114EFFFFF23232241BCFAFF272632594140F1FF7F101C2241BCFAFF2726325941');
---select topo_update.set_blocked_area('tmp_sf_ar5_forest_input.selected_forest_area','wkb_geometry','ogc_fid','topo_update.job_list_block',
---'0103000020E8640000010000000500000000000000815C2341000000D0D20C594100000000815C234100000020E810594100000040FC6D234100000020E810594100000040FC6D2341000000D0D20C594100000000815C2341000000D0D20C5941');

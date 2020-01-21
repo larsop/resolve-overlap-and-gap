@@ -31,7 +31,7 @@ DECLARE
   num_boxes_intersect integer;
   num_boxes_free integer;
   num_rows_removed integer;
-  box_id integer;
+  box_id integer;	
   face_table_name varchar;
   -- This is used when adding lines hte tolrannce is different when adding lines inside and box and the border;
   snap_tolerance_fixed float =      _snap_tolerance;
@@ -179,8 +179,8 @@ BEGIN
     END IF;
     border_topo_info.topology_name := _topology_name;
     -- NB We have to use fixed snap to here to be sure that lines snapp
-    command_string := Format('SELECT topo_update.add_border_lines(%1$L,geo,%3$s) from topo_update.get_left_over_borders(%4$L,%2$L,%5$L)', 
-    _topology_name, bb, snap_tolerance_fixed, overlapgap_grid,_topology_schema_name);
+    command_string := Format('SELECT topo_update.add_border_lines(%1$L,geo,%3$s) from topo_update.get_left_over_borders(%4$L,%6$L,%2$L,%5$L)', 
+    _topology_name, bb, snap_tolerance_fixed, overlapgap_grid,_topology_schema_name,input_table_geo_column_name);
     EXECUTE command_string;
   END IF;
   RAISE NOTICE 'done work at timeofday:% for layer %, with inside_cell_data %', Timeofday(), border_topo_info.topology_name, inside_cell_data;

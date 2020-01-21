@@ -62,9 +62,9 @@ BEGIN
   command_string := Format('
  	INSERT INTO %s(sql_to_run,cell_geo,sql_to_block) 
  	SELECT 
-    %s||quote_literal(r.geom::Varchar)||%s as sql_to_run, 
-    r.geom as cell_geo, 
-    %s||quote_literal(r.geom::Varchar)||%s as sql_to_block
+    %s||quote_literal(r.'||geo_collumn_name_||'::Varchar)||%s as sql_to_run, 
+    r.'||geo_collumn_name_||' as cell_geo, 
+    %s||quote_literal(r.'||geo_collumn_name_||'::Varchar)||%s as sql_to_block
  	from %s r', 
  	job_list_name_, 
  	Quote_literal(sql_to_run_grid), 

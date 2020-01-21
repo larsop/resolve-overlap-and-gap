@@ -67,7 +67,7 @@ BEGIN
   -- execute the sql command
   EXECUTE command_string INTO num_cells;
   -- Create Index
-  EXECUTE Format('CREATE INDEX ON %s USING GIST (geom)', _overlapgap_grid);
+  EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', _overlapgap_grid, _geo_collumn_name);
   -- ----------------------------- DONE - Handle content based grid init
   
   -- ----------------------------- Create help tables

@@ -2,7 +2,7 @@ CREATE OR REPLACE PROCEDURE resolve_overlap_gap_single_cell (
   input_table_name character varying, 
   input_table_geo_column_name character varying, 
   input_table_pk_column_name character varying, 
-  _topology_schema_name varchar, -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,
+  _table_name_result_prefix varchar, 
   _topology_name character varying, 
   _srid int,
   _utm boolean,
@@ -83,7 +83,7 @@ BEGIN
     -- the boundery linnes are saved in a table for later usage
     DROP TABLE IF EXISTS tmp_simplified_border_lines;
     command_string := Format('create temp table tmp_simplified_border_lines as (select g.* FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L,%L) g)', 
-    input_table_name, input_table_geo_column_name, bb, _simplify_tolerance, _do_chaikins,_topology_schema_name);
+    input_table_name, input_table_geo_column_name, bb, _simplify_tolerance, _do_chaikins,_table_name_result_prefix);
     RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
     -- add the glue line with no/small tolerance
@@ -180,7 +180,7 @@ BEGIN
     border_topo_info.topology_name := _topology_name;
     -- NB We have to use fixed snap to here to be sure that lines snapp
     command_string := Format('SELECT topo_update.add_border_lines(%1$L,geo,%3$s) from topo_update.get_left_over_borders(%4$L,%6$L,%2$L,%5$L)', 
-    _topology_name, bb, snap_tolerance_fixed, overlapgap_grid,_topology_schema_name,input_table_geo_column_name);
+    _topology_name, bb, snap_tolerance_fixed, overlapgap_grid,_table_name_result_prefix,input_table_geo_column_name);
     EXECUTE command_string;
   END IF;
   RAISE NOTICE 'done work at timeofday:% for layer %, with inside_cell_data %', Timeofday(), border_topo_info.topology_name, inside_cell_data;
@@ -196,8 +196,8 @@ BEGIN
   -- this is used for debug
   IF used_time > 10 THEN
     RAISE NOTICE 'very long a set of lines % time with geo for bb % ', used_time, bb;
-    EXECUTE FORMAT('INSERT INTO %s.long_time_log2 (execute_time, info, sql, geo) VALUES (%s, %L, %L, %L)',
-    _topology_schema_name,used_time,'simplefeature_c2_topo_surface_border_retry',command_string,bb);  
+    EXECUTE FORMAT('INSERT INTO %s (execute_time, info, sql, geo) VALUES (%s, %L, %L, %L)',
+    _table_name_result_prefix||'_long_time_log2',used_time,'simplefeature_c2_topo_surface_border_retry',command_string,bb);  
   END IF;
   PERFORM topo_update.clear_blocked_area (bb, _job_list_name);
   RAISE NOTICE 'leave work at timeofday:% for layer %, with inside_cell_data %', Timeofday(), border_topo_info.topology_name, inside_cell_data;

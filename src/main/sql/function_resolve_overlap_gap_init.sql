@@ -2,6 +2,7 @@
 -- this is a function that creates unlogged tables and the the grid neeed when later checking this table for overlap and gaps.
 
 CREATE OR REPLACE FUNCTION resolve_overlap_gap_init (
+_table_name_result_prefix varchar,
 _table_to_resolve varchar, -- The schema.table name with polygons to analyze for gaps and intersects
 _geo_collumn_name varchar, -- the name of geometry column on the table to analyze
 _srid int, -- the srid for the given geo column on the table analyze
@@ -76,32 +77,32 @@ BEGIN
 -- This is a list of lines that fails
 -- this is used for debug
 
-EXECUTE Format('CREATE UNLOGGED TABLE %s.no_cut_line_failed (
+EXECUTE Format('CREATE UNLOGGED TABLE %s (
   id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), error_info text, geo Geometry(LineString, %s)
-)',_topology_schema_name,_srid);
+)',_table_name_result_prefix||'_no_cut_line_failed',_srid);
 
 --DROP TABLE IF EXISTS  topo_update.long_time_log1;
 -- This is a list of lines that fails
 -- this is used for debug
 
-EXECUTE Format('CREATE UNLOGGED TABLE %s.long_time_log1 (
+EXECUTE Format('CREATE UNLOGGED TABLE %s (
   id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), execute_time real, info text,
   geo Geometry(LineString, %s)
-)',_topology_schema_name,_srid);
+)',_table_name_result_prefix||'_long_time_logl',_srid);
 
 --DROP TABLE IF EXISTS  topo_update.long_time_log2;
 -- This is a list of lines that fails
 -- this is used for debug
 
-EXECUTE Format('CREATE UNLOGGED TABLE %s.long_time_log2 (
+EXECUTE Format('CREATE UNLOGGED TABLE %s (
   id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), execute_time real, info text,
   sql text, geo Geometry(Polygon, %s)
-)',_topology_schema_name,_srid);
+)',_table_name_result_prefix||'_long_time_log2',_srid);
 
 --DROP TABLE IF EXISTS  topo_update.border_line_segments;
-EXECUTE Format('CREATE UNLOGGED TABLE %s.border_line_segments (
+EXECUTE Format('CREATE UNLOGGED TABLE %s (
   id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), geo Geometry(LineString, %s), point_geo Geometry(Point, %s)
-)',_topology_schema_name,_srid,_srid);
+)',_table_name_result_prefix||'_border_line_segments',_srid,_srid);
 
 
 

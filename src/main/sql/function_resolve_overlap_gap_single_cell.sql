@@ -36,7 +36,10 @@ DECLARE
   -- This is used when adding lines hte tolrannce is different when adding lines inside and box and the border;
   snap_tolerance_fixed float =      _snap_tolerance;
   glue_snap_tolerance_fixed float = _snap_tolerance/10000;
-  
+ 
+  temp_table_name varchar;
+  temp_table_id_column varchar;
+  final_result_table_name varchar;
   
 BEGIN
   RAISE NOTICE 'start wwork at timeofday:% for layer %, with _cell_job_type %', Timeofday(), _topology_name || '_', _cell_job_type;
@@ -61,11 +64,82 @@ BEGIN
   RAISE NOTICE 'area to block:% ', area_to_block;
   border_topo_info.snap_tolerance := _simplify_tolerance;
   --      --border_topo_info.border_layer_id = 317;
+  command_string := Format('select id from %1$s where cell_geo = %2$L', _job_list_name, bb);
+  RAISE NOTICE '% ', command_string;
+  EXECUTE command_string INTO box_id;
   RAISE NOTICE 'start work at timeofday:% for layer %, with _cell_job_type %', Timeofday(), _topology_name || '_' || box_id, _cell_job_type;
+
+  -- Create a temp table name
+  temp_table_name := '_result_temp_'||box_id; --now()::date::varchar
+  temp_table_id_column := '_id'||temp_table_name;
+  final_result_table_name := _table_name_result_prefix||'_result';
+  
+-- Drop/Create a temp to hold data temporay for job
+EXECUTE Format('DROP TABLE IF EXISTS %s',temp_table_name);
+  
+-- Create the temp for result simple feature result table  as copy of the input table
+EXECUTE Format('CREATE TEMP TABLE %s AS TABLE %s with NO DATA',temp_table_name,final_result_table_name);
+
+-- Add an extra column to hold a list of other intersections surfaces
+EXECUTE Format('ALTER TABLE %s ADD column %s serial',temp_table_name, temp_table_id_column);
+
+
+  	-- Insert new geos based on 
+    command_string := Format('insert into %3$s(%5$s)
+	select st_getFaceGeometry(%1$L,face_id) as %5$s from (
+	SELECT f.face_id, min(jl.id) as cell_id  FROM
+	%1$s.face f, 
+	%4$s jl 
+	WHERE f.mbr && jl.cell_geo and cell_geo && %2$L
+	GROUP BY f.face_id
+	) as r where cell_id = %6$s',	
+	_topology_name, bb, temp_table_name, _table_name_result_prefix||'_job_list', input_table_geo_column_name, box_id);	
+
+    RAISE NOTICE 'command_string %', command_string;
+   EXECUTE command_string;
+
+    
+   -- picks up value from the biggeste intersctin neighbour 
+command_string := Format('update %1$s t
+set %3$s = r.%3$s 
+from (
+	SELECT r.*, r.intersect_id_list[2:] as _other_intersect_id_list , r.intersect_id_list[1] as %3$s  from (
+		select distinct %5$s, array_agg(%3$s) OVER (PARTITION BY %5$s) as intersect_id_list from (
+		select %5$s, %3$s 
+			from (
+				SELECT %5$s, i.%3$s, ST_Area(ST_Intersection(f.%4$s,i.%4$s))/ST_area(f.%4$s) as area_coverarge, ST_Area(i.%4$s) as area_neighbour
+				FROM 
+				%1$s f,
+				%2$s i
+				where f.%4$s && i.%4$s and ST_Intersects(f.%4$s,i.%4$s)
+				order by %5$s, area_coverarge desc,  i.c1
+			) as r where area_coverarge > 0.1
+			order by %5$s, area_neighbour desc
+		) as r
+	) as r
+) r where r.%5$s = t.%5$s',
+    temp_table_name,
+	input_table_name, 
+	input_table_pk_column_name,
+	input_table_geo_column_name,
+	temp_table_id_column);	
+
+   EXECUTE command_string;
+
+    command_string := Format('insert into %1$s(%2$s,%3$s) select %2$s,%3$s from %4$s',	
+	final_result_table_name,
+	input_table_pk_column_name,
+	input_table_geo_column_name,
+	temp_table_name);	
+	
+    EXECUTE command_string;
+
+-- Drop/Create a temp to hold data temporay for job
+--EXECUTE Format('DROP TABLE IF EXISTS %s',temp_table_name);
+
+    EXECUTE command_string;
+  
   IF _cell_job_type  = 1 THEN
-    command_string := Format('select id from %1$s where cell_geo = %2$L', _job_list_name, bb);
-    RAISE NOTICE '% ', command_string;
-    EXECUTE command_string INTO box_id;
     border_topo_info.topology_name := _topology_name || '_' || box_id;
     RAISE NOTICE 'use border_topo_info.topology_name %', border_topo_info.topology_name;
       
@@ -166,7 +240,7 @@ BEGIN
     --              RAISE NOTICE 'Removed % small polygons in face_table_name %', num_rows_removed, 'topo_ar5_forest_sysdata.face';
     COMMIT;
     PERFORM topology.DropTopology (border_topo_info.topology_name);
-  ELSE
+  ELSIF _cell_job_type  = 2 THEN
     -- on cell border
     -- test with  area to block like bb
     -- area_to_block := bb;
@@ -186,6 +260,11 @@ BEGIN
     command_string := Format('SELECT topo_update.add_border_lines(%1$L,geo,%3$s) from topo_update.get_left_over_borders(%4$L,%6$L,%2$L,%5$L)', 
     _topology_name, bb, snap_tolerance_fixed, overlapgap_grid,_table_name_result_prefix,input_table_geo_column_name);
     EXECUTE command_string;
+  ELSIF _cell_job_type  = 3 THEN
+    RAISE NOTICE '_cell_job_type % ', _cell_job_type;
+
+  ELSE 
+    RAISE EXCEPTION  'Invalid _cell_job_type % ', _cell_job_type;
   END IF;
   RAISE NOTICE 'done work at timeofday:% for layer %, with _cell_job_type %', Timeofday(), border_topo_info.topology_name, _cell_job_type;
   command_string := Format('update %1$s set block_bb = %2$L where cell_geo = %3$L', _job_list_name, bb, bb);

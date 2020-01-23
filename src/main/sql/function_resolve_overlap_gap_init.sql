@@ -96,8 +96,9 @@ EXECUTE Format('CREATE UNLOGGED TABLE %s (
 
 -- Create the simple feature result table  as copy of the input table
 EXECUTE Format('CREATE UNLOGGED TABLE %s AS TABLE %s with NO DATA',_table_name_result_prefix||'_result',_table_to_resolve);
-	
-EXECUTE Format('ALTER TABLE %s ADD column _num_overlap int',_table_name_result_prefix||'_result');
+
+-- Add an extra column to hold a list of other intersections surfaces
+EXECUTE Format('ALTER TABLE %s ADD column _other_intersect_id_list int[]',_table_name_result_prefix||'_result');
 
   RETURN num_cells;
 END;

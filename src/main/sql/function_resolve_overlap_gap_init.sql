@@ -73,38 +73,31 @@ BEGIN
   
   -- ----------------------------- Create help tables
   -- TOOD find out how to handle log tables used for debug
---DROP TABLE IF EXISTS topo_update.no_cut_line_failed;
--- This is a list of lines that fails
--- this is used for debug
 
 EXECUTE Format('CREATE UNLOGGED TABLE %s (
   id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), error_info text, geo Geometry(LineString, %s)
 )',_table_name_result_prefix||'_no_cut_line_failed',_srid);
 
---DROP TABLE IF EXISTS  topo_update.long_time_log1;
--- This is a list of lines that fails
--- this is used for debug
 
 EXECUTE Format('CREATE UNLOGGED TABLE %s (
   id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), execute_time real, info text,
   geo Geometry(LineString, %s)
 )',_table_name_result_prefix||'_long_time_logl',_srid);
 
---DROP TABLE IF EXISTS  topo_update.long_time_log2;
--- This is a list of lines that fails
--- this is used for debug
-
 EXECUTE Format('CREATE UNLOGGED TABLE %s (
   id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), execute_time real, info text,
   sql text, geo Geometry(Polygon, %s)
 )',_table_name_result_prefix||'_long_time_log2',_srid);
 
---DROP TABLE IF EXISTS  topo_update.border_line_segments;
 EXECUTE Format('CREATE UNLOGGED TABLE %s (
   id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), geo Geometry(LineString, %s), point_geo Geometry(Point, %s)
 )',_table_name_result_prefix||'_border_line_segments',_srid,_srid);
 
 
+-- Create the simple feature result table  as copy of the input table
+EXECUTE Format('CREATE UNLOGGED TABLE %s AS TABLE %s with NO DATA',_table_name_result_prefix||'_result',_table_to_resolve);
+	
+EXECUTE Format('ALTER TABLE %s ADD column _num_overlap int',_table_name_result_prefix||'_result');
 
   RETURN num_cells;
 END;

@@ -103,20 +103,16 @@ BEGIN
   COMMIT;
   -- ############################# START # add lines inside box and cut lines and save then in separate table,
   -- lines maybe simplified in this process also, but not the lines that are close to a border
-  -- TODO REMOVE LOOP
-  LOOP
-    command_string := Format('SELECT ARRAY(SELECT sql_to_run as func_call FROM %s WHERE block_bb is null ORDER BY md5(cell_geo::Text) desc)', job_list_name);
-    RAISE NOTICE 'command_string %', command_string;
-    EXECUTE command_string INTO stmts;
-    EXIT
-    WHEN Array_length(stmts, 1) IS NULL
-      OR stmts IS NULL;
-    RAISE NOTICE 'array_length(stmts,1) %, stmts %', Array_length(stmts, 1), stmts;
-    SELECT execute_parallel (stmts, _max_parallel_jobs) INTO call_result;
-    IF (call_result = FALSE) THEN
-      RAISE EXCEPTION 'Failed to run overlap and gap for % with the following statement list %', _table_to_resolve, stmts;
-    END IF;
-  END LOOP;
+  command_string := Format('SELECT ARRAY(SELECT sql_to_run as func_call FROM %s WHERE block_bb is null ORDER BY md5(cell_geo::Text) desc)', job_list_name);
+  RAISE NOTICE 'command_string %', command_string;
+  EXECUTE command_string INTO stmts;
+  RAISE NOTICE 'array_length(stmts,1) %, stmts %', Array_length(stmts, 1), stmts;
+  SELECT execute_parallel (stmts, _max_parallel_jobs) INTO call_result;
+  IF (call_result = FALSE) THEN
+    RAISE EXCEPTION 'Failed to run overlap and gap for % with the following statement list %', _table_to_resolve, stmts;
+  END IF;
+  
+  
   -- ----------------------------- DONE # add lines inside box and cut lines and save then in separate table,
   -- ############################# START # add border lines saved in last run, we will here connect data from the different cell using he border lines.
   cell_job_type := 2;

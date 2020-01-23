@@ -1,4 +1,4 @@
-
+-- TODO we may not this code
 CREATE OR REPLACE FUNCTION resolve_overlap_gap_block_cell(
 input_table_name varchar, 
 input_table_geo_column_name varchar, 

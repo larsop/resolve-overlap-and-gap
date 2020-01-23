@@ -55,8 +55,9 @@ BEGIN
     EXECUTE command_string INTO bb;
   END IF;
   -- get area to block and set
-  area_to_block := resolve_overlap_gap_block_cell(input_table_name, input_table_geo_column_name, input_table_pk_column_name, _job_list_name,
-    bb);
+  -- I don't see why we need this code ??????????? why cant we just the bb as it is so I test thi snow
+  area_to_block := bb;
+  -- area_to_block := resolve_overlap_gap_block_cell(input_table_name, input_table_geo_column_name, input_table_pk_column_name, _job_list_name, bb);
   RAISE NOTICE 'area to block:% ', area_to_block;
   border_topo_info.snap_tolerance := _simplify_tolerance;
   --      --border_topo_info.border_layer_id = 317;
@@ -170,6 +171,9 @@ BEGIN
     -- test with  area to block like bb
     -- area_to_block := bb;
     -- count the number of rows that intersects
+    area_to_block := ST_BUffer(bb,glue_snap_tolerance_fixed);
+
+
     command_string := Format('select count(*) from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
     EXECUTE command_string INTO num_boxes_intersect;
     command_string := Format('select count(*) from (select * from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L) for update SKIP LOCKED) as r;', _job_list_name, area_to_block);

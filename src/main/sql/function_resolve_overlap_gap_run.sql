@@ -45,7 +45,7 @@ DECLARE
   -- TODO send as parameter or fix in another way
   simplify_tolerance double precision = (_tolerance*2); -- this is the tolerance used when adding new lines s
   snap_tolerance double precision = _tolerance; -- this is the tolerance used when creating the topo layer 
-  inside_cell_data boolean = TRUE;
+  cell_job_type int = 1; -- add lines 1 inside cell, 2 boderlines, 3 exract simple
   topology_schema_name varchar = _topology_name; -- for now we use the same schema as the topology structure
 
   -- TODO add a paarameter
@@ -96,7 +96,7 @@ BEGIN
   snap_tolerance, 
   _do_chaikins, 
   _min_area_to_keep, 
-  inside_cell_data
+  cell_job_type
   );
   EXECUTE command_string;
   -- ----------------------------- DONE - create jobList tables
@@ -119,7 +119,7 @@ BEGIN
   END LOOP;
   -- ----------------------------- DONE # add lines inside box and cut lines and save then in separate table,
   -- ############################# START # add border lines saved in last run, we will here connect data from the different cell using he border lines.
-  inside_cell_data := FALSE;
+  cell_job_type := 2;
   command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%L,%L,%s,%s,%L,%L,%L)', 
   _table_to_resolve, 
   _table_geo_collumn_name, 
@@ -133,7 +133,7 @@ BEGIN
   snap_tolerance, 
   _do_chaikins, 
   _min_area_to_keep, 
-  inside_cell_data
+  cell_job_type
   );
   EXECUTE command_string;
   COMMIT;

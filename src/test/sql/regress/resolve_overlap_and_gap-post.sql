@@ -39,7 +39,7 @@ simplify_tolerance_ double precision, -- the tolerance to be used when creating 
 snap_tolerance_ double precision, -- the tolrence to be used when add data
 do_chaikins_ boolean, -- simlyfy lines by using chaikins and simlify
 _min_area_to_keep float, -- surfaces with area less than this will merge with a neightbor
-inside_cell_data_ boolean -- add lines inside cell, or boderlines
+cell_job_type_ int -- add lines inside cell, or boderlines
 );
 
 DROP PROCEDURE IF EXISTS resolve_overlap_gap_job_list (
@@ -56,7 +56,7 @@ simplify_tolerance_ double precision, -- the tolerance to be used when creating 
 snap_tolerance_ double precision, -- the tolrence to be used when add data
 do_chaikins_ boolean, -- simlyfy lines by using chaikins and simlify
 _min_area_to_keep float, -- surfaces with area less than this will merge with a neightbor
-inside_cell_data_ boolean -- add lines inside cell, or boderlines
+cell_job_type_ int -- add lines inside cell, or boderlines
 );
 
 DROP FUNCTION IF EXISTS resolve_overlap_gap_block_cell(

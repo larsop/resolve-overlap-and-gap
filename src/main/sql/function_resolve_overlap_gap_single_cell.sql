@@ -13,7 +13,7 @@ CREATE OR REPLACE PROCEDURE resolve_overlap_gap_single_cell (
   _job_list_name character varying, 
   overlapgap_grid varchar,
   bb geometry,
-  inside_cell_data boolean
+  _cell_job_type int -- add lines 1 inside cell, 2 boderlines, 3 exract simple
 )
 LANGUAGE plpgsql
 AS $$
@@ -39,7 +39,7 @@ DECLARE
   
   
 BEGIN
-  RAISE NOTICE 'start wwork at timeofday:% for layer %, with inside_cell_data %', Timeofday(), _topology_name || '_', inside_cell_data;
+  RAISE NOTICE 'start wwork at timeofday:% for layer %, with _cell_job_type %', Timeofday(), _topology_name || '_', _cell_job_type;
   -- check if job is done already
   command_string := Format('select count(*) from %s as gt, %s as done
    where gt.cell_geo && ST_PointOnSurface(%3$L) and gt.id = done.id', _job_list_name, _job_list_name || '_donejobs', bb);
@@ -49,7 +49,7 @@ BEGIN
     RETURN;
   END IF;
   start_time := Clock_timestamp();
-  RAISE NOTICE 'enter work at timeofday:% for layer %, with inside_cell_data %', Timeofday(), _topology_name || '_' || box_id, inside_cell_data;
+  RAISE NOTICE 'enter work at timeofday:% for layer %, with _cell_job_type %', Timeofday(), _topology_name || '_' || box_id, _cell_job_type;
   IF bb IS NULL AND input_table_name IS NOT NULL THEN
     command_string := Format('select ST_Envelope(ST_Collect(geo)) from %s', input_table_name);
     EXECUTE command_string INTO bb;
@@ -60,8 +60,8 @@ BEGIN
   RAISE NOTICE 'area to block:% ', area_to_block;
   border_topo_info.snap_tolerance := _simplify_tolerance;
   --      --border_topo_info.border_layer_id = 317;
-  RAISE NOTICE 'start work at timeofday:% for layer %, with inside_cell_data %', Timeofday(), _topology_name || '_' || box_id, inside_cell_data;
-  IF inside_cell_data THEN
+  RAISE NOTICE 'start work at timeofday:% for layer %, with _cell_job_type %', Timeofday(), _topology_name || '_' || box_id, _cell_job_type;
+  IF _cell_job_type  = 1 THEN
     command_string := Format('select id from %1$s where cell_geo = %2$L', _job_list_name, bb);
     RAISE NOTICE '% ', command_string;
     EXECUTE command_string INTO box_id;
@@ -183,7 +183,7 @@ BEGIN
     _topology_name, bb, snap_tolerance_fixed, overlapgap_grid,_table_name_result_prefix,input_table_geo_column_name);
     EXECUTE command_string;
   END IF;
-  RAISE NOTICE 'done work at timeofday:% for layer %, with inside_cell_data %', Timeofday(), border_topo_info.topology_name, inside_cell_data;
+  RAISE NOTICE 'done work at timeofday:% for layer %, with _cell_job_type %', Timeofday(), border_topo_info.topology_name, _cell_job_type;
   command_string := Format('update %1$s set block_bb = %2$L where cell_geo = %3$L', _job_list_name, bb, bb);
   RAISE NOTICE '% ', command_string;
   EXECUTE command_string;
@@ -200,7 +200,7 @@ BEGIN
     _table_name_result_prefix||'_long_time_log2',used_time,'simplefeature_c2_topo_surface_border_retry',command_string,bb);  
   END IF;
   PERFORM topo_update.clear_blocked_area (bb, _job_list_name);
-  RAISE NOTICE 'leave work at timeofday:% for layer %, with inside_cell_data %', Timeofday(), border_topo_info.topology_name, inside_cell_data;
+  RAISE NOTICE 'leave work at timeofday:% for layer %, with _cell_job_type %', Timeofday(), border_topo_info.topology_name, _cell_job_type;
   --RETURN added_rows;
 END
 $$;

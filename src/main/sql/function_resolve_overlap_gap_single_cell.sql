@@ -96,8 +96,8 @@ BEGIN
     --              EXECUTE command_string;
     -- add to glue lijnes to the finale result
     -- NB We have to use snap less that one meter to avpid snapping across cell
-    command_string := Format('SELECT topo_update.add_border_lines(%3$L,r.geom,%1$s) FROM (
-                  SELECT geom from  %2$s.edge ) as r', snap_tolerance_fixed, border_topo_info.topology_name, _topology_name);
+    command_string := Format('SELECT topo_update.add_border_lines(%3$L,r.geom,%1$s,%4$L) FROM (
+                  SELECT geom from  %2$s.edge ) as r', snap_tolerance_fixed, border_topo_info.topology_name, _topology_name, _table_name_result_prefix);
     -- using the input tolreance for adding
     border_topo_info.snap_tolerance := snap_tolerance_fixed;
     command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::Text, %L) 
@@ -125,13 +125,13 @@ BEGIN
   ),
   r as (SELECT (ST_Dump(ST_LineMerge(ST_ExteriorRing(lg2.geom)))).geom
   from lg2)
-  SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s) FROM r', _snap_tolerance, Quote_literal(border_topo_info.topology_name), border_topo_info.topology_name, _topology_name);
+  SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM r', _snap_tolerance, Quote_literal(border_topo_info.topology_name), border_topo_info.topology_name, _topology_name, _table_name_result_prefix);
     --              RAISE NOTICE 'command_string %' , command_string;
     --              EXECUTE command_string;
     -- add to finale result
     ------- this does not work
-    command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s) FROM (
-                  SELECT geom from  %2$s.edge where ST_DWithin(geom,%3$L,0.6) is true) as r', _snap_tolerance, border_topo_info.topology_name, ST_ExteriorRing (bb), _topology_name);
+    command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (
+                  SELECT geom from  %2$s.edge where ST_DWithin(geom,%3$L,0.6) is true) as r', _snap_tolerance, border_topo_info.topology_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
     --              RAISE NOTICE 'command_string %' , command_string;
     --              EXECUTE command_string;
     -- add to finale result
@@ -152,8 +152,8 @@ BEGIN
     --              EXECUTE command_string;
     --
     --END IF;
-    command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s) FROM (
-                  SELECT geom from  %2$s.edge) as r', _snap_tolerance, border_topo_info.topology_name, ST_ExteriorRing (bb), _topology_name);
+    command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (
+                  SELECT geom from  %2$s.edge) as r', _snap_tolerance, border_topo_info.topology_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
     RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
     -- analyze table topo_ar5_forest_sysdata.face;
@@ -177,7 +177,7 @@ BEGIN
     END IF;
     border_topo_info.topology_name := _topology_name;
     -- NB We have to use fixed snap to here to be sure that lines snapp
-    command_string := Format('SELECT topo_update.add_border_lines(%1$L,geo,%3$s) from topo_update.get_left_over_borders(%4$L,%6$L,%2$L,%5$L)', _topology_name, bb, snap_tolerance_fixed, overlapgap_grid, _table_name_result_prefix, input_table_geo_column_name);
+    command_string := Format('SELECT topo_update.add_border_lines(%1$L,geo,%3$s,%5$L) from topo_update.get_left_over_borders(%4$L,%6$L,%2$L,%5$L)', _topology_name, bb, snap_tolerance_fixed, overlapgap_grid, _table_name_result_prefix, input_table_geo_column_name);
     EXECUTE command_string;
   ELSIF _cell_job_type = 3 THEN
     -- Drop/Create a temp to hold data temporay for job

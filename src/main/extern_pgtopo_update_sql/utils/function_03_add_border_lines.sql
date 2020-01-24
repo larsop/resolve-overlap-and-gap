@@ -4,7 +4,7 @@
 
 -- TODO add code for simple_add_v2
 -- TODO add code for get_single_lineparts
-CREATE OR REPLACE FUNCTION topo_update.add_border_lines (_topology_name character varying, _new_line geometry, _snap_tolerance float)
+CREATE OR REPLACE FUNCTION topo_update.add_border_lines (_topology_name character varying, _new_line geometry, _snap_tolerance float, _table_name_result_prefix varchar)
   RETURNS integer
   AS $$
 DECLARE
@@ -66,8 +66,8 @@ BEGIN
           WHEN OTHERS THEN
             RAISE NOTICE 'failed  ::::::::::::::::::::::::::::::::::::::::::::::::::: ';
           -- select TopoGeo_addLinestring('topo_ar5_forest_sysdata','0102000020E86400000200000000F0FF2748422341FDFF008045125941001000F8474223410300FF7F48125941',1)
-          INSERT INTO topo_update.no_cut_line_failed (error_info, geo)
-            VALUES ('Failed for line with length ' || ST_length (new_egde_geom), new_egde_geom);
+          EXECUTE Format('INSERT INTO %s(error_info, geo) VALUES (%s, %L)', _table_name_result_prefix || '_no_cut_line_failed', new_egde_geom);
+  
           END;
       END;
     END;

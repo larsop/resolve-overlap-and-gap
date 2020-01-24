@@ -82,28 +82,21 @@ BEGIN
     command_string := Format('create temp table tmp_simplified_border_lines as (select g.* FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L,%L) g)', input_table_name, input_table_geo_column_name, bb, _simplify_tolerance, _do_chaikins, _table_name_result_prefix);
     RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
+    
     -- add the glue line with no/small tolerance
     border_topo_info.snap_tolerance := glue_snap_tolerance_fixed;
     command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::Text, %L) 
                   from tmp_simplified_border_lines g where line_type = 1', border_topo_info);
     RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
-    -- add lines aleday added som we get he same break
-    border_topo_info.snap_tolerance := snap_tolerance_fixed;
-    command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::Text, %L) 
-                  from tmp_simplified_border_lines g where line_type = 2', border_topo_info);
-    --              RAISE NOTICE 'command_string %' , command_string;
-    --              EXECUTE command_string;
-    -- add to glue lijnes to the finale result
-    -- NB We have to use snap less that one meter to avpid snapping across cell
-    command_string := Format('SELECT topo_update.add_border_lines(%3$L,r.geom,%1$s,%4$L) FROM (
-                  SELECT geom from  %2$s.edge ) as r', snap_tolerance_fixed, border_topo_info.topology_name, _topology_name, _table_name_result_prefix);
+
     -- using the input tolreance for adding
     border_topo_info.snap_tolerance := snap_tolerance_fixed;
     command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::Text, %L) 
                   from tmp_simplified_border_lines g where line_type = 0', border_topo_info);
     RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
+
     face_table_name = border_topo_info.topology_name || '.face';
     start_remove_small := Clock_timestamp();
     RAISE NOTICE 'Start clean small polygons for face_table_name % at %', face_table_name, Clock_timestamp();
@@ -112,46 +105,7 @@ BEGIN
       _utm);
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
     RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
-    -- get valid faces and thise eges that touch out biedery
-    -------------- this does not work
-    command_string := Format('
-  WITH lg as (
-  SELECT 
-  topology.ST_GetFaceGeometry(%2$s,lg.face_id) as geom 
-  from  %3$s.face lg where ST_Area(mbr,false) > 100
-  ),
-  lg2 as (
-  select (ST_DumpRings((st_dump(lg.geom)).geom)).geom from lg where lg.geom is not null and ST_area(lg.geom) > 49
-  ),
-  r as (SELECT (ST_Dump(ST_LineMerge(ST_ExteriorRing(lg2.geom)))).geom
-  from lg2)
-  SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM r', _snap_tolerance, Quote_literal(border_topo_info.topology_name), border_topo_info.topology_name, _topology_name, _table_name_result_prefix);
-    --              RAISE NOTICE 'command_string %' , command_string;
-    --              EXECUTE command_string;
-    -- add to finale result
-    ------- this does not work
-    command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (
-                  SELECT geom from  %2$s.edge where ST_DWithin(geom,%3$L,0.6) is true) as r', _snap_tolerance, border_topo_info.topology_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
-    --              RAISE NOTICE 'command_string %' , command_string;
-    --              EXECUTE command_string;
-    -- add to finale result
-    --TODO make a test for final result or not
-    --if (_do_chaikins is false) THEN
-    --              command_string := format('SELECT topo_update.add_border_lines(r.geom,%1$s) FROM (
-    --              SELECT geom from  %2$s.edge) as r'
-    --              , _snap_tolerance, border_topo_info.topology_name,ST_ExteriorRing(bb));
-    --              RAISE NOTICE 'command_string %' , command_string;
-    --              EXECUTE command_string;
-    --ELSE
-    --              ------- this does not work
-    --              command_string := format('SELECT topo_update.add_border_lines(r.geom,%1$s) FROM (
-    --              SELECT e1.geom from  %2$s.edge e1, tmp_sf_ar5_forest_input.not_selected_forest_area p
-    --where ST_CoveredBy(p.wkb_geometry,%3$L) and ST_CoveredBy(e1.geom,p.wkb_geometry) is false) as r'
-    --              , _snap_tolerance, border_topo_info.topology_name,bb);
-    --              RAISE NOTICE 'command_string %' , command_string;
-    --              EXECUTE command_string;
-    --
-    --END IF;
+ 
     command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (
                   SELECT geom from  %2$s.edge) as r', _snap_tolerance, border_topo_info.topology_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
     RAISE NOTICE 'command_string %', command_string;

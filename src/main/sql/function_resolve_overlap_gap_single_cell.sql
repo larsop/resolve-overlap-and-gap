@@ -213,7 +213,7 @@ EXECUTE Format('ALTER TABLE %s ADD column %s serial',temp_table_name, temp_table
 	SELECT f.face_id, min(jl.id) as cell_id  FROM
 	%1$s.face f, 
 	%4$s jl 
-	WHERE f.mbr && jl.cell_geo and cell_geo && %2$L
+	WHERE f.mbr && %2$L and jl.cell_geo && f.mbr
 	GROUP BY f.face_id
 	) as r where cell_id = %6$s',	
 	_topology_name, bb, temp_table_name, _table_name_result_prefix||'_job_list', input_table_geo_column_name, box_id);	

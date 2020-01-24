@@ -17,6 +17,8 @@ SELECT 'degrees_check_added_lines', count(geom) from test_topo_t2.edge;
 
 SELECT 'degrees_check_added_faces', count(mbr) from test_topo_t2.face;
 
+SELECT 'degrees_check_added_simple_feature_polygons', count(*) from test_topo_t2.overlap_gap_input_t2_result;
+
 SELECT 'degrees', topology.droptopology('test_topo_t2');
 
 

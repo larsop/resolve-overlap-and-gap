@@ -40,7 +40,8 @@ DECLARE
   temp_table_name varchar;
   temp_table_id_column varchar;
   final_result_table_name varchar;
-  
+  update_fields varchar;
+  update_fields_source varchar;
 BEGIN
   RAISE NOTICE 'start wwork at timeofday:% for layer %, with _cell_job_type %', Timeofday(), _topology_name || '_', _cell_job_type;
   -- check if job is done already
@@ -73,6 +74,13 @@ BEGIN
   temp_table_name := '_result_temp_'||box_id; --now()::date::varchar
   temp_table_id_column := '_id'||temp_table_name;
   final_result_table_name := _table_name_result_prefix||'_result';
+
+--  	  	array_agg(quote_ident(update_column)) AS update_fields,
+--	  	array_agg('r.'||quote_ident(update_column)) as update_fields_source
+-- 		  INTO
+--		  	update_fields,
+--		  	update_fields_source
+
    
   IF _cell_job_type  = 1 THEN
     border_topo_info.topology_name := _topology_name || '_' || box_id;
@@ -196,7 +204,8 @@ BEGIN
     _topology_name, bb, snap_tolerance_fixed, overlapgap_grid,_table_name_result_prefix,input_table_geo_column_name);
     EXECUTE command_string;
   ELSIF _cell_job_type  = 3 THEN
- 
+
+
 -- Drop/Create a temp to hold data temporay for job
 EXECUTE Format('DROP TABLE IF EXISTS %s',temp_table_name);
   
@@ -206,8 +215,22 @@ EXECUTE Format('CREATE TEMP TABLE %s AS TABLE %s with NO DATA',temp_table_name,f
 -- Add an extra column to hold a list of other intersections surfaces
 EXECUTE Format('ALTER TABLE %s ADD column %s serial',temp_table_name, temp_table_id_column);
 
+     -- Update cl
+	  	command_string :=   Format('select 
+	  	array_to_string(array_agg(quote_ident(update_column)),%L) AS update_fields,
+	  	array_to_string(array_agg(%L||quote_ident(update_column)),%L) as update_fields_source
+		  FROM (
+		   SELECT distinct(json_object_keys) AS update_column
+		   FROM json_object_keys(to_json(json_populate_record(NULL::%s, %L::JSON))) 
+		   WHERE json_object_keys != %L AND json_object_keys != %L AND json_object_keys != %L  
+		  ) AS keys',
+		  ',','r.',',git ',temp_table_name,'{}',temp_table_id_column,input_table_geo_column_name,'_other_intersect_id_list');
 
-  	-- Insert new geos based on 
+		   RAISE NOTICE '% ', command_string;
+  EXECUTE command_string INTO update_fields,update_fields_source;
+ 	
+
+  	-- Insert new geos based on all face id 
     command_string := Format('insert into %3$s(%5$s)
 	select st_getFaceGeometry(%1$L,face_id) as %5$s from (
 	SELECT f.face_id, min(jl.id) as cell_id  FROM
@@ -221,10 +244,11 @@ EXECUTE Format('ALTER TABLE %s ADD column %s serial',temp_table_name, temp_table
     RAISE NOTICE 'command_string %', command_string;
    EXECUTE command_string;
 
+
     
-   -- picks up value from the biggeste intersctin neighbour 
+   -- update/add primary key and _other_intersect_id_list based on geo
 command_string := Format('update %1$s t
-set %3$s = r.%3$s 
+set (%3$s,_other_intersect_id_list) = (r.%3$s,r._other_intersect_id_list) 
 from (
 	SELECT r.*, r.intersect_id_list[2:] as _other_intersect_id_list , r.intersect_id_list[1] as %3$s  from (
 		select distinct %5$s, array_agg(%3$s) OVER (PARTITION BY %5$s) as intersect_id_list from (
@@ -246,13 +270,27 @@ from (
 	input_table_pk_column_name,
 	input_table_geo_column_name,
 	temp_table_id_column);	
-
    EXECUTE command_string;
 
-    command_string := Format('insert into %1$s(%2$s,%3$s) select %2$s,%3$s from %4$s',	
-	final_result_table_name,
+   
+   
+-- Remove extra column column to hold a list of other intersections surfaces
+EXECUTE Format('ALTER TABLE %s DROP column %s',temp_table_name, temp_table_id_column);
+
+   -- update/add primary key and _other_intersect_id_list based on geo
+command_string := Format('update %1$s t
+set (%4$s) = (%5$s) 
+from %2$s r
+where r.%3$s = t.%3$s',
+    temp_table_name,
+	input_table_name, 
 	input_table_pk_column_name,
-	input_table_geo_column_name,
+	update_fields,
+	update_fields_source);	
+   EXECUTE command_string;
+
+    command_string := Format('insert into %1$s select * from %2$s',	
+	final_result_table_name,
 	temp_table_name);	
 	
     EXECUTE command_string;

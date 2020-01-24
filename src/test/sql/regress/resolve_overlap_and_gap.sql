@@ -17,7 +17,13 @@ SELECT 'degrees_check_added_lines', count(geom) from test_topo_t2.edge;
 
 SELECT 'degrees_check_added_faces', count(mbr) from test_topo_t2.face;
 
-SELECT 'degrees_check_added_simple_feature_polygons', count(*) from test_topo_t2.overlap_gap_input_t2_result;
+SELECT 'degrees_check_added_simple_feature_geom', count(*) from test_topo_t2.overlap_gap_input_t2_result where geom is not null;
+
+SELECT 'degrees_check_added_simple_feature_c1', count(*) from test_topo_t2.overlap_gap_input_t2_result where c1 is not null;
+
+SELECT 'degrees_check_added_simple_feature_c2', count(*) from test_topo_t2.overlap_gap_input_t2_result where c2 is not null;
+
+SELECT 'degrees_check_added_simple_feature_c3', count(*) from test_topo_t2.overlap_gap_input_t2_result where c3 is not null;
 
 SELECT 'degrees', topology.droptopology('test_topo_t2');
 
@@ -32,6 +38,8 @@ SELECT 'utm_check_border_lines', count(geo) from test_topo_t3.overlap_gap_input_
 SELECT 'utm_check_added_lines', count(geom) from test_topo_t3.edge;
 
 SELECT 'utm_check_added_faces', count(mbr) from test_topo_t3.face;
+
+SELECT 'utm_check_added_simple_feature_polygons', count(*) from test_topo_t3.overlap_gap_input_t3_result;
 
 SELECT 'utm', topology.droptopology('test_topo_t3');
 

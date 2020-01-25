@@ -66,7 +66,7 @@ BEGIN
           WHEN OTHERS THEN
             RAISE NOTICE 'failed  ::::::::::::::::::::::::::::::::::::::::::::::::::: ';
           -- select TopoGeo_addLinestring('topo_ar5_forest_sysdata','0102000020E86400000200000000F0FF2748422341FDFF008045125941001000F8474223410300FF7F48125941',1)
-          EXECUTE Format('INSERT INTO %s(error_info, geo) VALUES (%s, %L)', _table_name_result_prefix || '_no_cut_line_failed', new_egde_geom);
+          EXECUTE Format('INSERT INTO %s(error_info, geo) VALUES(%L, %L)', _table_name_result_prefix||'_no_cut_line_failed', 'Failed topo_update.add_border_lines ', new_egde_geom);
   
           END;
       END;
@@ -77,6 +77,3 @@ END;
 $$
 LANGUAGE plpgsql;
 
---select topo_update.add_border_lines('0102000020E864000004000000000000808C392341DA40A70D1B095941000000808A392341000000001B095941000000808A392341FFFFFFFF0D095941000000808C392341FFFFFFFF0D095941');
---select topo_update.add_border_lines('0102000020E864000004000000000000808C392341DA40A70D1B095941000000808A392341000000001B095941000000808A392341FFFFFFFF0D095941000000808C392341FFFFFFFF0D095941');
--- select topo_update.add_border_lines(geo) FROM topo_update.border_line_segments where id = 11295 ;

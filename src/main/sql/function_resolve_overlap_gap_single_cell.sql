@@ -76,6 +76,13 @@ BEGIN
     EXECUTE Format('ALTER table %s.node set unlogged', border_topo_info.topology_name);
     EXECUTE Format('ALTER table %s.face set unlogged', border_topo_info.topology_name);
     EXECUTE Format('ALTER table %s.relation set unlogged', border_topo_info.topology_name);
+    
+  EXECUTE Format('CREATE INDEX ON %s.relation(layer_id)', border_topo_info.topology_name);
+  EXECUTE Format('CREATE INDEX ON %s.relation(abs(element_id))', border_topo_info.topology_name);
+  EXECUTE Format('CREATE INDEX ON %s.edge_data USING GIST (geom)', border_topo_info.topology_name);
+  EXECUTE Format('CREATE INDEX ON %s.relation(element_id)', border_topo_info.topology_name);
+  EXECUTE Format('CREATE INDEX ON %s.relation(topogeo_id)', border_topo_info.topology_name);
+
     -- get the siple feature data both the line_types and the inner lines.
     -- the boundery linnes are saved in a table for later usage
     DROP TABLE IF EXISTS tmp_simplified_border_lines;
@@ -87,14 +94,14 @@ BEGIN
     border_topo_info.snap_tolerance := glue_snap_tolerance_fixed;
     command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::Text, %L) 
                   from tmp_simplified_border_lines g where line_type = 1', border_topo_info);
-    RAISE NOTICE 'command_string %', command_string;
+    --RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
 
     -- using the input tolreance for adding
     border_topo_info.snap_tolerance := snap_tolerance_fixed;
     command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::Text, %L) 
                   from tmp_simplified_border_lines g where line_type = 0', border_topo_info);
-    RAISE NOTICE 'command_string %', command_string;
+    --RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
 
     face_table_name = border_topo_info.topology_name || '.face';
@@ -108,7 +115,7 @@ BEGIN
  
     command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (
                   SELECT geom from  %2$s.edge) as r', _snap_tolerance, border_topo_info.topology_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
-    RAISE NOTICE 'command_string %', command_string;
+    --RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
     -- analyze table topo_ar5_forest_sysdata.face;
     -- remove small polygons in main table

@@ -16,7 +16,7 @@ BEGIN
   BEGIN
     update_egde_id = 0;
     command_string := Format('SELECT e.edge_id, e.geom FROM %1$s.edge_data e where e.geom && %2$L and ST_Intersects(e.geom,%2$L) limit 1', _topology_name, _new_line);
-    RAISE NOTICE '%s, command_string test %s', ST_Length (_new_line), command_string;
+    -- RAISE NOTICE '%s, command_string test %s', ST_Length (_new_line), command_string;
     --		SELECT e.edge_id, e.geom FROM test_topo.edge_data e where e.geom && 0102000020A2100000020000007E2ED15B6788194000E6ABFBFF314E40F0D5450C668819405156FE0700324E40 and ST_Intersects(e.geom,0102000020A2100000020000007E2ED15B6788194000E6ABFBFF314E40F0D5450C668819405156FE0700324E40) limit 1
     EXECUTE command_string INTO update_egde_id, old_egde_geom;
     IF update_egde_id IS NULL THEN

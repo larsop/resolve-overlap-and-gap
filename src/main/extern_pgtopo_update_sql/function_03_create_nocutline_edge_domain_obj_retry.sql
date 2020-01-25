@@ -38,7 +38,7 @@ BEGIN
   json_input_structure.input_geo := ST_GeomFromGeoJSON (feat ->> 'geometry');
   start_tolerance = border_topo_info.snap_tolerance;
   BEGIN
-    RAISE NOTICE 'work start with %,  containing % points', json_input_structure.input_geo, ST_NumPoints (json_input_structure.input_geo);
+    --RAISE NOTICE 'work start with %,  containing % points', json_input_structure.input_geo, ST_NumPoints (json_input_structure.input_geo);
     --test remove reptead points
     inGeom := ST_RemoveRepeatedPoints (json_input_structure.input_geo, start_tolerance);
     json_input_structure.input_geo := inGeom;

@@ -17,7 +17,7 @@ DECLARE
 BEGIN
   -- Convert geometry to TopoGeometry, write it in the temp table
   command_string := Format('select topology.TopoGeo_AddLineString(%L, %L, %L)', border_topo_info.topology_name, json_input_structure.input_geo, border_topo_info.snap_tolerance);
-  RAISE NOTICE 'command_string %', command_string;
+  --RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
   RETURN;
 END;

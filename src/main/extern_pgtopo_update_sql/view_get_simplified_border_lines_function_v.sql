@@ -28,6 +28,7 @@ DECLARE
   boundary_with real = _snap_tolerance * 1.5;
   glue_boundary_with real = _snap_tolerance * 0.5;
   overlap_width_inner real = _snap_tolerance;
+  try_update_invalid_rows int;
 BEGIN
   -- buffer in to work with geom that lines are only meter from the border
   -- will only work with polygons
@@ -89,11 +90,7 @@ BEGIN
     --	update tmp_inner_lines_merged lg
     --	set geo = ST_Segmentize(geo, 1);
   END IF;
-  -- log error lines
-  EXECUTE Format('INSERT INTO %s (error_info, geo)
-  SELECT %L AS error_info, r.geo
-  FROM tmp_inner_lines_merged r
-  WHERE ST_IsValid (r.geo) = FALSE',_table_name_result_prefix||'_no_cut_line_failed','Failed to make valid input line ');
+
   -- make linns for glue parts.
   --#############################
   DROP TABLE IF EXISTS tmp_boundary_line_type_parts;
@@ -108,15 +105,34 @@ BEGIN
     SELECT (ST_Dump (ST_LineMerge (ST_Union (lg.geo ) ) ) ).geom AS geo
     FROM tmp_boundary_line_type_parts AS lg ) r
   );
-INSERT INTO tmp_inner_lines_merged (geo, line_type)
-SELECT r.geo, 1 AS line_type
-FROM tmp_boundary_line_types_merged r
-WHERE ST_ISvalid (r.geo);
-  -- log error lines
-  EXECUTE Format('INSERT INTO %s (error_info, geo)
-  SELECT %L AS error_info, r.geo
-  FROM tmp_boundary_line_types_merged r
-  WHERE ST_IsValid (r.geo) = FALSE',_table_name_result_prefix||'_no_cut_line_failed','Failed to make valid input border line ');
+  
+  
+ -- Try to fix invalid lines
+  UPDATE tmp_inner_lines_merged r 
+  SET geo = ST_MakeValid(r.geo)
+  WHERE ST_IsValid (r.geo) = FALSE; 
+  GET DIAGNOSTICS try_update_invalid_rows = ROW_COUNT;
+  IF  try_update_invalid_rows > 0 THEN
+    -- log error lines
+    EXECUTE Format('INSERT INTO %s (error_info, geo)
+    SELECT %L AS error_info, r.geo
+    FROM tmp_inner_lines_merged r
+    WHERE ST_IsValid (r.geo) = FALSE',_table_name_result_prefix||'_no_cut_line_failed','Failed to make valid input border line in tmp_inner_lines_merged');
+    
+    INSERT INTO tmp_inner_lines_merged (geo, line_type)
+    SELECT r.geo, 1 AS line_type
+    FROM tmp_boundary_line_types_merged r
+    WHERE ST_ISvalid (r.geo);
+
+  ELSE
+  
+    INSERT INTO tmp_inner_lines_merged (geo, line_type)
+    SELECT r.geo, 1 AS line_type
+    FROM tmp_boundary_line_types_merged r;
+    
+  END IF; 
+  
+
   
   
   -- make line part for outer box, that contains the line parts will be added add the final stage when all the cell are done.
@@ -131,19 +147,40 @@ WHERE ST_ISvalid (r.geo);
     SELECT (ST_Dump (ST_LineMerge (ST_Union (lg.geo ) ) ) ).geom AS geo
     FROM tmp_boundary_line_parts AS lg
     );
+
+
+     -- Try to fix invalid lines
+  UPDATE tmp_boundary_lines_merged r 
+  SET geo = ST_MakeValid(r.geo)
+  WHERE ST_IsValid (r.geo) = FALSE; 
+  GET DIAGNOSTICS try_update_invalid_rows = ROW_COUNT;
+  IF  try_update_invalid_rows > 0 THEN
+    -- log error lines
+    EXECUTE Format('INSERT INTO %s (error_info, geo)
+    SELECT %L AS error_info, r.geo
+    FROM tmp_boundary_lines_merged r
+    WHERE ST_IsValid (r.geo) = FALSE',_table_name_result_prefix||'_no_cut_line_failed','Failed to make valid input border line for tmp_boundary_lines_merged' );
     
-  EXECUTE Format('INSERT INTO %s (geo, point_geo)
-  SELECT r.geo, NULL AS point_geo
-  FROM (
-  SELECT r.geo
-  FROM tmp_boundary_lines_merged r
-  WHERE ST_IsValid (r.geo) IS TRUE) AS r',_table_name_result_prefix||'_border_line_segments');
+    EXECUTE Format('INSERT INTO %s (geo, point_geo)
+    SELECT r.geo, NULL AS point_geo
+    FROM (
+    SELECT r.geo
+    FROM tmp_boundary_lines_merged r
+    WHERE ST_IsValid (r.geo) IS TRUE) AS r',_table_name_result_prefix||'_border_line_segments');
+
+  ELSE
+
+    EXECUTE Format('INSERT INTO %s (geo, point_geo)
+    SELECT r.geo, NULL AS point_geo
+    FROM (
+    SELECT r.geo
+    FROM tmp_boundary_lines_merged r) AS r',_table_name_result_prefix||'_border_line_segments');
+
+  END IF; 
+
+    
 
   -- log error lines
-  EXECUTE Format('INSERT INTO %s (error_info, geo)
-  SELECT %L AS error_info, r.geo
-  FROM tmp_boundary_lines_merged r
-  WHERE ST_IsValid (r.geo) = FALSE',_table_name_result_prefix||'_no_cut_line_failed','Failed to make valid input border line ' );
   
   -- return the result of inner geos to handled imediatly
   RETURN QUERY

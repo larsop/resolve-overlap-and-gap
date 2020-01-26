@@ -1,7 +1,7 @@
 /**
  * Add border lines 
  */
---DROP FUNCTION topo_update.add_border_lines (_topology_name character varying, _new_line geometry, _snap_tolerance float, _table_name_result_prefix varchar);
+DROP FUNCTION topo_update.add_border_lines (_topology_name character varying, _new_line geometry, _snap_tolerance float, _table_name_result_prefix varchar);
 
 -- TODO add code for simple_add_v2
 -- TODO add code for get_single_lineparts
@@ -54,42 +54,38 @@ BEGIN
     EXCEPTION
     WHEN OTHERS THEN
       RAISE NOTICE 'failed topo_update.add_border_lines ::::::::::::::::::::::::::::::::::::::::::::::::::: % for edge_id % ', ST_GeometryType (new_egde_geom), update_egde_id;
-      GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
-      v_context = PG_EXCEPTION_CONTEXT;
-      RAISE NOTICE 'failed: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
-      EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', 
-      _table_name_result_prefix || '_no_cut_line_failed', 
-      false, 'Warning, will do retry ', 
-      v_state, v_msg, v_detail, v_hint, v_context,
-      new_egde_geom);
- 
-      
+    GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
+    v_context = PG_EXCEPTION_CONTEXT;
+    RAISE NOTICE 'failed: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
+    EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', _table_name_result_prefix || '_no_cut_line_failed', FALSE, 'Warning, will do retry ', v_state, v_msg, v_detail, v_hint, v_context, new_egde_geom);
     -- ERROR:  XX000: SQL/MM Spatial exception - coincident node
     BEGIN
-      PERFORM topo_update.simple_add_v2 (geom)
+	  PERFORM topology.TopoGeo_addLinestring(_topology_name,geom,_snap_tolerance) 
       FROM (
-        SELECT (ST_Dump (ST_Boundary (ST_Buffer (geom, 1)))).geom
-          --                     SELECT (ST_Dump(topo_update.extend_line(geom,2))).geom
+        SELECT (ST_Dump (geom)).geom
         FROM (
           SELECT topo_update.get_single_lineparts ((ST_Dump (_new_line)).geom) AS geom) AS r) AS r
-    WHERE ST_length (geom) > 0;
+        WHERE ST_length (geom) > 0;
       EXCEPTION
       WHEN OTHERS THEN
-        BEGIN
-          PERFORM topo_update.simple_add_v2 (topo_update.extend_line (geom, 2))
+        GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
+        v_context = PG_EXCEPTION_CONTEXT;
+      RAISE NOTICE 'failed: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
+      EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', _table_name_result_prefix || '_no_cut_line_failed', FALSE, 'Failed topo_update.add_border_lines ', v_state, v_msg, v_detail, v_hint, v_context, _new_line);
+      BEGIN
+        PERFORM topology.TopoGeo_addLinestring(_topology_name,geom,_snap_tolerance) 
+        FROM (
+          SELECT (ST_Dump (geom)).geom
           FROM (
-            SELECT (ST_Dump (topo_update.get_single_lineparts ((ST_Dump (_new_line)).geom))).geom) AS r;
-          EXCEPTION
-          WHEN OTHERS THEN
-            GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
-            v_context = PG_EXCEPTION_CONTEXT;
-            RAISE NOTICE 'failed: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
-            EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', 
-            _table_name_result_prefix || '_no_cut_line_failed', 
-            true, 'Failed topo_update.add_border_lines ', 
-            v_state, v_msg, v_detail, v_hint, v_context,
-            new_egde_geom);
-          END;
+            SELECT topo_update.get_single_lineparts ((ST_Dump (topo_update.extend_line(_new_line, _snap_tolerance*2))).geom) AS geom) AS r) AS r
+          WHERE ST_length (geom) > 0;  
+        EXCEPTION
+        WHEN OTHERS THEN
+          GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
+          v_context = PG_EXCEPTION_CONTEXT;
+        RAISE NOTICE 'failed: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
+        EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', _table_name_result_prefix || '_no_cut_line_failed', TRUE, 'Failed topo_update.add_border_lines ', v_state, v_msg, v_detail, v_hint, v_context, _new_line);
+        END;
       END;
     END;
   RETURN update_egde_id;
@@ -98,5 +94,13 @@ END;
 $$
 LANGUAGE plpgsql;
 
---CALL resolve_overlap_gap_single_cell ('test_data.jm_ukomm_flate_problem', 'geo', 'figurid', 'test_topo_jm.jm_ukomm_flate_problem', 'test_topo_jm', 4258, 'false', 2e-06, 1e-06, 'false', 49, 'test_topo_jm.jm_ukomm_flate_problem_job_list', 'test_topo_jm.jm_ukomm_flate_problem_grid', '0103000020A21000000100000005000000019C3592DD2B2640C2A4F8F884C24F40019C3592DD2B2640328E91EC91CE4F4094AA6F9DC0602640328E91EC91CE4F4094AA6F9DC0602640C2A4F8F884C24F40019C3592DD2B2640C2A4F8F884C24F40', 1);
+UPDATE
+  test_topo_jm.jm_ukomm_flate_problem_job_list
+SET block_bb = NULL;
+
+TRUNCATE test_topo_jm.jm_ukomm_flate_problem_no_cut_line_failed;
+
+TRUNCATE test_topo_jm.jm_ukomm_flate_problem_job_list_donejobs;
+
+CALL resolve_overlap_gap_single_cell ('test_data.jm_ukomm_flate_problem', 'geo', 'figurid', 'test_topo_jm.jm_ukomm_flate_problem', 'test_topo_jm', 4258, 'false', 2e-06, 1e-06, 'false', 49, 'test_topo_jm.jm_ukomm_flate_problem_job_list', 'test_topo_jm.jm_ukomm_flate_problem_grid', '0103000020A21000000100000005000000019C3592DD2B2640C2A4F8F884C24F40019C3592DD2B2640328E91EC91CE4F4094AA6F9DC0602640328E91EC91CE4F4094AA6F9DC0602640C2A4F8F884C24F40019C3592DD2B2640C2A4F8F884C24F40', 1);
 

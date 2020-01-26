@@ -75,7 +75,16 @@ BEGIN
   -- TOOD find out how to handle log tables used for debug
 
 EXECUTE Format('CREATE UNLOGGED TABLE %s (
-  id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), error_info text, geo Geometry(LineString, %s)
+  id serial PRIMARY KEY NOT NULL, 
+  log_time timestamp DEFAULT Now(), 
+  line_geo_lost boolean,
+  error_info text, 
+  d_state text,
+  d_msg text,
+  d_detail text,
+  d_hint text,
+  d_context text,
+  geo Geometry(LineString, %s)
 )',_table_name_result_prefix||'_no_cut_line_failed',_srid);
 
 

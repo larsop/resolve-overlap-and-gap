@@ -6,7 +6,9 @@ DECLARE
   old_egde_geom geometry;
   new_egde_geom geometry;
   tmp_egde_geom geometry;
+  tmp_edge_geom2 geometry;
   single_line_geo geometry;
+  single_line_geo2 geometry;
   command_string text;
   v_state TEXT;
   v_msg TEXT;
@@ -64,22 +66,42 @@ BEGIN
             -- 2
             BEGIN
               -- try remove old intersecting egdes and add them again
-              tmp_egde_geom := ST_ExteriorRing (ST_buffer (new_egde_geom, _snap_tolerance, 1));
+              tmp_egde_geom := new_egde_geom;
               command_string := Format('CREATE TEMP table temp_table_fix_topo as 
-                (
-                select (ST_Dump(ST_LineMerge(ST_Union(ST_SnapToGrid(e.geom,%1$s),ST_SnapToGrid(%2$L,%1$s))))).geom as line, e.edge_id
-                from 
-                %3$s.edge e
-                where e.geom && %4$L and ST_Intersects(e.geom,%4$L)
-                )', _snap_tolerance, new_egde_geom, _topology_name, tmp_egde_geom);
+                      (
+                      select (ST_Dump(ST_LineMerge(ST_Union(ST_SnapToGrid(e.geom,%1$s),ST_SnapToGrid(%2$L,%1$s))))).geom as line, e.edge_id
+                      from 
+                      %3$s.edge e
+                      where e.geom && %2$L and ST_Intersects(e.geom,%2$L)
+                      )', _snap_tolerance, tmp_egde_geom, _topology_name);
               EXECUTE command_string;
               command_string := Format('select topology.ST_RemEdgeNewFace(%1$L,  l.edge_id) from 
-                (select distinct edge_id from temp_table_fix_topo) as l,
-                %1$s.edge e
-                where l.edge_id = e.edge_id', _topology_name);
+                      (select distinct edge_id from temp_table_fix_topo) as l,
+                      %1$s.edge e
+                      where l.edge_id = e.edge_id', _topology_name);
               EXECUTE command_string;
-              command_string := Format('select topology.TopoGeo_addLinestring(%1$L,line,%2$s) from temp_table_fix_topo', _topology_name,_snap_tolerance);
-              EXECUTE command_string;
+              command_string := Format('select ST_Collect(distinct line) from temp_table_fix_topo');
+              EXECUTE command_string into single_line_geo2;
+
+              -- start loop throug each
+              SELECT ST_NumGeometries (single_line_geo2) INTO dim2;
+              --1
+              WHILE i2 < dim2 LOOP
+                i2 := i2 + 1;
+                tmp_edge_geom2 := ST_GeometryN (single_line_geo2, i2);
+                BEGIN
+                  command_string := Format('select topology.TopoGeo_addLinestring(%s,%L,%s)', Quote_literal(_topology_name), tmp_edge_geom2, _snap_tolerance * 2);
+                  EXECUTE command_string;
+                  EXCEPTION
+                  WHEN OTHERS THEN
+                    RAISE NOTICE 'failed topo_update.add_border_lines ::::::::::::::::::::::::::::::::::::::::::::::::::: %', ST_GeometryType (tmp_edge_geom2);
+                  GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
+                  v_context = PG_EXCEPTION_CONTEXT;
+                  RAISE NOTICE 'failed: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
+                  EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, TRUE, 'Failed1, at num '||i2||' topo_update.add_border_lines', v_state, v_msg, v_detail, v_hint, v_context, tmp_edge_geom2);
+                  END;
+              END LOOP;
+              -- done loop throug each
               DROP TABLE temp_table_fix_topo;
               EXCEPTION
               WHEN OTHERS THEN
@@ -87,7 +109,7 @@ BEGIN
               GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
               v_context = PG_EXCEPTION_CONTEXT;
               RAISE NOTICE 'failed: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
-              EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, TRUE, 'Failed1, topo_update.add_border_lines', v_state, v_msg, v_detail, v_hint, v_context, tmp_egde_geom);
+              EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, TRUE, 'Failed2, topo_update.add_border_lines', v_state, v_msg, v_detail, v_hint, v_context, tmp_egde_geom);
               -- 2
               END;
             --1

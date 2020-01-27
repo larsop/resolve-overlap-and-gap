@@ -67,7 +67,7 @@ BEGIN
               tmp_egde_geom := ST_ExteriorRing (ST_buffer (new_egde_geom, _snap_tolerance, 1));
               command_string := Format('CREATE TEMP table temp_table_fix_topo as 
                 (
-                select ST_LineMerge(ST_Union(ST_SnapToGrid(e.geom,%1$s),ST_SnapToGrid(%2$L,%1$s))) as line, e.edge_id
+                select (ST_Dump(ST_LineMerge(ST_Union(ST_SnapToGrid(e.geom,%1$s),ST_SnapToGrid(%2$L,%1$s))))).geom as line, e.edge_id
                 from 
                 %3$s.edge e
                 where e.geom && %4$L and ST_Intersects(e.geom,%4$L)
@@ -78,7 +78,7 @@ BEGIN
                 %1$s.edge e
                 where l.edge_id = e.edge_id', _topology_name);
               EXECUTE command_string;
-              command_string := Format('select topology.TopoGeo_addLinestring(%1$L,line,0.00001) from temp_table_fix_topo', _topology_name);
+              command_string := Format('select topology.TopoGeo_addLinestring(%1$L,line,%2$s) from temp_table_fix_topo', _topology_name,_snap_tolerance);
               EXECUTE command_string;
               DROP TABLE temp_table_fix_topo;
               EXCEPTION

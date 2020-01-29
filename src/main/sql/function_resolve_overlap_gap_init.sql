@@ -40,6 +40,7 @@ BEGIN
   EXECUTE Format('ALTER TABLE %s.face SET unlogged', _topology_schema_name);
   EXECUTE Format('ALTER TABLE %s.relation SET unlogged', _topology_schema_name);
   -- Create indexes
+  EXECUTE Format('CREATE INDEX ON %s.node(containing_face)', _topology_schema_name);
   EXECUTE Format('CREATE INDEX ON %s.relation(layer_id)', _topology_schema_name);
   EXECUTE Format('CREATE INDEX ON %s.relation(abs(element_id))', _topology_schema_name);
   EXECUTE Format('CREATE INDEX ON %s.edge_data USING GIST (geom)', _topology_schema_name);

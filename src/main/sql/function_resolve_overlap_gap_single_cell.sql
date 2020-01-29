@@ -77,6 +77,7 @@ BEGIN
     EXECUTE Format('ALTER table %s.face set unlogged', border_topo_info.topology_name);
     EXECUTE Format('ALTER table %s.relation set unlogged', border_topo_info.topology_name);
     
+  EXECUTE Format('CREATE INDEX ON %s.node(containing_face)', border_topo_info.topology_name);
   EXECUTE Format('CREATE INDEX ON %s.relation(layer_id)', border_topo_info.topology_name);
   EXECUTE Format('CREATE INDEX ON %s.relation(abs(element_id))', border_topo_info.topology_name);
   EXECUTE Format('CREATE INDEX ON %s.edge_data USING GIST (geom)', border_topo_info.topology_name);

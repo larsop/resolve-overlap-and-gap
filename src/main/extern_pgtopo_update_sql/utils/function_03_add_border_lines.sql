@@ -10,11 +10,11 @@ DECLARE
   single_line_geo geometry;
   single_line_geo2 geometry;
   command_string text;
-  v_state TEXT;
-  v_msg TEXT;
-  v_detail TEXT;
-  v_hint TEXT;
-  v_context TEXT;
+  v_state text;
+  v_msg text;
+  v_detail text;
+  v_hint text;
+  v_context text;
   i INT DEFAULT 0;
   dim INT DEFAULT 0;
   i2 INT DEFAULT 0;
@@ -78,11 +78,15 @@ BEGIN
             BEGIN
               -- try remove old intersecting egdes and add them again
               -- Check if the last message is 'SQL/MM Spatial exception - geometry crosses edge ****'
+              
+	          CREATE TEMP table temp_table_fix_topo(line geometry, edge_id int);
+	          
               LOOP
                 BEGIN
 	            crosses_edge_num = - 1;
 	            done_ok := true;
                 num_not_done_ok := num_not_done_ok + 1;
+                i2 := 0;
 
                 EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, FALSE, 
                 'Warn4, will do retry, topo_update.add_border_lines ', v_state, v_msg, v_detail, v_hint, v_context, tmp_egde_geom);
@@ -93,20 +97,18 @@ BEGIN
                 tmp_egde_geom := new_egde_geom;
                 IF (crosses_edge > 0) THEN
                   crosses_edge_num := Trim(Substring(v_msg FROM (crosses_edge + Char_length('geometry crosses edge'))))::Int;
-                  command_string := Format('CREATE TEMP table temp_table_fix_topo as 
-                       (
-                       select (ST_Dump(ST_LineMerge(ST_Union(ST_SnapToGrid(e.geom,%1$s),ST_SnapToGrid(%2$L,%1$s))))).geom as line, e.edge_id
+                  command_string := Format('INSERT into temp_table_fix_topo(line,edge_id)  
+                       select distinct (ST_Dump(ST_LineMerge(ST_Union(ST_SnapToGrid(e.geom,%1$s),ST_SnapToGrid(%2$L,%1$s))))).geom as line, e.edge_id
                        from 
                        %3$s.edge e
-                       where e.edge_id = %4$L)', _snap_tolerance, tmp_egde_geom, _topology_name, crosses_edge_num);
+                       where e.edge_id = %4$L', _snap_tolerance, tmp_egde_geom, _topology_name, crosses_edge_num);
                 ELSE
-                  command_string := Format('CREATE TEMP table temp_table_fix_topo as 
-                       (
-                       select (ST_Dump(ST_LineMerge(ST_Union(ST_SnapToGrid(e.geom,%1$s),ST_SnapToGrid(%2$L,%1$s))))).geom as line, e.edge_id
+                  command_string := Format('INSERT into temp_table_fix_topo(line,edge_id)   
+                       select distinct (ST_Dump(ST_LineMerge(ST_Union(ST_SnapToGrid(e.geom,%1$s),ST_SnapToGrid(%2$L,%1$s))))).geom as line, e.edge_id
                        from 
                        %3$s.edge e
                        where e.geom && %2$L and ST_Intersects(e.geom,%2$L)
-                       )', _snap_tolerance, tmp_egde_geom, _topology_name);
+                       ', _snap_tolerance, tmp_egde_geom, _topology_name);
                 END IF;
                 EXECUTE command_string;
                 command_string := Format('select topology.ST_RemEdgeNewFace(%1$L,  l.edge_id) from 
@@ -114,7 +116,7 @@ BEGIN
                        %1$s.edge e
                        where l.edge_id = e.edge_id', _topology_name);
                 EXECUTE command_string;
-                command_string := Format('select ST_Collect(distinct line) from temp_table_fix_topo');
+                command_string := Format('select ST_CollectionExtract(ST_Collect(distinct line),2) from temp_table_fix_topo');
                 EXECUTE command_string INTO single_line_geo2;
                 -- start loop throug each
                 SELECT ST_NumGeometries (single_line_geo2) INTO dim2;
@@ -124,13 +126,14 @@ BEGIN
                   tmp_edge_geom2 := ST_GeometryN (single_line_geo2, i2);
                   BEGIN
                 EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, FALSE, 
-                'Warn5, will do retry, topo_update.add_border_lines ', v_state, v_msg, v_detail, v_hint, v_context, tmp_egde_geom);
+                'Warn5, will do retry, topo_update.add_border_lines i2:'||i2||' dim2:'||dim2||' num_not_done_ok:'||num_not_done_ok||' max_num_not_done_ok:'||max_num_not_done_ok, 
+                v_state, v_msg, v_detail, v_hint, v_context, tmp_edge_geom2);
 	                  
-                    command_string := Format('select topology.TopoGeo_addLinestring(%s,%L,%s)', Quote_literal(_topology_name), tmp_edge_geom2, _snap_tolerance * 2);
+                    command_string := Format('select topology.TopoGeo_addLinestring(%s,%L,%s)', Quote_literal(_topology_name), tmp_edge_geom2, _snap_tolerance );
                     EXECUTE command_string;
                     EXCEPTION
                     WHEN OTHERS THEN
-                    done_ok := true;
+                    done_ok := false;
 
                       RAISE NOTICE 'failed topo_update.add_border_lines ::::::::::::::::::::::::::::::::::::::::::::::::::: %', ST_GeometryType (tmp_edge_geom2);
                     GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
@@ -147,8 +150,6 @@ BEGIN
                     v_state, v_msg, v_detail, v_hint, v_context, tmp_edge_geom2);
                   END;
                 END LOOP;
-                -- done loop throug each
-                DROP TABLE temp_table_fix_topo;
                 EXCEPTION
                 WHEN OTHERS THEN
                   RAISE NOTICE 'failed topo_update.add_border_lines ::::::::::::::::::::::::::::::::::::::::::::::::::: %', ST_GeometryType (tmp_egde_geom);
@@ -161,6 +162,8 @@ BEGIN
                 EXIT WHEN max_num_not_done_ok = num_not_done_ok or done_ok = true;
 
               END LOOP;
+              -- done loop throug each
+              DROP TABLE temp_table_fix_topo;
               --1
               END;
             END;

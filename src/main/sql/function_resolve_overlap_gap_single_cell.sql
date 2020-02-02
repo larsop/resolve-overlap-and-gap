@@ -66,11 +66,14 @@ BEGIN
   IF _cell_job_type = 1 THEN
     border_topo_info.topology_name := _topology_name || '_' || box_id;
     RAISE NOTICE 'use border_topo_info.topology_name %', border_topo_info.topology_name;
-    --    IF ((SELECT Count(*) FROM topology.topology WHERE name = border_topo_info.topology_name) = 1) THEN
-    --      EXECUTE Format('SELECT topology.droptopology(%s)', Quote_literal(border_topo_info.topology_name));
-    --    END IF;
+   border_topo_info.topology_name := _topology_name || '_' || box_id;
+    RAISE NOTICE 'use border_topo_info.topology_name %', border_topo_info.topology_name;
+    IF ((SELECT Count(*) FROM topology.topology WHERE name = border_topo_info.topology_name) = 1) THEN
+       EXECUTE Format('SELECT topology.droptopology(%s)', Quote_literal(border_topo_info.topology_name));
+    END IF;
     --drop this schema in case it exists
-    --    EXECUTE Format('DROP SCHEMA IF EXISTS %s CASCADE', border_topo_info.layer_schema_name);
+    EXECUTE Format('DROP SCHEMA IF EXISTS %s CASCADE', border_topo_info.layer_schema_name);
+ 
     PERFORM topology.CreateTopology (border_topo_info.topology_name, _srid, snap_tolerance_fixed);
     EXECUTE Format('ALTER table %s.edge_data set unlogged', border_topo_info.topology_name);
     EXECUTE Format('ALTER table %s.node set unlogged', border_topo_info.topology_name);

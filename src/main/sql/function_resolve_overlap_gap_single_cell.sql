@@ -164,7 +164,7 @@ BEGIN
     EXECUTE command_string INTO update_fields, update_fields_source;
     -- Insert new geos based on all face id
     command_string := Format('insert into %3$s(%5$s)
- 	select st_getFaceGeometry(%1$L,face_id) as %5$s from (
+ 	select (ST_dump(st_getFaceGeometry(%1$L,face_id))).geom as %5$s from (
  	SELECT f.face_id, min(jl.id) as cell_id  FROM
  	%1$s.face f, 
  	%4$s jl 

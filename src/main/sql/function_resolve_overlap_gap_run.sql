@@ -73,7 +73,7 @@ BEGIN
     EXECUTE command_string;
     COMMIT;
     LOOP
-      command_string := Format('SELECT ARRAY(SELECT sql_to_run as func_call FROM %s WHERE block_bb is null ORDER BY md5(cell_geo::Text) desc)', job_list_name);
+      command_string := Format('SELECT ARRAY(SELECT sql_to_run as func_call FROM %s WHERE block_bb is null ORDER BY md5(cell_geo::Text) desc limit 200 )', job_list_name);
       RAISE NOTICE 'command_string %', command_string;
       EXECUTE command_string INTO stmts;
       EXIT
@@ -84,6 +84,12 @@ BEGIN
       IF (call_result = FALSE) THEN
         RAISE EXCEPTION 'Failed to run overlap and gap for % with the following statement list %', _table_to_resolve, stmts;
       END IF;
+      
+      EXECUTE Format('ANALYZE %s.edge_data', _topology_name);
+      EXECUTE Format('ANALYZE %s.node', _topology_name);
+      EXECUTE Format('ANALYZE %s.face', _topology_name);
+      EXECUTE Format('ANALYZE %s.relation', _topology_name);
+
     END LOOP;
   END LOOP;
 END

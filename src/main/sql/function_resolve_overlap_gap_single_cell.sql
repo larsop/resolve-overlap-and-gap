@@ -117,6 +117,13 @@ BEGIN
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
     RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
  
+   -- IF box_id > 0 and MOD(box_id,50) = 0 THEN
+   --    EXECUTE Format('ANALYZE %s.edge_data', _topology_name);
+   --    EXECUTE Format('ANALYZE %s.node', _topology_name);
+   --    EXECUTE Format('ANALYZE %s.face', _topology_name);
+   --    EXECUTE Format('ANALYZE %s.relation', _topology_name);
+   -- END IF;
+
     command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (
                   SELECT geom from  %2$s.edge) as r', _snap_tolerance, border_topo_info.topology_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
     --RAISE NOTICE 'command_string %', command_string;

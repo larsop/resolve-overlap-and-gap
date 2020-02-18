@@ -35,6 +35,12 @@ DECLARE
   has_edges boolean;
   has_edges_temp_table_name text;
 
+  v_state text;
+  v_msg text;
+  v_detail text;
+  v_hint text;
+  v_context text;
+
 BEGIN
   RAISE NOTICE 'start wwork at timeofday:% for layer %, with _cell_job_type %', Timeofday(), _topology_name || '_', _cell_job_type;
   -- check if job is done already
@@ -166,14 +172,17 @@ BEGIN
       border_topo_info.topology_name);
       EXECUTE command_string;
       
-      
--- no border line error
-    command_string := Format('SELECT topology.TopoGeo_addLinestring(%3$L,r.geom,%1$s) FROM (SELECT geom from %2$s) as r', 
-    _snap_tolerance, has_edges_temp_table_name, _topology_name);
-     EXECUTE command_string;
-
---    command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (SELECT geom from %2$s) as r', _snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
---    EXECUTE command_string;
+--      BEGIN  
+       -- no border line error
+       command_string := Format('SELECT topology.TopoGeo_addLinestring(%3$L,r.geom,%1$s) FROM (SELECT geom from %2$s) as r', 
+       _snap_tolerance, has_edges_temp_table_name, _topology_name);
+       EXECUTE command_string;
+--       EXCEPTION WHEN OTHERS THEN
+--        GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT, v_context = PG_EXCEPTION_CONTEXT;
+--        RAISE NOTICE 'failed: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
+--        command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (SELECT geom from %2$s) as r', _snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
+--        EXECUTE command_string;
+--      END;
       
       command_string := Format('drop table %s',has_edges_temp_table_name);
       EXECUTE command_string;

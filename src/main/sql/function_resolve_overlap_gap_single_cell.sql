@@ -26,6 +26,15 @@ DECLARE
   final_result_table_name varchar;
   update_fields varchar;
   update_fields_source varchar;
+  
+  
+  subtransControlLock_start timestamp;
+  subtransControlLock_count int;
+  subtranscontrollock int;
+
+  has_edges boolean;
+  has_edges_temp_table_name text;
+
 BEGIN
   RAISE NOTICE 'start wwork at timeofday:% for layer %, with _cell_job_type %', Timeofday(), _topology_name || '_', _cell_job_type;
   -- check if job is done already
@@ -63,6 +72,26 @@ BEGIN
   -- 		  INTO
   --		  	update_fields,
   --		  	update_fields_source
+  
+      -- check if any 'SubtransControlLock' is there
+        subtransControlLock_start = clock_timestamp();
+        subtransControlLock_count = 0;
+    LOOP
+      EXECUTE Format('SELECT count(*) from pg_stat_activity where wait_event = %L',
+      'SubtransControlLock') into subtransControlLock;
+      EXIT WHEN subtransControlLock = 0;
+      subtransControlLock_count := subtransControlLock_count + 1;
+      PERFORM pg_sleep(subtransControlLock*subtransControlLock_count*0.1);
+
+    END LOOP;
+    
+    IF subtransControlLock_count > 0 THEN
+      RAISE NOTICE '% subtransControlLock loops, sleep % seconds to wait for release, for _cell_job_type %',
+      subtransControlLock_count, 
+      (Extract(EPOCH FROM (clock_timestamp() - subtransControlLock_start))),
+      _cell_job_type;
+    END IF;
+    
   IF _cell_job_type = 1 THEN
     border_topo_info.topology_name := _topology_name || '_' || box_id;
     RAISE NOTICE 'use border_topo_info.topology_name %', border_topo_info.topology_name;
@@ -117,22 +146,41 @@ BEGIN
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
     RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
  
-   -- IF box_id > 0 and MOD(box_id,50) = 0 THEN
-   --    EXECUTE Format('ANALYZE %s.edge_data', _topology_name);
-   --    EXECUTE Format('ANALYZE %s.node', _topology_name);
-   --    EXECUTE Format('ANALYZE %s.face', _topology_name);
-   --    EXECUTE Format('ANALYZE %s.relation', _topology_name);
-   -- END IF;
+     IF box_id > 0 and MOD(box_id,25) = 0 THEN
+       EXECUTE Format('ANALYZE %s.edge_data', _topology_name);
+       EXECUTE Format('ANALYZE %s.node', _topology_name);
+       EXECUTE Format('ANALYZE %s.face', _topology_name);
+       EXECUTE Format('ANALYZE %s.relation', _topology_name);
+   END IF;
 
-    command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (
-                  SELECT geom from  %2$s.edge) as r', _snap_tolerance, border_topo_info.topology_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
-    --RAISE NOTICE 'command_string %', command_string;
-    EXECUTE command_string;
-    -- analyze table topo_ar5_forest_sysdata.face;
-    -- remove small polygons in main table
-    --              num_rows_removed := topo_update.do_remove_small_areas_no_block(border_topo_info.topology_name,'topo_ar5_forest_sysdata.face' ,'mbr','face_id',_job_list_name ,bb );
-    --              RAISE NOTICE 'Removed % small polygons in face_table_name %', num_rows_removed, 'topo_ar5_forest_sysdata.face';
-    COMMIT;
+
+    command_string := Format('SELECT EXISTS(SELECT 1 from  %1$s.edge limit 1)',
+    border_topo_info.topology_name);
+
+    EXECUTE command_string into has_edges;
+    IF (has_edges) THEN
+      has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;
+      
+      command_string := Format('create unlogged table %1$s as (SELECT geom from  %2$s.edge_data)',
+      has_edges_temp_table_name,
+      border_topo_info.topology_name);
+      EXECUTE command_string;
+      
+      
+-- no border line error
+    command_string := Format('SELECT topology.TopoGeo_addLinestring(%3$L,r.geom,%1$s) FROM (SELECT geom from %2$s) as r', 
+    _snap_tolerance, has_edges_temp_table_name, _topology_name);
+     EXECUTE command_string;
+
+--    command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (SELECT geom from %2$s) as r', _snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
+--    EXECUTE command_string;
+      
+      command_string := Format('drop table %s',has_edges_temp_table_name);
+      EXECUTE command_string;
+    END IF;
+
+
+    execute Format('SET CONSTRAINTS ALL IMMEDIATE');
     PERFORM topology.DropTopology (border_topo_info.topology_name);
   ELSIF _cell_job_type = 2 THEN
     -- on cell border

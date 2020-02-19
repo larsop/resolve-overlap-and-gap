@@ -194,41 +194,24 @@ BEGIN
     PERFORM topology.DropTopology (border_topo_info.topology_name);
     
   ELSIF _cell_job_type = 2 THEN
-     has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;
-     command_string := Format('SELECT EXISTS(SELECT 1 from to_regclass(%L) where to_regclass is not null)',
-     has_edges_temp_table_name);
-
-     EXECUTE command_string into has_edges;
-
-     RAISE NOTICE 'cell % cell_job_type %, has_edges %', box_id, _cell_job_type, has_edges;
+    has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;
+    command_string := Format('SELECT EXISTS(SELECT 1 from to_regclass(%L) where to_regclass is not null)',
+    has_edges_temp_table_name);
+    EXECUTE command_string into has_edges;
+    RAISE NOTICE 'cell % cell_job_type %, has_edges %, _loop_number %', box_id, _cell_job_type, has_edges, _loop_number;
 
     IF (has_edges) THEN
-      
+     IF _loop_number = 1 THEN 
        command_string := Format('SELECT topology.TopoGeo_addLinestring(%3$L,r.geom,%1$s) FROM (SELECT geom from %2$s) as r', _snap_tolerance, has_edges_temp_table_name, _topology_name);
-       EXECUTE command_string;
+     ELSE
+       command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (SELECT geom from %2$s) as r', _snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
+     END IF;
+     EXECUTE command_string;
       
-       command_string := Format('drop table %s',has_edges_temp_table_name);
-       EXECUTE command_string;
+     command_string := Format('drop table %s',has_edges_temp_table_name);
+     EXECUTE command_string;
     END IF;
-      
   ELSIF _cell_job_type = 3 THEN
-     has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;
-     command_string := Format('SELECT EXISTS(SELECT 1 from to_regclass(%L) where to_regclass is not null)',
-     has_edges_temp_table_name);
-
-     EXECUTE command_string into has_edges;
-
-     RAISE NOTICE 'cell % cell_job_type %, has_edges %', box_id, _cell_job_type, has_edges;
-
-    IF (has_edges) THEN
-      command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (SELECT geom from %2$s) as r', _snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
-      EXECUTE command_string;
-      
-      command_string := Format('drop table %s',has_edges_temp_table_name);
-      EXECUTE command_string;
-    END IF;
-  
-  ELSIF _cell_job_type = 4 THEN
     -- on cell border
     -- test with  area to block like bb
     -- area_to_block := bb;
@@ -245,7 +228,7 @@ BEGIN
     -- NB We have to use fixed snap to here to be sure that lines snapp
     command_string := Format('SELECT topo_update.add_border_lines(%1$L,geo,%3$s,%5$L) from topo_update.get_left_over_borders(%4$L,%6$L,%2$L,%5$L)', _topology_name, bb, snap_tolerance_fixed, overlapgap_grid, _table_name_result_prefix, input_table_geo_column_name);
     EXECUTE command_string;
-  ELSIF _cell_job_type = 5 THEN
+  ELSIF _cell_job_type = 4 THEN
     -- Drop/Create a temp to hold data temporay for job
     EXECUTE Format('DROP TABLE IF EXISTS %s', temp_table_name);
     -- Create the temp for result simple feature result table  as copy of the input table

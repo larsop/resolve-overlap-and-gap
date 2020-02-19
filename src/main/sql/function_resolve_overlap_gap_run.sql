@@ -73,8 +73,9 @@ BEGIN
     command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%L,%L,%s,%s,%L,%L,%s)', _table_to_resolve, _table_geo_collumn_name, _table_srid, _utm, overlapgap_grid, table_name_result_prefix, _topology_name, job_list_name, _table_pk_column_name, simplify_tolerance, snap_tolerance, _do_chaikins, _min_area_to_keep, cell_job_type);
     EXECUTE command_string;
     COMMIT;
-    loop_number = 1;
+    loop_number := 1;
     LOOP
+      stmts := '{}';
       command_string := Format('SELECT ARRAY(SELECT sql_to_run||%L as func_call FROM %s WHERE block_bb is null ORDER BY md5(cell_geo::Text) desc )', 
       loop_number||');',job_list_name);
       RAISE NOTICE 'command_string %', command_string;
@@ -83,11 +84,14 @@ BEGIN
       WHEN Array_length(stmts, 1) IS NULL
         OR stmts IS NULL;
       
-      RAISE NOTICE 'array_length(stmts,1) %, stmts %', Array_length(stmts, 1), stmts;
- 
+
+      RAISE NOTICE 'Start to run overlap for % stmts and gap for table % cell_job_type % at loop_number %', 
+      Array_length(stmts, 1), _table_to_resolve, cell_job_type, loop_number;
+
       SELECT execute_parallel (stmts, _max_parallel_jobs) INTO call_result;
-      IF (call_result = FALSE AND cell_job_type != 2 AND loop_number = 1) THEN
-        RAISE EXCEPTION 'Failed to run overlap and gap for % with the following statement list %', _table_to_resolve, stmts;
+      IF (call_result = FALSE AND loop_number > 1) THEN
+        RAISE EXCEPTION 'FFailed to run overlap and gap for % at loop_number % for the following statement list %', 
+        _table_to_resolve, loop_number, stmts;
       END IF;
       
       EXECUTE Format('ANALYZE %s.edge_data', _topology_name);

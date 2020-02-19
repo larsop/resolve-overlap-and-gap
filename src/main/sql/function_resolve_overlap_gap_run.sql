@@ -66,7 +66,7 @@ BEGIN
   command_string := Format('SELECT resolve_overlap_gap_init(%L,%s,%s,%s,%s,%s,%s,%s)', table_name_result_prefix, Quote_literal(_table_to_resolve), Quote_literal(_table_geo_collumn_name), _table_srid, _max_rows_in_each_cell, Quote_literal(overlapgap_grid), Quote_literal(_topology_name), snap_tolerance);
   -- execute the string
   EXECUTE command_string INTO num_cells;
-  FOR cell_job_type IN 1..3 LOOP
+  FOR cell_job_type IN 1..5 LOOP
     -- 1 ############################# START # add lines inside box and cut lines and save then in separate table,
     -- 2 ############################# START # add border lines saved in last run, we will here connect data from the different cell using he border lines.
     command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%L,%L,%s,%s,%L,%L,%s)', _table_to_resolve, _table_geo_collumn_name, _table_srid, _utm, overlapgap_grid, table_name_result_prefix, _topology_name, job_list_name, _table_pk_column_name, simplify_tolerance, snap_tolerance, _do_chaikins, _min_area_to_keep, cell_job_type);
@@ -79,11 +79,16 @@ BEGIN
       EXIT
       WHEN Array_length(stmts, 1) IS NULL
         OR stmts IS NULL;
+      
       RAISE NOTICE 'array_length(stmts,1) %, stmts %', Array_length(stmts, 1), stmts;
+ 
       SELECT execute_parallel (stmts, _max_parallel_jobs) INTO call_result;
-      IF (call_result = FALSE) THEN
+      IF (call_result = FALSE AND  cell_job_type != 2) THEN
         RAISE EXCEPTION 'Failed to run overlap and gap for % with the following statement list %', _table_to_resolve, stmts;
       END IF;
+      
+      EXIT
+      WHEN cell_job_type = 2;
       
       EXECUTE Format('ANALYZE %s.edge_data', _topology_name);
       EXECUTE Format('ANALYZE %s.node', _topology_name);

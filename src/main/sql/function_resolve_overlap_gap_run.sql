@@ -49,6 +49,7 @@ DECLARE
   -- TODO add a paarameter
   _do_chaikins boolean = FALSE;
   _min_area_to_keep float = 49.0;
+  loop_number int;
 BEGIN
   table_name_result_prefix := _topology_name || Substring(_table_to_resolve FROM (Position('.' IN _table_to_resolve)));
   -- This is table name prefix including schema used for the result tables
@@ -72,8 +73,10 @@ BEGIN
     command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%L,%L,%s,%s,%L,%L,%s)', _table_to_resolve, _table_geo_collumn_name, _table_srid, _utm, overlapgap_grid, table_name_result_prefix, _topology_name, job_list_name, _table_pk_column_name, simplify_tolerance, snap_tolerance, _do_chaikins, _min_area_to_keep, cell_job_type);
     EXECUTE command_string;
     COMMIT;
+    loop_number = 1;
     LOOP
-      command_string := Format('SELECT ARRAY(SELECT sql_to_run as func_call FROM %s WHERE block_bb is null ORDER BY md5(cell_geo::Text) desc )', job_list_name);
+      command_string := Format('SELECT ARRAY(SELECT sql_to_run||%L as func_call FROM %s WHERE block_bb is null ORDER BY md5(cell_geo::Text) desc )', 
+      loop_number||');',job_list_name);
       RAISE NOTICE 'command_string %', command_string;
       EXECUTE command_string INTO stmts;
       EXIT
@@ -94,6 +97,8 @@ BEGIN
       EXECUTE Format('ANALYZE %s.node', _topology_name);
       EXECUTE Format('ANALYZE %s.face', _topology_name);
       EXECUTE Format('ANALYZE %s.relation', _topology_name);
+      loop_number := loop_number + 1;
+
 
     END LOOP;
   END LOOP;

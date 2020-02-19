@@ -68,7 +68,7 @@ BEGIN
  	from %s r', 
  	job_list_name_, 
  	Quote_literal(sql_to_run_grid), 
- 	Quote_literal(',' || _cell_job_type || ');'), 
+ 	Quote_literal(',' || _cell_job_type || ','), 
  	Quote_literal(sql_to_block_cmd), 
  	Quote_literal(');'), 
  	overlapgap_grid_);

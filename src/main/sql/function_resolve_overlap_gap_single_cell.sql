@@ -1,4 +1,19 @@
-CREATE OR REPLACE PROCEDURE resolve_overlap_gap_single_cell (input_table_name character varying, input_table_geo_column_name character varying, input_table_pk_column_name character varying, _table_name_result_prefix varchar, _topology_name character varying, _srid int, _utm boolean, _simplify_tolerance double precision, _snap_tolerance double precision, _do_chaikins boolean, _min_area_to_keep float, _job_list_name character varying, overlapgap_grid varchar, bb geometry, _cell_job_type int -- add lines 1 inside cell, 2 boderlines, 3 exract simple
+CREATE OR REPLACE PROCEDURE resolve_overlap_gap_single_cell (
+input_table_name character varying, 
+input_table_geo_column_name character varying, 
+input_table_pk_column_name character varying, 
+_table_name_result_prefix varchar, 
+_topology_name character varying, 
+_srid int, _utm boolean, 
+_simplify_tolerance double precision,
+_snap_tolerance double precision, 
+_do_chaikins boolean, 
+_min_area_to_keep float, 
+_job_list_name character varying, 
+overlapgap_grid varchar, 
+bb geometry, 
+_cell_job_type int, -- add lines 1 inside cell, 2 boderlines, 3 exract simple
+_loop_number int
 )
 LANGUAGE plpgsql
 AS $$

@@ -88,7 +88,7 @@ BEGIN
       RAISE NOTICE 'Start to run overlap for % stmts and gap for table % cell_job_type % at loop_number %', 
       Array_length(stmts, 1), _table_to_resolve, cell_job_type, loop_number;
 
-      SELECT execute_parallel (stmts, _max_parallel_jobs) INTO call_result;
+      SELECT execute_parallel (stmts, _max_parallel_jobs,true) INTO call_result;
       IF (call_result = FALSE AND loop_number > 1) THEN
         RAISE EXCEPTION 'FFailed to run overlap and gap for % at loop_number % for the following statement list %', 
         _table_to_resolve, loop_number, stmts;

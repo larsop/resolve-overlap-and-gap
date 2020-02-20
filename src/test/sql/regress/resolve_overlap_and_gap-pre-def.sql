@@ -281,15 +281,22 @@ GRANT EXECUTE ON FUNCTION cbg_content_based_balanced_grid (table_name_column_nam
  * Based on code from Joe Conway <mail@joeconway.com>
  * https://www.postgresql-archive.org/How-to-run-in-parallel-in-Postgres-td6114510.html
  * 
+ * Execute a set off stmts in parallel  
+ * 
  */
 
-DROP FUNCTION IF EXISTS execute_parallel(stmts text[]);
-DROP FUNCTION IF EXISTS execute_parallel(stmts text[], num_parallel_thread int);
+DROP FUNCTION IF EXISTS execute_parallel(_stmts text[]);
+DROP FUNCTION IF EXISTS execute_parallel(_stmts text[], _num_parallel_thread int);
+DROP FUNCTION IF EXISTS execute_parallel(_stmts text[], _num_parallel_thread int,_user_connstr text);
+DROP FUNCTION IF EXISTS execute_parallel(_stmts text[], _num_parallel_thread int,_close_open_conn boolean,_user_connstr text);
 
--- TODO add test return value
--- TODO catch error on main loop to be sure connenctinos are closed
 
-CREATE OR REPLACE FUNCTION execute_parallel(stmts text[], num_parallel_thread int DEFAULT 3)
+CREATE OR REPLACE FUNCTION execute_parallel(
+_stmts text[], -- The list of statements to run
+_num_parallel_thread int DEFAULT 3, -- number threads/connections to use
+_close_open_conn boolean DEFAULT false, -- always close connection before and open before sending next statement
+_user_connstr text DEFAULT NULL -- check https://www.postgresql.org/docs/11/contrib-dblink-connect.html
+)
 RETURNS boolean AS
 $$
 declare
@@ -297,6 +304,7 @@ declare
   current_stmt_index int = 1;
   current_stmt_sent int = 0;
   new_stmt text;
+  old_stmt text;
   num_stmts_executed int = 0;
   num_stmts_failed int = 0;
   num_conn_opened int = 0;
@@ -319,25 +327,32 @@ declare
   db text := current_database();
 begin
 	
-	IF (Array_length(stmts, 1) IS NULL OR stmts IS NULL) THEN
+	IF (Array_length(_stmts, 1) IS NULL OR _stmts IS NULL) THEN
        RAISE NOTICE 'No statements to execute';
        RETURN TRUE;
     ELSE
-       RAISE NOTICE '% statements to execute in % threads', Array_length(stmts, 1), num_parallel_thread;
+       RAISE NOTICE '% statements to execute in % threads', Array_length(_stmts, 1), _num_parallel_thread;
     END IF;
- 	
-	
-	-- Check if num parallel theads if bugger than num stmts
-	IF (num_parallel_thread > array_length(stmts,1)) THEN
-  	  	num_parallel_thread = array_length(stmts,1);
+    
+	-- Check if num parallel theads if bugger than num _stmts
+	IF (_num_parallel_thread > array_length(_stmts,1)) THEN
+  	  	_num_parallel_thread = array_length(_stmts,1);
   	END IF;
 
-  	connstr := 'dbname=' || db;
-
   	
-  	-- Open connections for num_parallel_thread
+    IF _user_connstr IS NULL THEN
+      connstr := 'dbname=' || db;
+    ELSE
+      --connstr := 'dbname=' || db || ' port=5432';
+      connstr := _user_connstr;
+    END IF;
+ 	
+    RAISE NOTICE '% statements to execute in % threads using %', Array_length(_stmts, 1), _num_parallel_thread, connstr;
+	
+  	
+  	-- Open connections for _num_parallel_thread
 	BEGIN
-	  	for i in 1..num_parallel_thread loop
+	  	for i in 1.._num_parallel_thread loop
 		    conntions_array[i] := 'conn' || i::text;
 		    perform dblink_connect(conntions_array[i], connstr);
 		    num_conn_opened := num_conn_opened + 1;
@@ -348,11 +363,11 @@ begin
 	    GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
                     v_context = PG_EXCEPTION_CONTEXT;
         RAISE NOTICE 'Failed to open all requested connections % , reduce to  % state  : %  message: % detail : % hint   : % context: %', 
-        num_parallel_thread, num_conn_opened, v_state, v_msg, v_detail, v_hint, v_context;
+        _num_parallel_thread, num_conn_opened, v_state, v_msg, v_detail, v_hint, v_context;
 		
-		-- Check if num parallel theads if bugger than num stmts
-		IF (num_conn_opened < num_parallel_thread) THEN
-	  	  	num_parallel_thread = num_conn_opened;
+		-- Check if num parallel theads if bugger than num _stmts
+		IF (num_conn_opened < _num_parallel_thread) THEN
+	  	  	_num_parallel_thread = num_conn_opened;
 	  	END IF;
 
 	END;
@@ -364,12 +379,13 @@ begin
 	  	  new_stmts_started = false;
 	  
 		 -- check if connections are not used
-		 FOR i IN 1..num_parallel_thread loop
+		 FOR i IN 1.._num_parallel_thread loop
 		    IF (conn_stmts[i] is not null) THEN 
 		      --select count(*) from dblink_get_notify(conntions_array[i]) into num_conn_notify;
 		      --IF (num_conn_notify is not null and num_conn_notify > 0) THEN
 		      SELECT dblink_is_busy(conntions_array[i]) into conn_status;
 		      IF (conn_status = 0) THEN
+		        old_stmt := conn_stmts[i];
 			    conn_stmts[i] := null;
 			    num_stmts_executed := num_stmts_executed + 1;
 		    	BEGIN
@@ -382,24 +398,27 @@ begin
 				EXCEPTION WHEN OTHERS THEN
 				    GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
                     v_context = PG_EXCEPTION_CONTEXT;
-                    RAISE NOTICE 'Failed get value for stmt: %s , using conn %, state  : % message: % detail : % hint : % context: %', conn_stmts[i], conntions_array[i], v_state, v_msg, v_detail, v_hint, v_context;
+                    RAISE NOTICE 'Failed get value for stmt: %s , using conn %, state  : % message: % detail : % hint : % context: %', 
+                    old_stmt, conntions_array[i], v_state, v_msg, v_detail, v_hint, v_context;
 					num_stmts_failed := num_stmts_failed + 1;
 		   	 	    perform dblink_disconnect(conntions_array[i]);
 		            perform dblink_connect(conntions_array[i], connstr);
 				END;
 		      END IF;
 		    END IF;
-	        IF conn_stmts[i] is null AND current_stmt_index <= array_length(stmts,1) THEN
+	        IF conn_stmts[i] is null AND current_stmt_index <= array_length(_stmts,1) THEN
 	            -- start next job
 	            -- TODO remove duplicate job
-		        new_stmt := stmts[current_stmt_index];
+		        new_stmt := _stmts[current_stmt_index];
 		        conn_stmts[i] :=  new_stmt;
 		   		RAISE NOTICE 'New stmt (%) on connection %', new_stmt, conntions_array[i];
 	    	    BEGIN
-			    --rv := dblink_send_query(conntions_array[i],'BEGIN; '||new_stmt|| '; COMMIT;');
-			    rv := dblink_send_query(conntions_array[i],new_stmt);
---		   	 	    perform dblink_disconnect(conntions_array[i]);
---		            perform dblink_connect(conntions_array[i], connstr);
+		    	  IF _close_open_conn=true THEN
+		   	 	    perform dblink_disconnect(conntions_array[i]);
+		            perform dblink_connect(conntions_array[i], connstr);
+		    	  END IF;
+			      --rv := dblink_send_query(conntions_array[i],'BEGIN; '||new_stmt|| '; COMMIT;');
+			      rv := dblink_send_query(conntions_array[i],new_stmt);
 			    new_stmts_started = true;
 			    EXCEPTION WHEN OTHERS THEN
 			      GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
@@ -415,24 +434,26 @@ begin
 		    
 		  END loop;
 		  
-		  EXIT WHEN num_stmts_executed = Array_length(stmts, 1); 
+		  EXIT WHEN num_stmts_executed = Array_length(_stmts, 1); 
 		  
 		  -- Do a slepp if nothings happens to reduce CPU load 
 		  IF (new_stmts_started = false) THEN 
 		  	--RAISE NOTICE 'Do sleep at num_stmts_executed %s current_stmt_index =% , array_length= %, new_stmts_started = %', 
-		  	--num_stmts_executed,current_stmt_index, array_length(stmts,1), new_stmts_started;
+		  	--num_stmts_executed,current_stmt_index, array_length(_stmts,1), new_stmts_started;
 			perform pg_sleep(0.0001);
 		  END IF;
 		END LOOP ;
 	
-		-- cose connections for num_parallel_thread
-	  	for i in 1..num_parallel_thread loop
+		-- cose connections for _num_parallel_thread
+	  	for i in 1.._num_parallel_thread loop
 		    perform dblink_disconnect(conntions_array[i]);
 		end loop;
   END IF;
 
+  RAISE NOTICE '% statements to execute in % threads, done with % , failed num %', 
+  Array_length(_stmts, 1), _num_parallel_thread, (current_stmt_index -1), num_stmts_failed;
 
-  IF num_stmts_failed = 0 AND (current_stmt_index -1)= array_length(stmts,1) THEN
+  IF num_stmts_failed = 0 AND (current_stmt_index -1)= array_length(_stmts,1) THEN
   	return true;
   else
   	return false;
@@ -441,7 +462,7 @@ begin
 END;
 $$ language plpgsql;
 
-GRANT EXECUTE on FUNCTION execute_parallel(stmts text[], num_parallel_thread int) TO public;
+GRANT EXECUTE on FUNCTION execute_parallel(_stmts text[], _num_parallel_thread int,_close_open_conn boolean,_user_connstr text) TO public;
 
 
 -- this is internal helper function

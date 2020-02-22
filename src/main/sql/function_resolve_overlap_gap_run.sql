@@ -50,6 +50,13 @@ DECLARE
   _do_chaikins boolean = FALSE;
   _min_area_to_keep float = 49.0;
   loop_number int;
+  
+  -- the name of the content based based on the grid so each thread work on diffrent cell
+  overlapgap_grid_threads varchar;
+  overlapgap_grid_threads_cell_size int;
+  overlapgap_grid_threads_num_cells int;
+
+
 BEGIN
   table_name_result_prefix := _topology_name || Substring(_table_to_resolve FROM (Position('.' IN _table_to_resolve)));
   -- This is table name prefix including schema used for the result tables
@@ -64,9 +71,42 @@ BEGIN
   -- the name of job_list table, this table is ued to track of done jobs
   job_list_name := table_name_result_prefix || '_job_list';
   -- Call init method to create content based create and main topology schema
-  command_string := Format('SELECT resolve_overlap_gap_init(%L,%s,%s,%s,%s,%s,%s,%s)', table_name_result_prefix, Quote_literal(_table_to_resolve), Quote_literal(_table_geo_collumn_name), _table_srid, _max_rows_in_each_cell, Quote_literal(overlapgap_grid), Quote_literal(_topology_name), snap_tolerance);
+  command_string := Format('SELECT resolve_overlap_gap_init(%L,%s,%s,%s,%s,%s,%s,%s)', 
+  table_name_result_prefix, Quote_literal(_table_to_resolve), Quote_literal(_table_geo_collumn_name), _table_srid, _max_rows_in_each_cell, Quote_literal(overlapgap_grid), Quote_literal(_topology_name), snap_tolerance);
   -- execute the string
   EXECUTE command_string INTO num_cells;
+  
+  
+  -- Create a second grid for each thread
+  -- TODO move to init_job ??
+    -- create a content based grid table for input data
+  overlapgap_grid_threads := overlapgap_grid||'_threads'; 
+  overlapgap_grid_threads_cell_size := num_cells/_max_parallel_jobs;
+  IF overlapgap_grid_threads_cell_size = 0 THEN
+    overlapgap_grid_threads_cell_size = 1;
+  END IF;
+  
+  EXECUTE Format('CREATE TABLE %s( id serial, %s geometry(Geometry,%s))', 
+  overlapgap_grid_threads, _table_geo_collumn_name, _table_srid);
+  command_string := Format('INSERT INTO %s(%s) 
+ 	SELECT q_grid.cell::Geometry(geometry,%s) as %s
+ 	from (
+ 	select(st_dump(
+ 	cbg_content_based_balanced_grid(array[ %L],%s))
+ 	).geom as cell) as q_grid', 
+ 	overlapgap_grid_threads, _table_geo_collumn_name, _table_srid, _table_geo_collumn_name, 
+ 	overlapgap_grid || ' '|| _table_geo_collumn_name, overlapgap_grid_threads_cell_size);
+  -- execute the sql command
+  EXECUTE command_string;
+  -- count number of cells in grid
+  command_string := Format('SELECT count(*) from %s', overlapgap_grid_threads);
+  -- execute the sql command
+  EXECUTE command_string INTO overlapgap_grid_threads_num_cells;
+  -- Create Index
+  EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', overlapgap_grid_threads, _table_geo_collumn_name);
+
+  
+  
   FOR cell_job_type IN 1..4 LOOP
     -- 1 ############################# START # add lines inside box and cut lines and save then in separate table,
     -- 2 ############################# START # add border lines saved in last run, we will here connect data from the different cell using he border lines.

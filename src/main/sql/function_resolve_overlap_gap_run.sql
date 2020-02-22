@@ -51,11 +51,6 @@ DECLARE
   _min_area_to_keep float = 49.0;
   loop_number int;
   
-  -- the name of the content based based on the grid so each thread work on diffrent cell
-  overlapgap_grid_threads varchar;
-  overlapgap_grid_threads_cell_size int;
-  overlapgap_grid_threads_num_cells int;
-
 
 BEGIN
   table_name_result_prefix := _topology_name || Substring(_table_to_resolve FROM (Position('.' IN _table_to_resolve)));
@@ -77,38 +72,7 @@ BEGIN
   EXECUTE command_string INTO num_cells;
   
   
-  -- Create a second grid for each thread
-  -- TODO move to init_job ??
-    -- create a content based grid table for input data
-  overlapgap_grid_threads := overlapgap_grid||'_threads'; 
-  overlapgap_grid_threads_cell_size := _max_rows_in_each_cell*_max_parallel_jobs*2;
-  IF overlapgap_grid_threads_cell_size = 0 THEN
-    overlapgap_grid_threads_cell_size = 1;
-  END IF;
-  
-  EXECUTE Format('CREATE TABLE %s( id serial, %s geometry(Geometry,%s))', 
-  overlapgap_grid_threads, _table_geo_collumn_name, _table_srid);
-  command_string := Format('INSERT INTO %s(%s) 
- 	SELECT q_grid.cell::Geometry(geometry,%s) as %s
- 	from (
- 	select(st_dump(
- 	cbg_content_based_balanced_grid(array[ %L],%s))
- 	).geom as cell) as q_grid', 
- 	overlapgap_grid_threads, _table_geo_collumn_name, _table_srid, _table_geo_collumn_name, 
- 	_table_to_resolve || ' '|| _table_geo_collumn_name, overlapgap_grid_threads_cell_size);
-  -- execute the sql command
-  EXECUTE command_string;
-  -- count number of cells in grid
-  command_string := Format('SELECT count(*) from %s', overlapgap_grid_threads);
-  -- execute the sql command
-  EXECUTE command_string INTO overlapgap_grid_threads_num_cells;
- 
-  EXECUTE Format('UPDATE %s set %s = ST_Buffer(%s,-%s)', 
-  overlapgap_grid_threads, _table_geo_collumn_name, _table_geo_collumn_name, _tolerance);
-  
-  -- Create Index
-  EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', overlapgap_grid_threads, _table_geo_collumn_name);
-  
+
   
   FOR cell_job_type IN 1..4 LOOP
     -- 1 ############################# START # add lines inside box and cut lines and save then in separate table,
@@ -116,10 +80,6 @@ BEGIN
     command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%L,%L,%s,%s,%L,%L,%s)', 
     _table_to_resolve, _table_geo_collumn_name, _table_srid, _utm, overlapgap_grid, table_name_result_prefix, _topology_name, job_list_name, _table_pk_column_name, simplify_tolerance, snap_tolerance, _do_chaikins, _min_area_to_keep, cell_job_type);
     EXECUTE command_string;
-    COMMIT;
-    EXECUTE Format('ALTER TABLE %s ADD column inside_cell boolean default false', job_list_name);
-    EXECUTE Format('UPDATE %s g SET inside_cell = true from %s t where t.%s && g.cell_geo and ST_covers(t.%s,g.cell_geo)', 
-    job_list_name,overlapgap_grid_threads,_table_geo_collumn_name,_table_geo_collumn_name);
     COMMIT;
 
     loop_number := 1;

@@ -21,6 +21,10 @@ DECLARE
   -- drop result tables
   drop_result_tables_ boolean = TRUE;
   -- table to keep track of results
+  -- the name of the content based based on the grid so each thread work on diffrent cell
+  overlapgap_grid_threads varchar;
+  overlapgap_grid_threads_cell_size int;
+  overlapgap_grid_threads_num_cells int;
 BEGIN
   -- ############################# START # Create Topology master working schema
   -- drop schema if exists
@@ -70,6 +74,44 @@ BEGIN
   EXECUTE command_string INTO num_cells;
   -- Create Index
   EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', _overlapgap_grid, _geo_collumn_name);
+  
+  -- Create a second grid for each thread
+  -- TODO move to init_job ??
+  -- create a content based grid table for input data
+  overlapgap_grid_threads := _overlapgap_grid||'_threads'; 
+  overlapgap_grid_threads_cell_size := num_cells/5;
+  IF overlapgap_grid_threads_cell_size = 0 THEN
+    overlapgap_grid_threads_cell_size = 1;
+  END IF;
+  
+  EXECUTE Format('CREATE TABLE %s( id serial, %s geometry(Geometry,%s))', 
+  overlapgap_grid_threads, _geo_collumn_name, _srid);
+  command_string := Format('INSERT INTO %s(%s) 
+ 	SELECT q_grid.cell::Geometry(geometry,%s) as %s
+ 	from (
+ 	select(st_dump(
+ 	cbg_content_based_balanced_grid(array[ %L],%s))
+ 	).geom as cell) as q_grid', 
+ 	overlapgap_grid_threads, _geo_collumn_name, _srid, _geo_collumn_name, 
+ 	_overlapgap_grid || ' '|| _geo_collumn_name, overlapgap_grid_threads_cell_size);
+  -- execute the sql command
+  EXECUTE command_string;
+  -- count number of cells in grid
+  command_string := Format('SELECT count(*) from %s', overlapgap_grid_threads);
+  -- execute the sql command
+  EXECUTE command_string INTO overlapgap_grid_threads_num_cells;
+ 
+  EXECUTE Format('UPDATE %s set %s = ST_Buffer(%s,-%s)', 
+  overlapgap_grid_threads, _geo_collumn_name, _geo_collumn_name, _snap_tolerance);
+  
+  -- Create Index
+  EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', overlapgap_grid_threads, _geo_collumn_name);
+
+  EXECUTE Format('ALTER TABLE %s ADD column inside_cell boolean default false', _overlapgap_grid);
+  EXECUTE Format('UPDATE %s g SET inside_cell = true from %s t where ST_covers(t.%s,g.%s)', 
+  _overlapgap_grid,overlapgap_grid_threads,_geo_collumn_name,_geo_collumn_name,_geo_collumn_name);
+
+  
   -- ----------------------------- DONE - Handle content based grid init
   
   -- ----------------------------- Create help tables

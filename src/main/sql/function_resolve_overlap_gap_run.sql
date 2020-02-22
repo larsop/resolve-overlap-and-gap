@@ -81,7 +81,7 @@ BEGIN
   -- TODO move to init_job ??
     -- create a content based grid table for input data
   overlapgap_grid_threads := overlapgap_grid||'_threads'; 
-  overlapgap_grid_threads_cell_size := num_cells/_max_parallel_jobs;
+  overlapgap_grid_threads_cell_size := _max_rows_in_each_cell*_max_parallel_jobs*2;
   IF overlapgap_grid_threads_cell_size = 0 THEN
     overlapgap_grid_threads_cell_size = 1;
   END IF;
@@ -95,28 +95,38 @@ BEGIN
  	cbg_content_based_balanced_grid(array[ %L],%s))
  	).geom as cell) as q_grid', 
  	overlapgap_grid_threads, _table_geo_collumn_name, _table_srid, _table_geo_collumn_name, 
- 	overlapgap_grid || ' '|| _table_geo_collumn_name, overlapgap_grid_threads_cell_size);
+ 	_table_to_resolve || ' '|| _table_geo_collumn_name, overlapgap_grid_threads_cell_size);
   -- execute the sql command
   EXECUTE command_string;
   -- count number of cells in grid
   command_string := Format('SELECT count(*) from %s', overlapgap_grid_threads);
   -- execute the sql command
   EXECUTE command_string INTO overlapgap_grid_threads_num_cells;
+ 
+  EXECUTE Format('UPDATE %s set %s = ST_Buffer(%s,-%s)', 
+  overlapgap_grid_threads, _table_geo_collumn_name, _table_geo_collumn_name, _tolerance);
+  
   -- Create Index
   EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', overlapgap_grid_threads, _table_geo_collumn_name);
-
   
   
   FOR cell_job_type IN 1..4 LOOP
     -- 1 ############################# START # add lines inside box and cut lines and save then in separate table,
     -- 2 ############################# START # add border lines saved in last run, we will here connect data from the different cell using he border lines.
-    command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%L,%L,%s,%s,%L,%L,%s)', _table_to_resolve, _table_geo_collumn_name, _table_srid, _utm, overlapgap_grid, table_name_result_prefix, _topology_name, job_list_name, _table_pk_column_name, simplify_tolerance, snap_tolerance, _do_chaikins, _min_area_to_keep, cell_job_type);
+    command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%L,%L,%s,%s,%L,%L,%s)', 
+    _table_to_resolve, _table_geo_collumn_name, _table_srid, _utm, overlapgap_grid, table_name_result_prefix, _topology_name, job_list_name, _table_pk_column_name, simplify_tolerance, snap_tolerance, _do_chaikins, _min_area_to_keep, cell_job_type);
     EXECUTE command_string;
     COMMIT;
+    EXECUTE Format('ALTER TABLE %s ADD column inside_cell boolean default false', job_list_name);
+    EXECUTE Format('UPDATE %s g SET inside_cell = true from %s t where t.%s && g.cell_geo and ST_covers(t.%s,g.cell_geo)', 
+    job_list_name,overlapgap_grid_threads,_table_geo_collumn_name,_table_geo_collumn_name);
+    COMMIT;
+
     loop_number := 1;
     LOOP
       stmts := '{}';
-      command_string := Format('SELECT ARRAY(SELECT sql_to_run||%L as func_call FROM %s WHERE block_bb is null ORDER BY md5(cell_geo::Text) desc )', 
+      command_string := Format('SELECT ARRAY(SELECT sql_to_run||%L as func_call FROM %s WHERE block_bb is null 
+        ORDER BY inside_cell desc, md5(cell_geo::Text) desc )',  
       loop_number||');',job_list_name);
       RAISE NOTICE 'command_string %', command_string;
       EXECUTE command_string INTO stmts;
@@ -124,7 +134,6 @@ BEGIN
       WHEN Array_length(stmts, 1) IS NULL
         OR stmts IS NULL;
       
-
       RAISE NOTICE 'Start to run overlap for % stmts and gap for table % cell_job_type % at loop_number %', 
       Array_length(stmts, 1), _table_to_resolve, cell_job_type, loop_number;
 

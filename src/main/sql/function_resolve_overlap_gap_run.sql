@@ -86,7 +86,7 @@ BEGIN
     LOOP
       stmts := '{}';
       command_string := Format('SELECT ARRAY(SELECT sql_to_run||%L as func_call FROM %s WHERE block_bb is null 
-        ORDER BY inside_cell desc, md5(cell_geo::Text) desc )',  
+        ORDER BY inside_cell desc, num_polygons desc )',  
       loop_number||');',job_list_name);
       RAISE NOTICE 'command_string %', command_string;
       EXECUTE command_string INTO stmts;

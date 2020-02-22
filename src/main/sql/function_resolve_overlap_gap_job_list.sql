@@ -32,7 +32,7 @@ BEGIN
   command_string := Format('DROP table if exists %s', job_list_name_);
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
-  command_string := Format('CREATE unlogged table %s(id serial, start_time timestamp with time zone, inside_cell boolean, sql_to_block varchar, sql_to_run varchar, cell_geo geometry(geometry,%s),block_bb Geometry(geometry,%s))',
+  command_string := Format('CREATE unlogged table %s(id serial, start_time timestamp with time zone, inside_cell boolean, num_polygons int, sql_to_block varchar, sql_to_run varchar, cell_geo geometry(geometry,%s),block_bb Geometry(geometry,%s))',
   job_list_name_,_srid,_srid);
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
@@ -60,9 +60,10 @@ BEGIN
   -- add inside cell polygons
   -- TODO solve how to find r.geom
   command_string := Format('
- 	INSERT INTO %s(inside_cell,sql_to_run,cell_geo,sql_to_block) 
+ 	INSERT INTO %s(inside_cell,num_polygons,sql_to_run,cell_geo,sql_to_block) 
  	SELECT
     r.inside_cell, 
+    r.num_polygons,
     %s||quote_literal(r.'||geo_collumn_name_||'::Varchar)||%s as sql_to_run, 
     r.'||geo_collumn_name_||' as cell_geo, 
     %s||quote_literal(r.'||geo_collumn_name_||'::Varchar)||%s as sql_to_block
@@ -82,6 +83,12 @@ BEGIN
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
   command_string := Format('CREATE INDEX ON %s (id);', job_list_name_);
+  RAISE NOTICE 'command_string %', command_string;
+  command_string := Format('CREATE INDEX ON %s (id);', job_list_name_);
+  RAISE NOTICE 'command_string %', command_string;
+  command_string := Format('CREATE INDEX ON %s (num_polygons);', job_list_name_);
+  RAISE NOTICE 'command_string %', command_string;
+  command_string := Format('CREATE INDEX ON %s (inside_cell);', job_list_name_);
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
   command_string := Format('CREATE INDEX ON %s (id);', job_list_name_ || '_donejobs');

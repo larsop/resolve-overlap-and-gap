@@ -111,6 +111,13 @@ BEGIN
   EXECUTE Format('UPDATE %s g SET inside_cell = true from %s t where ST_covers(t.%s,g.%s)', 
   _overlapgap_grid,overlapgap_grid_threads,_geo_collumn_name,_geo_collumn_name,_geo_collumn_name);
 
+  EXECUTE Format('ALTER TABLE %s ADD column num_polygons int default 0', _overlapgap_grid);
+  
+  EXECUTE Format('UPDATE %s g SET num_polygons = r.num_polygons FROM 
+  (select count(t.*) as num_polygons,g.id from %s t, %s g where t.%s && g.%s group by g.id) as r
+  where r.id = g.id', 
+  _overlapgap_grid,_table_to_resolve,_overlapgap_grid,_geo_collumn_name,_geo_collumn_name);
+
   
   -- ----------------------------- DONE - Handle content based grid init
   

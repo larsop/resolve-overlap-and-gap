@@ -113,6 +113,8 @@ BEGIN
       _cell_job_type;
     END IF;
     
+   
+    
   IF _cell_job_type = 1 THEN
     border_topo_info.topology_name := _topology_name || '_' || box_id;
     RAISE NOTICE 'use border_topo_info.topology_name %', border_topo_info.topology_name;
@@ -167,14 +169,6 @@ BEGIN
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
     RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
  
-     IF box_id > 0 and MOD(box_id,25) = 0 THEN
-       EXECUTE Format('ANALYZE %s.edge_data', _topology_name);
-       EXECUTE Format('ANALYZE %s.node', _topology_name);
-       EXECUTE Format('ANALYZE %s.face', _topology_name);
-       EXECUTE Format('ANALYZE %s.relation', _topology_name);
-   END IF;
-
-
     command_string := Format('SELECT EXISTS(SELECT 1 from  %1$s.edge limit 1)',
     border_topo_info.topology_name);
 
@@ -194,6 +188,14 @@ BEGIN
     PERFORM topology.DropTopology (border_topo_info.topology_name);
     
   ELSIF _cell_job_type = 2 THEN
+    IF box_id > 0 and MOD(box_id,25) = 0 THEN
+       EXECUTE Format('ANALYZE %s.edge_data', _topology_name);
+       EXECUTE Format('ANALYZE %s.node', _topology_name);
+       EXECUTE Format('ANALYZE %s.face', _topology_name);
+       EXECUTE Format('ANALYZE %s.relation', _topology_name);
+    END IF;
+
+
     has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;
     command_string := Format('SELECT EXISTS(SELECT 1 from to_regclass(%L) where to_regclass is not null)',
     has_edges_temp_table_name);
@@ -212,6 +214,12 @@ BEGIN
      EXECUTE command_string;
     END IF;
   ELSIF _cell_job_type = 3 THEN
+    IF box_id > 0 and MOD(box_id,50) = 0 THEN
+       EXECUTE Format('ANALYZE %s.edge_data', _topology_name);
+       EXECUTE Format('ANALYZE %s.node', _topology_name);
+       EXECUTE Format('ANALYZE %s.face', _topology_name);
+       EXECUTE Format('ANALYZE %s.relation', _topology_name);
+    END IF;
     -- on cell border
     -- test with  area to block like bb
     -- area_to_block := bb;

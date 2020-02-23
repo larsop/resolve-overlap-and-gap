@@ -97,17 +97,24 @@ BEGIN
       -- check if any 'SubtransControlLock' is there
         subtransControlLock_start = clock_timestamp();
         subtransControlLock_count = 0;
+        
+        -- this isnot good beacuse if have code making this block
+        -- we need to make a check on for relation 
+        -- SELECT relation::regclass, * FROM pg_locks WHERE NOT GRANTED;
+        --relation           | test_topo_ar5.edge_data
     LOOP
-      EXECUTE Format('SELECT count(*) from pg_stat_activity where wait_event = %L',
-      'SubtransControlLock') into subtransControlLock;
+      EXECUTE Format('SELECT count(*) from pg_stat_activity where wait_event in (%L,%L)',
+      'SubtransControlLock','relation') into subtransControlLock;
       EXIT WHEN subtransControlLock = 0;
       subtransControlLock_count := subtransControlLock_count + 1;
       PERFORM pg_sleep(subtransControlLock*subtransControlLock_count*0.1);
 
     END LOOP;
     
+    
+    
     IF subtransControlLock_count > 0 THEN
-      RAISE NOTICE '% subtransControlLock loops, sleep % seconds to wait for release, for _cell_job_type %',
+      RAISE NOTICE '% subtransControlLock,relation loops, sleep % seconds to wait for release, for _cell_job_type %',
       subtransControlLock_count, 
       (Extract(EPOCH FROM (clock_timestamp() - subtransControlLock_start))),
       _cell_job_type;

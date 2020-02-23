@@ -105,7 +105,8 @@ BEGIN
     LOOP
       EXECUTE Format('SELECT count(*) from pg_stat_activity where wait_event in (%L,%L)',
       'SubtransControlLock','relation') into subtransControlLock;
-      EXIT WHEN subtransControlLock = 0;
+      EXIT WHEN subtransControlLock = 0 OR subtransControlLock_count > 40;
+      
       subtransControlLock_count := subtransControlLock_count + 1;
       PERFORM pg_sleep(subtransControlLock*subtransControlLock_count*0.1);
 

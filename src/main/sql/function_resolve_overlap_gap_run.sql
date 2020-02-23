@@ -103,10 +103,10 @@ BEGIN
         _table_to_resolve, loop_number, stmts;
       END IF;
       
-      EXECUTE Format('ANALYZE %s.edge_data', _topology_name);
-      EXECUTE Format('ANALYZE %s.node', _topology_name);
-      EXECUTE Format('ANALYZE %s.face', _topology_name);
-      EXECUTE Format('ANALYZE %s.relation', _topology_name);
+      --EXECUTE Format('ANALYZE %s.edge_data', _topology_name);
+      --EXECUTE Format('ANALYZE %s.node', _topology_name);
+      --EXECUTE Format('ANALYZE %s.face', _topology_name);
+      --EXECUTE Format('ANALYZE %s.relation', _topology_name);
       loop_number := loop_number + 1;
 
 

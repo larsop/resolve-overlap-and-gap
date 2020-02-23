@@ -138,8 +138,8 @@ END;
   --	RAISE NOTICE 'work done proc :% border_layer_id %, using % secs, num of % rows', done_time, border_topo_info.border_layer_id, used_time,  ST_NumPoints(json_input_structure.input_geo);
   IF used_time > 10 THEN
     RAISE NOTICE 'very long single line % time with geo for % ', used_time, json_input_structure.input_geo;
-    INSERT INTO topo_update.long_time_log1 (execute_time, info, geo)
-      VALUES (used_time, 'long ' || used_time::Varchar || ' num points ' || ST_NumPoints (json_input_structure.input_geo), json_input_structure.input_geo);
+  --  INSERT INTO topo_update.long_time_log1 (execute_time, info, geo)
+  --    VALUES (used_time, 'long ' || used_time::Varchar || ' num points ' || ST_NumPoints (json_input_structure.input_geo), json_input_structure.input_geo);
   END IF;
   RETURN;
 END;

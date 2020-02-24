@@ -72,8 +72,6 @@ BEGIN
   EXECUTE command_string INTO num_cells;
   
   
-
-  
   FOR cell_job_type IN 1..4 LOOP
     -- 1 ############################# START # add lines inside box and cut lines and save then in separate table,
     -- 2 ############################# START # add border lines saved in last run, we will here connect data from the different cell using he border lines.
@@ -86,7 +84,7 @@ BEGIN
     LOOP
       stmts := '{}';
       command_string := Format('SELECT ARRAY(SELECT sql_to_run||%L as func_call FROM %s WHERE block_bb is null 
-        ORDER BY inside_cell desc, md5(cell_geo::Text) desc )',  
+        ORDER BY inside_cell desc, row_number, num_polygons desc )',  
       loop_number||');',job_list_name);
       RAISE NOTICE 'command_string %', command_string;
       EXECUTE command_string INTO stmts;

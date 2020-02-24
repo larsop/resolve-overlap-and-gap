@@ -25,6 +25,9 @@ DECLARE
   overlapgap_grid_threads varchar;
   overlapgap_grid_threads_cell_size int;
   overlapgap_grid_threads_num_cells int;
+  
+  layer_centroid geometry;
+  
 BEGIN
   -- ############################# START # Create Topology master working schema
   -- drop schema if exists
@@ -111,12 +114,30 @@ BEGIN
   EXECUTE Format('UPDATE %s g SET inside_cell = true from %s t where ST_covers(t.%s,g.%s)', 
   _overlapgap_grid,overlapgap_grid_threads,_geo_collumn_name,_geo_collumn_name,_geo_collumn_name);
 
+  EXECUTE Format('ALTER TABLE %s ADD column grid_thread_cell int default 0', _overlapgap_grid);
+  EXECUTE Format('UPDATE %s g SET grid_thread_cell = t.id from %s t where ST_Intersects(t.%s,g.%s)', 
+  _overlapgap_grid,overlapgap_grid_threads,_geo_collumn_name,_geo_collumn_name,_geo_collumn_name);
+
   EXECUTE Format('ALTER TABLE %s ADD column num_polygons int default 0', _overlapgap_grid);
   
   EXECUTE Format('UPDATE %s g SET num_polygons = r.num_polygons FROM 
-  (select count(t.*) as num_polygons,g.id from %s t, %s g where t.%s && g.%s group by g.id) as r
+  (select count(t.*) as num_polygons, g.id from %s t, %s g where t.%s && g.%s group by g.id) as r
   where r.id = g.id', 
   _overlapgap_grid,_table_to_resolve,_overlapgap_grid,_geo_collumn_name,_geo_collumn_name);
+
+      -- find centroid
+  EXECUTE Format('SELECT ST_Centroid(ST_Union(%s)) from %s', _geo_collumn_name, _overlapgap_grid) into layer_centroid;
+
+  EXECUTE Format('ALTER TABLE %s ADD column row_number int default 0', _overlapgap_grid);
+
+  EXECUTE Format('UPDATE %s g SET row_number = r.row_number FROM 
+  (select id,  
+  ROW_NUMBER()  OVER (PARTITION BY grid_thread_cell 
+  order by ST_distance(%s,%L) desc) 
+  from %s) as r
+  where r.id = g.id', 
+  _overlapgap_grid,_geo_collumn_name, layer_centroid,_overlapgap_grid);
+
 
   
   -- ----------------------------- DONE - Handle content based grid init

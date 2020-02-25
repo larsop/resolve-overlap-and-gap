@@ -19,6 +19,8 @@ DECLARE
   this_list_id int;
   -- Holds the list of func_call to run
   stmts text[];
+  stmts_final text[];
+
   -- Holds the sql for a functin to call
   func_call text;
   -- Holds the reseult from paralell calls
@@ -51,6 +53,9 @@ DECLARE
   _min_area_to_keep float = 49.0;
   loop_number int;
   
+  i_stmts int;
+  analyze_stmts int;
+  
 
 BEGIN
   table_name_result_prefix := _topology_name || Substring(_table_to_resolve FROM (Position('.' IN _table_to_resolve)));
@@ -82,7 +87,7 @@ BEGIN
 
     loop_number := 1;
     LOOP
-      stmts := '{}';
+
       command_string := Format('SELECT ARRAY(SELECT sql_to_run||%L as func_call FROM %s WHERE block_bb is null 
         ORDER BY inside_cell desc, row_number, num_polygons desc )',  
       loop_number||');',job_list_name);
@@ -92,19 +97,36 @@ BEGIN
       WHEN Array_length(stmts, 1) IS NULL
         OR stmts IS NULL;
       
-      RAISE NOTICE 'Start to run overlap for % stmts and gap for table % cell_job_type % at loop_number %', 
-      Array_length(stmts, 1), _table_to_resolve, cell_job_type, loop_number;
+      stmts_final := '{}';
+      analyze_stmts  := 0;
+      FOR i_stmts IN 1 .. Array_length(stmts, 1)
+      LOOP
+         stmts_final[i_stmts+analyze_stmts] = stmts[i_stmts];
+         IF MOD(i_stmts,200) = 0 AND cell_job_type > 1 AND cell_job_type < 4 THEN
+           analyze_stmts := analyze_stmts + 1;
+           stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.edge_data;', _topology_name);
+           analyze_stmts := analyze_stmts + 1;
+           stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.node;', _topology_name);
+           analyze_stmts := analyze_stmts + 1;
+           stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.face;', _topology_name);
+           analyze_stmts := analyze_stmts + 1;
+           stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.relation;', _topology_name);
+         END IF;
+      END LOOP;
+      
+      stmts := '{}';
 
-      SELECT execute_parallel (stmts, _max_parallel_jobs,true) INTO call_result;
+
+      
+      RAISE NOTICE 'Start to run overlap for % stmts_final and gap for table % cell_job_type % at loop_number %', 
+      Array_length(stmts_final, 1), _table_to_resolve, cell_job_type, loop_number;
+
+      SELECT execute_parallel (stmts_final, _max_parallel_jobs,true) INTO call_result;
       IF (call_result = FALSE AND loop_number > 1) THEN
         RAISE EXCEPTION 'FFailed to run overlap and gap for % at loop_number % for the following statement list %', 
-        _table_to_resolve, loop_number, stmts;
+        _table_to_resolve, loop_number, stmts_final;
       END IF;
       
-      --EXECUTE Format('ANALYZE %s.edge_data', _topology_name);
-      --EXECUTE Format('ANALYZE %s.node', _topology_name);
-      --EXECUTE Format('ANALYZE %s.face', _topology_name);
-      --EXECUTE Format('ANALYZE %s.relation', _topology_name);
       loop_number := loop_number + 1;
 
 

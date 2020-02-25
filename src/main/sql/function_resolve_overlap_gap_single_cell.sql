@@ -196,13 +196,6 @@ BEGIN
     PERFORM topology.DropTopology (border_topo_info.topology_name);
     
   ELSIF _cell_job_type = 2 THEN
-    IF box_id > 0 and MOD(box_id,25) = 0 THEN
-       EXECUTE Format('ANALYZE %s.edge_data', _topology_name);
-       EXECUTE Format('ANALYZE %s.node', _topology_name);
-       EXECUTE Format('ANALYZE %s.face', _topology_name);
-       EXECUTE Format('ANALYZE %s.relation', _topology_name);
-    END IF;
-
 
     has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;
     command_string := Format('SELECT EXISTS(SELECT 1 from to_regclass(%L) where to_regclass is not null)',
@@ -222,12 +215,6 @@ BEGIN
      EXECUTE command_string;
     END IF;
   ELSIF _cell_job_type = 3 THEN
-    IF box_id > 0 and MOD(box_id,50) = 0 THEN
-       EXECUTE Format('ANALYZE %s.edge_data', _topology_name);
-       EXECUTE Format('ANALYZE %s.node', _topology_name);
-       EXECUTE Format('ANALYZE %s.face', _topology_name);
-       EXECUTE Format('ANALYZE %s.relation', _topology_name);
-    END IF;
     -- on cell border
     -- test with  area to block like bb
     -- area_to_block := bb;

@@ -317,7 +317,7 @@ BEGIN
     RAISE NOTICE 'very long a set of lines % time with geo for bb % ', used_time, bb;
     EXECUTE Format('INSERT INTO %s (execute_time, info, sql, geo) VALUES (%s, %L, %L, %L)', _table_name_result_prefix || '_long_time_log2', used_time, 'simplefeature_c2_topo_surface_border_retry', command_string, bb);
   END IF;
-  PERFORM topo_update.clear_blocked_area (bb, _job_list_name);
+  PERFORM topo_update.clear_blocked_area (area_to_block, _job_list_name);
   RAISE NOTICE 'leave work at timeofday:% for layer %, with _cell_job_type %', Timeofday(), border_topo_info.topology_name, _cell_job_type;
   --RETURN added_rows;
 END

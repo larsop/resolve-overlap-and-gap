@@ -237,7 +237,6 @@ BEGIN
       command_string := Format('SELECT topo_update.add_border_lines(%1$L,geo,%3$s,%5$L) from topo_update.get_left_over_borders(%4$L,%6$L,%2$L,%5$L)', 
       _topology_name, bb, snap_tolerance_fixed, overlapgap_grid, _table_name_result_prefix, input_table_geo_column_name);
     END IF;
-    EXECUTE command_string;
     -- NB We have to use fixed snap to here to be sure that lines snapp
     EXECUTE command_string;
   ELSIF _cell_job_type = 4 THEN

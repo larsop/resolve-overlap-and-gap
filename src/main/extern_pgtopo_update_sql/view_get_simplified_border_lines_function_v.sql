@@ -59,9 +59,9 @@ BEGIN
  	select 
      ST_RemoveRepeatedPoints (geom,%4$s) as geom, 
      ST_NPoints(geom) as npoints,
-     ST_Intersects(geom,%2$L) as touch_outside 
+     ST_Intersects(geom,%5$L) as touch_outside 
     from lines where  ST_IsEmpty(geom) is false', 
- 	_input_table_name, bb_boundary_outer, _input_table_geo_column_name, _snap_tolerance);
+ 	_input_table_name, bb_boundary_outer, _input_table_geo_column_name, _snap_tolerance, boundary_geom);
   EXECUTE command_string;
   command_string := Format('create index %1$s on tmp_data_all_lines using gist(geom)', 'idx1' || Md5(ST_AsBinary (_bb)));
   EXECUTE command_string;

@@ -159,15 +159,16 @@ BEGIN
       create temp table tmp_simplified_border_lines as 
       (select * from tmp_simplified_border_lines_1 where 
       is_closed = false or 
-      ( ST_NPoints(geo) > 3 AND ST_Area(ST_MakePolygon(geo),false) > _min_area_to_keep)); 
+      ST_Area(ST_MakePolygon(geo),false) > _min_area_to_keep); 
     ELSE
       create temp table tmp_simplified_border_lines as 
       (select * from tmp_simplified_border_lines_1 where 
       is_closed = false or 
-      ( ST_NPoints(geo) > 3 AND ST_Area(ST_MakePolygon(geo)) > _min_area_to_keep)); 
+      ST_Area(ST_MakePolygon(geo)) > _min_area_to_keep); 
     END IF;
 
     DROP TABLE tmp_simplified_border_lines_1;
+
 
     
     -- add the glue line with no/small tolerance
@@ -180,7 +181,7 @@ BEGIN
     -- using the input tolreance for adding
     border_topo_info.snap_tolerance := snap_tolerance_fixed;
     command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::Text, %L) 
-                  from tmp_simplified_border_lines g where line_type = 0', border_topo_info);
+                  from tmp_simplified_border_lines g where line_type = 0 order by num_points desc', border_topo_info);
     --RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
 
@@ -202,7 +203,7 @@ BEGIN
     EXECUTE command_string into has_edges;
     IF (has_edges) THEN
       has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;
-      command_string := Format('create unlogged table %1$s as (SELECT geom, ST_NPoints(geom) as num_points, ST_IsClosed(geom) as is_closed from  %2$s.edge_data)',
+      command_string := Format('create unlogged table %1$s as (SELECT geom, ST_NPoints(geom) as num_points from  %2$s.edge_data)',
       has_edges_temp_table_name,
       border_topo_info.topology_name);
       EXECUTE command_string;
@@ -223,9 +224,9 @@ BEGIN
 
     IF (has_edges) THEN
      IF _loop_number = 1 THEN 
-       command_string := Format('SELECT topology.TopoGeo_addLinestring(%3$L,r.geom,%1$s) FROM (SELECT geom from %2$s order by ST_Isclosed(geom) desc, num_points desc) as r', _snap_tolerance, has_edges_temp_table_name, _topology_name);
+       command_string := Format('SELECT topology.TopoGeo_addLinestring(%3$L,r.geom,%1$s) FROM (SELECT geom from %2$s order by num_points desc) as r', _snap_tolerance, has_edges_temp_table_name, _topology_name);
      ELSE
-       command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (SELECT geom from %2$s order by ST_Isclosed(geom) desc, num_points desc) as r', _snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
+       command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (SELECT geom from %2$s order by num_points desc) as r', _snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
      END IF;
      EXECUTE command_string;
       

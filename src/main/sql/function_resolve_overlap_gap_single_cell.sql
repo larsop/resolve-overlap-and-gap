@@ -296,7 +296,7 @@ BEGIN
  				FROM 
  				%1$s f,
  				%2$s i
- 				where f.%4$s && i.%4$s and ST_Intersects(f.%4$s,i.%4$s)
+ 				where f.%4$s && i.%4$s and ST_Intersects(f.%4$s,i.%4$s) and ST_IsValid(f.%4$s) and ST_IsValid(i.%4$s)
  				order by %5$s, area_coverarge desc,  i.%3$s
  			) as r where area_coverarge > 0.1
  			order by %5$s, area_neighbour desc
@@ -338,4 +338,3 @@ BEGIN
   --RETURN added_rows;
 END
 $$;
-

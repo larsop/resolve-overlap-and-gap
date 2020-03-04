@@ -56,8 +56,8 @@ BEGIN
  	where ST_Intersects(v.%3$s,%2$L)
  	),
  	lines as (select distinct (ST_Dump(geom)).geom as geom from rings)
- 	select geom, ST_NPoints(geom) as npoints from lines 
- 	where  ST_IsEmpty(geom) is false', _input_table_name, bb_boundary_outer, _input_table_geo_column_name);
+ 	select ST_RemoveRepeatedPoints (geom,%4$s) as geom, ST_NPoints(geom) as npoints from lines 
+ 	where  ST_IsEmpty(geom) is false', _input_table_name, bb_boundary_outer, _input_table_geo_column_name, _snap_tolerance);
   EXECUTE command_string;
   command_string := Format('create index %1$s on tmp_data_all_lines using gist(geom)', 'idx1' || Md5(ST_AsBinary (_bb)));
   EXECUTE command_string;

@@ -159,10 +159,12 @@ BEGIN
       create temp table tmp_simplified_border_lines as 
       (select * from tmp_simplified_border_lines_1 where 
       is_closed = false or 
-      ST_Area(ST_MakePolygon(geo),false) > _min_area_to_keep); 
+      ( ST_NPoints(geo) > 3 AND ST_Area(ST_MakePolygon(geo),false) > _min_area_to_keep)); 
     ELSE
       create temp table tmp_simplified_border_lines as 
-      (select * from tmp_simplified_border_lines_1 where is_closed = false or ST_Area(ST_MakePolygon(geo)) > _min_area_to_keep); 
+      (select * from tmp_simplified_border_lines_1 where 
+      is_closed = false or 
+      ( ST_NPoints(geo) > 3 AND ST_Area(ST_MakePolygon(geo)) > _min_area_to_keep)); 
     END IF;
 
     DROP TABLE tmp_simplified_border_lines_1;

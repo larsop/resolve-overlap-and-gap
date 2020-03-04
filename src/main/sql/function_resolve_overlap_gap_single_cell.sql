@@ -255,6 +255,22 @@ BEGIN
     END IF;
     -- NB We have to use fixed snap to here to be sure that lines snapp
     EXECUTE command_string;
+
+    -- add long lines that 
+    IF _loop_number = 1 THEN 
+      command_string := Format('SELECT topology.TopoGeo_addLinestring(%1$L,r.geo,%3$s) from %7$s r where ST_StartPoint(r.geo) && %2$L', 
+      _topology_name, bb, snap_tolerance_fixed, overlapgap_grid, 
+      _table_name_result_prefix, input_table_geo_column_name,
+      _table_name_result_prefix||'_border_line_many_points');
+    ELSE
+      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%3$s,%5$L) from %7$s r where ST_StartPoint(r.geo) && %2$L' , 
+      _topology_name, bb, snap_tolerance_fixed, overlapgap_grid, 
+      _table_name_result_prefix, input_table_geo_column_name,
+      _table_name_result_prefix||'_border_line_many_points');
+    END IF;
+    -- NB We have to use fixed snap to here to be sure that lines snapp
+    EXECUTE command_string;
+    
     
     face_table_name = _topology_name || '.face';
     start_remove_small := Clock_timestamp();

@@ -255,6 +255,20 @@ BEGIN
     END IF;
     -- NB We have to use fixed snap to here to be sure that lines snapp
     EXECUTE command_string;
+    
+    face_table_name = _topology_name || '.face';
+    start_remove_small := Clock_timestamp();
+    RAISE NOTICE 'Start clean small polygons for border plygons face_table_name % at %', face_table_name, Clock_timestamp();
+    -- remove small polygons in temp
+    -- TODO 6 sould be based on other values
+    num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, _min_area_to_keep, face_table_name, ST_buffer(ST_ExteriorRing(bb),_snap_tolerance * 6),
+      _utm);
+    used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
+    RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
+
+    
+    -- remove small polygons in border sones
+    
   ELSIF _cell_job_type = 4 THEN
     -- Drop/Create a temp to hold data temporay for job
     EXECUTE Format('DROP TABLE IF EXISTS %s', temp_table_name);

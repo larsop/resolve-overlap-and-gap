@@ -149,10 +149,24 @@ BEGIN
 
     -- get the siple feature data both the line_types and the inner lines.
     -- the boundery linnes are saved in a table for later usage
-    DROP TABLE IF EXISTS tmp_simplified_border_lines;
-    command_string := Format('create temp table tmp_simplified_border_lines as (select g.* FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L,%L) g)', input_table_name, input_table_geo_column_name, bb, _simplify_tolerance, _do_chaikins, _table_name_result_prefix);
-    RAISE NOTICE 'command_string %', command_string;
-    EXECUTE command_string;
+    command_string := Format('create temp table tmp_simplified_border_lines_1 as 
+    (select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
+     FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L,%L) g)', 
+    input_table_name, input_table_geo_column_name, bb, _simplify_tolerance, _do_chaikins, _table_name_result_prefix);
+    EXECUTE command_string ;
+    
+    IF (_utm = false) THEN
+      create temp table tmp_simplified_border_lines as 
+      (select * from tmp_simplified_border_lines_1 where 
+      is_closed = false or 
+      ST_Area(ST_MakePolygon(geo),false) > _min_area_to_keep); 
+    ELSE
+      create temp table tmp_simplified_border_lines as 
+      (select * from tmp_simplified_border_lines_1 where is_closed = false or ST_Area(ST_MakePolygon(geo)) > _min_area_to_keep); 
+    END IF;
+
+    DROP TABLE tmp_simplified_border_lines_1;
+
     
     -- add the glue line with no/small tolerance
     border_topo_info.snap_tolerance := glue_snap_tolerance_fixed;
@@ -177,14 +191,16 @@ BEGIN
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
     RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
  
+    DROP TABLE IF EXISTS tmp_simplified_border_lines;
+    
+    
     command_string := Format('SELECT EXISTS(SELECT 1 from  %1$s.edge limit 1)',
     border_topo_info.topology_name);
 
     EXECUTE command_string into has_edges;
     IF (has_edges) THEN
       has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;
-      
-      command_string := Format('create unlogged table %1$s as (SELECT geom from  %2$s.edge_data)',
+      command_string := Format('create unlogged table %1$s as (SELECT geom, ST_NPoints(geom) as num_points, ST_IsClosed(geom) as is_closed from  %2$s.edge_data)',
       has_edges_temp_table_name,
       border_topo_info.topology_name);
       EXECUTE command_string;

@@ -223,9 +223,9 @@ BEGIN
 
     IF (has_edges) THEN
      IF _loop_number = 1 THEN 
-       command_string := Format('SELECT topology.TopoGeo_addLinestring(%3$L,r.geom,%1$s) FROM (SELECT geom from %2$s) as r', _snap_tolerance, has_edges_temp_table_name, _topology_name);
+       command_string := Format('SELECT topology.TopoGeo_addLinestring(%3$L,r.geom,%1$s) FROM (SELECT geom from %2$s order by ST_Isclosed(geom) desc, num_points desc) as r', _snap_tolerance, has_edges_temp_table_name, _topology_name);
      ELSE
-       command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (SELECT geom from %2$s) as r', _snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
+       command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (SELECT geom from %2$s order by ST_Isclosed(geom) desc, num_points desc) as r', _snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
      END IF;
      EXECUTE command_string;
       

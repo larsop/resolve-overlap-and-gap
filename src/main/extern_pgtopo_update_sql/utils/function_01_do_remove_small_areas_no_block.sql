@@ -16,7 +16,7 @@ DECLARE
   num_rows int;
   num_rows_total int = 0;
   -- Based on testing and it's not accurate at all
-  min_mbr_area float = _min_area * 20;
+  min_mbr_area float = _min_area * 30;
 BEGIN
   LOOP
     command_string := Format('select sum(topo_update.removes_tiny_polygons(%1$s,face_id,topo_area,%2$s)) 

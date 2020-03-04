@@ -11,7 +11,7 @@ DECLARE
 BEGIN
   BEGIN
 	IF (utm = false) THEN
-      face_area := ST_Area (st_getFaceGeometry (_atopology, _face_id), FALSE);
+      face_area := ST_Area (st_getFaceGeometry (_atopology, _face_id), TRUE);
     ELSE
       face_area := ST_Area (st_getFaceGeometry (_atopology, _face_id)); 
     END IF;

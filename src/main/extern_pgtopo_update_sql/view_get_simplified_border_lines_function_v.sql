@@ -56,8 +56,12 @@ BEGIN
  	where ST_Intersects(v.%3$s,%2$L)
  	),
  	lines as (select distinct (ST_Dump(geom)).geom as geom from rings)
- 	select ST_RemoveRepeatedPoints (geom,%4$s) as geom, ST_NPoints(geom) as npoints from lines 
- 	where  ST_IsEmpty(geom) is false', _input_table_name, bb_boundary_outer, _input_table_geo_column_name, _snap_tolerance);
+ 	select 
+     ST_RemoveRepeatedPoints (geom,%4$s) as geom, 
+     ST_NPoints(geom) as npoints,
+     ST_Intersects(geom,%2$L) as touch_outside 
+    from lines where  ST_IsEmpty(geom) is false', 
+ 	_input_table_name, bb_boundary_outer, _input_table_geo_column_name, _snap_tolerance);
   EXECUTE command_string;
   command_string := Format('create index %1$s on tmp_data_all_lines using gist(geom)', 'idx1' || Md5(ST_AsBinary (_bb)));
   EXECUTE command_string;
@@ -66,10 +70,11 @@ BEGIN
   EXECUTE Format('INSERT INTO %s (geo)
     SELECT r.geom as geo
     FROM tmp_data_all_lines r
-    WHERE npoints > %s'
+    WHERE npoints > %s and touch_outside = true'
   ,_table_name_result_prefix||'_border_line_many_points', _max_point_in_line);
   
-    
+  DELETE FROM tmp_data_all_lines where npoints > _max_point_in_line and touch_outside = true;
+      
   
   -- 1 make line parts for inner box
   -- holds the lines inside bb_boundary_inner
@@ -78,7 +83,6 @@ BEGIN
   CREATE temp TABLE tmp_inner_line_parts AS (
     SELECT (ST_Dump (ST_Intersection (rings.geom, bb_inner_glue_geom ) ) ).geom AS geo
     FROM tmp_data_all_lines AS rings
-    where npoints <= _max_point_in_line
     );
   DROP TABLE IF EXISTS tmp_inner_lines_merged;
   CREATE temp TABLE tmp_inner_lines_merged AS (
@@ -110,7 +114,7 @@ BEGIN
   DROP TABLE IF EXISTS tmp_boundary_line_type_parts;
   CREATE temp TABLE tmp_boundary_line_type_parts AS (
     SELECT (ST_Dump (ST_Intersection (rings.geom, boundary_glue_geom ) ) ).geom AS geo
-    FROM tmp_data_all_lines AS rings where npoints <= _max_point_in_line
+    FROM tmp_data_all_lines AS rings
     );
   DROP TABLE IF EXISTS tmp_boundary_line_types_merged;
   CREATE temp TABLE tmp_boundary_line_types_merged AS (
@@ -154,8 +158,7 @@ BEGIN
   DROP TABLE IF EXISTS tmp_boundary_line_parts;
   CREATE temp TABLE tmp_boundary_line_parts AS (
     SELECT (ST_Dump (ST_Intersection (rings.geom, boundary_geom ) ) ).geom AS geo
-    FROM tmp_data_all_lines AS rings where npoints <= _max_point_in_line
-    );
+    FROM tmp_data_all_lines AS rings );
   DROP TABLE IF EXISTS tmp_boundary_lines_merged;
   CREATE temp TABLE tmp_boundary_lines_merged AS (
     SELECT (ST_Dump (ST_LineMerge (ST_Union (lg.geo ) ) ) ).geom AS geo

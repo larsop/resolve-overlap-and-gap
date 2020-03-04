@@ -174,6 +174,10 @@ EXECUTE Format('CREATE UNLOGGED TABLE %s (
 )',_table_name_result_prefix||'_border_line_segments',_srid,_srid);
 
 
+EXECUTE Format('CREATE UNLOGGED TABLE %s (
+  id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), geo Geometry(LineString, %s)
+)',_table_name_result_prefix||'_border_line_many_points',_srid,_srid);
+
 -- Create the simple feature result table  as copy of the input table
 EXECUTE Format('CREATE UNLOGGED TABLE %s AS TABLE %s with NO DATA',_table_name_result_prefix||'_result',_table_to_resolve);
 

@@ -70,8 +70,8 @@ BEGIN
   EXECUTE Format('INSERT INTO %s (geo)
     SELECT r.geom as geo
     FROM tmp_data_all_lines r
-    WHERE npoints > %s and touch_outside = true'
-  ,_table_name_result_prefix||'_border_line_many_points', _max_point_in_line);
+    WHERE npoints > %s and touch_outside = true and ST_StartPoint(r.geom) && %L'
+  ,_table_name_result_prefix||'_border_line_many_points', _max_point_in_line, _bb);
   
   DELETE FROM tmp_data_all_lines where npoints > _max_point_in_line and touch_outside = true;
       

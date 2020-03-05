@@ -147,27 +147,22 @@ BEGIN
 
     DROP TABLE tmp_simplified_border_lines_1;
 
-    IF _loop_number = 1 THEN 
-
-       RAISE NOTICE 'use _topology_name %', _topology_name;
-    
-       command_string := Format('SELECT topology.TopoGeo_addLinestring(%2$L,r.geo,%1$s) FROM 
-         (SELECT geo from tmp_simplified_border_lines where line_type = 1 order by num_points desc) as r', glue_snap_tolerance_fixed, _topology_name);
-       EXECUTE command_string ; 
-       
-       command_string := Format('SELECT topology.TopoGeo_addLinestring(%2$L,r.geo,%1$s) FROM 
-         (SELECT geo from tmp_simplified_border_lines where line_type = 0 order by num_points desc) as r', snap_tolerance_fixed, _topology_name);
-       EXECUTE command_string ; 
-
-       RAISE NOTICE 'Start clean small polygons at _loop_number 1 for face_table_name % at %', face_table_name, Clock_timestamp();
-       -- remove small polygons in temp
-       face_table_name = _topology_name || '.face';
-       num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, _min_area_to_keep, face_table_name, ST_buffer(bb,_snap_tolerance * -6),
-       _utm);
-       used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
-       RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
-
-    ELSE 
+--    IF _loop_number = 1 THEN 
+--       RAISE NOTICE 'use _topology_name %', _topology_name;
+--       command_string := Format('SELECT topology.TopoGeo_addLinestring(%2$L,r.geo,%1$s) FROM 
+--         (SELECT geo from tmp_simplified_border_lines where line_type = 1) as r', glue_snap_tolerance_fixed, _topology_name);
+--       EXECUTE command_string ; 
+--       command_string := Format('SELECT topology.TopoGeo_addLinestring(%2$L,r.geo,%1$s) FROM 
+--         (SELECT geo from tmp_simplified_border_lines where line_type = 0 order by is_closed desc, num_points desc) as r', snap_tolerance_fixed, _topology_name);
+--       EXECUTE command_string ; 
+--       RAISE NOTICE 'Start clean small polygons at _loop_number 1 for face_table_name % at %', face_table_name, Clock_timestamp();
+--       -- remove small polygons in temp
+--       face_table_name = _topology_name || '.face';
+--       num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, _min_area_to_keep, face_table_name, ST_buffer(bb,_snap_tolerance * -6),
+--       _utm);
+--       used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
+--       RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
+--    ELSE 
     
     border_topo_info.topology_name := _topology_name || '_' || box_id;
     RAISE NOTICE 'use border_topo_info.topology_name %', border_topo_info.topology_name;
@@ -202,7 +197,7 @@ BEGIN
     -- using the input tolreance for adding
     border_topo_info.snap_tolerance := snap_tolerance_fixed;
     command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::Text, %L) 
-                  from tmp_simplified_border_lines g where line_type = 0 order by num_points desc', border_topo_info);
+                  from tmp_simplified_border_lines g where line_type = 0 order by is_closed desc, num_points desc', border_topo_info);
     --RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
 
@@ -210,7 +205,7 @@ BEGIN
     start_remove_small := Clock_timestamp();
     RAISE NOTICE 'Start clean small polygons for face_table_name % at %', face_table_name, Clock_timestamp();
     -- remove small polygons in temp
-    num_rows_removed := topo_update.do_remove_small_areas_no_block (border_topo_info.topology_name, _min_area_to_keep, face_table_name, bb,
+    num_rows_removed := topo_update.do_remove_only_valid_small_areas (border_topo_info.topology_name, _min_area_to_keep, face_table_name, bb,
       _utm);
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
     RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
@@ -221,7 +216,7 @@ BEGIN
     EXECUTE command_string into has_edges;
     IF (has_edges) THEN
       has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;
-      command_string := Format('create unlogged table %1$s as (SELECT geom, ST_NPoints(geom) as num_points from  %2$s.edge_data)',
+      command_string := Format('create unlogged table %1$s as (SELECT geom, ST_IsClosed(geom) as is_closed, ST_NPoints(geom) as num_points from  %2$s.edge_data)',
       has_edges_temp_table_name,
       border_topo_info.topology_name);
       EXECUTE command_string;
@@ -230,7 +225,7 @@ BEGIN
     execute Format('SET CONSTRAINTS ALL IMMEDIATE');
     PERFORM topology.DropTopology (border_topo_info.topology_name);
 
-    END IF;
+--    END IF;
 
     
     DROP TABLE IF EXISTS tmp_simplified_border_lines;
@@ -246,9 +241,9 @@ BEGIN
 
     IF (has_edges) THEN
      IF _loop_number = 1 THEN 
-       command_string := Format('SELECT topology.TopoGeo_addLinestring(%3$L,r.geom,%1$s) FROM (SELECT geom from %2$s order by num_points desc) as r', _snap_tolerance, has_edges_temp_table_name, _topology_name);
+       command_string := Format('SELECT topology.TopoGeo_addLinestring(%3$L,r.geom,%1$s) FROM (SELECT geom from %2$s order by is_closed desc, num_points desc) as r', _snap_tolerance, has_edges_temp_table_name, _topology_name);
      ELSE
-       command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (SELECT geom from %2$s order by num_points desc) as r', _snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
+       command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (SELECT geom from %2$s order by is_closed desc, num_points desc) as r', _snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
      END IF;
      EXECUTE command_string;
       

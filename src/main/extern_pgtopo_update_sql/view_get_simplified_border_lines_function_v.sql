@@ -30,7 +30,7 @@ DECLARE
   overlap_width_inner real = _snap_tolerance;
   try_update_invalid_rows int;
   
-  _max_point_in_line int = 4000;
+  _max_point_in_line int = 10000;
   
 BEGIN
   -- buffer in to work with geom that lines are only meter from the border

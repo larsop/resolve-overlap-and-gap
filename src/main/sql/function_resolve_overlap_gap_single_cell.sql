@@ -124,29 +124,7 @@ BEGIN
    
     
   IF _cell_job_type = 1 THEN
-    border_topo_info.topology_name := _topology_name || '_' || box_id;
-    RAISE NOTICE 'use border_topo_info.topology_name %', border_topo_info.topology_name;
-   border_topo_info.topology_name := _topology_name || '_' || box_id;
-    RAISE NOTICE 'use border_topo_info.topology_name %', border_topo_info.topology_name;
-    IF ((SELECT Count(*) FROM topology.topology WHERE name = border_topo_info.topology_name) = 1) THEN
-       EXECUTE Format('SELECT topology.droptopology(%s)', Quote_literal(border_topo_info.topology_name));
-    END IF;
-    --drop this schema in case it exists
-    EXECUTE Format('DROP SCHEMA IF EXISTS %s CASCADE', border_topo_info.layer_schema_name);
- 
-    PERFORM topology.CreateTopology (border_topo_info.topology_name, _srid, snap_tolerance_fixed);
-    EXECUTE Format('ALTER table %s.edge_data set unlogged', border_topo_info.topology_name);
-    EXECUTE Format('ALTER table %s.node set unlogged', border_topo_info.topology_name);
-    EXECUTE Format('ALTER table %s.face set unlogged', border_topo_info.topology_name);
-    EXECUTE Format('ALTER table %s.relation set unlogged', border_topo_info.topology_name);
-    
-  EXECUTE Format('CREATE INDEX ON %s.node(containing_face)', border_topo_info.topology_name);
-  EXECUTE Format('CREATE INDEX ON %s.relation(layer_id)', border_topo_info.topology_name);
-  EXECUTE Format('CREATE INDEX ON %s.relation(abs(element_id))', border_topo_info.topology_name);
-  EXECUTE Format('CREATE INDEX ON %s.edge_data USING GIST (geom)', border_topo_info.topology_name);
-  EXECUTE Format('CREATE INDEX ON %s.relation(element_id)', border_topo_info.topology_name);
-  EXECUTE Format('CREATE INDEX ON %s.relation(topogeo_id)', border_topo_info.topology_name);
-
+  
     -- get the siple feature data both the line_types and the inner lines.
     -- the boundery linnes are saved in a table for later usage
     command_string := Format('create temp table tmp_simplified_border_lines_1 as 
@@ -159,7 +137,7 @@ BEGIN
       create temp table tmp_simplified_border_lines as 
       (select * from tmp_simplified_border_lines_1 where 
       is_closed = false or 
-      ST_Area(ST_MakePolygon(geo),false) > _min_area_to_keep); 
+      ST_Area(ST_MakePolygon(geo),true) > _min_area_to_keep); 
     ELSE
       create temp table tmp_simplified_border_lines as 
       (select * from tmp_simplified_border_lines_1 where 
@@ -169,8 +147,51 @@ BEGIN
 
     DROP TABLE tmp_simplified_border_lines_1;
 
+    IF _loop_number = 1 THEN 
 
+       RAISE NOTICE 'use _topology_name %', _topology_name;
     
+       command_string := Format('SELECT topology.TopoGeo_addLinestring(%2$L,r.geo,%1$s) FROM 
+         (SELECT geo from tmp_simplified_border_lines where line_type = 1 order by num_points desc) as r', glue_snap_tolerance_fixed, _topology_name);
+       EXECUTE command_string ; 
+       
+       command_string := Format('SELECT topology.TopoGeo_addLinestring(%2$L,r.geo,%1$s) FROM 
+         (SELECT geo from tmp_simplified_border_lines where line_type = 0 order by num_points desc) as r', snap_tolerance_fixed, _topology_name);
+       EXECUTE command_string ; 
+
+       RAISE NOTICE 'Start clean small polygons at _loop_number 1 for face_table_name % at %', face_table_name, Clock_timestamp();
+       -- remove small polygons in temp
+       face_table_name = _topology_name || '.face';
+       num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, _min_area_to_keep, face_table_name, ST_buffer(bb,_snap_tolerance * -6),
+       _utm);
+       used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
+       RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
+
+    ELSE 
+    
+    border_topo_info.topology_name := _topology_name || '_' || box_id;
+    RAISE NOTICE 'use border_topo_info.topology_name %', border_topo_info.topology_name;
+    
+    IF ((SELECT Count(*) FROM topology.topology WHERE name = border_topo_info.topology_name) = 1) THEN
+       EXECUTE Format('SELECT topology.droptopology(%s)', Quote_literal(border_topo_info.topology_name));
+    END IF;
+    --drop this schema in case it exists
+    EXECUTE Format('DROP SCHEMA IF EXISTS %s CASCADE', border_topo_info.layer_schema_name);
+ 
+    PERFORM topology.CreateTopology (border_topo_info.topology_name, _srid, snap_tolerance_fixed);
+    EXECUTE Format('ALTER table %s.edge_data set unlogged', border_topo_info.topology_name);
+    EXECUTE Format('ALTER table %s.node set unlogged', border_topo_info.topology_name);
+    EXECUTE Format('ALTER table %s.face set unlogged', border_topo_info.topology_name);
+    EXECUTE Format('ALTER table %s.relation set unlogged', border_topo_info.topology_name);
+    
+    EXECUTE Format('CREATE INDEX ON %s.node(containing_face)', border_topo_info.topology_name);
+    EXECUTE Format('CREATE INDEX ON %s.relation(layer_id)', border_topo_info.topology_name);
+    EXECUTE Format('CREATE INDEX ON %s.relation(abs(element_id))', border_topo_info.topology_name);
+    EXECUTE Format('CREATE INDEX ON %s.edge_data USING GIST (geom)', border_topo_info.topology_name);
+    EXECUTE Format('CREATE INDEX ON %s.relation(element_id)', border_topo_info.topology_name);
+    EXECUTE Format('CREATE INDEX ON %s.relation(topogeo_id)', border_topo_info.topology_name);
+
+        
     -- add the glue line with no/small tolerance
     border_topo_info.snap_tolerance := glue_snap_tolerance_fixed;
     command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::Text, %L) 
@@ -193,9 +214,6 @@ BEGIN
       _utm);
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
     RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
- 
-    DROP TABLE IF EXISTS tmp_simplified_border_lines;
-    
     
     command_string := Format('SELECT EXISTS(SELECT 1 from  %1$s.edge limit 1)',
     border_topo_info.topology_name);
@@ -209,11 +227,15 @@ BEGIN
       EXECUTE command_string;
       
     END IF;
-
-
     execute Format('SET CONSTRAINTS ALL IMMEDIATE');
     PERFORM topology.DropTopology (border_topo_info.topology_name);
+
+    END IF;
+
     
+    DROP TABLE IF EXISTS tmp_simplified_border_lines;
+    
+ 
   ELSIF _cell_job_type = 2 THEN
 
     has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;

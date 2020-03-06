@@ -18,15 +18,14 @@ DECLARE
   -- Based on testing and it's not accurate at all
   min_mbr_area float = _min_area * 30;
 BEGIN
-  LOOP
-    command_string := Format('select sum(topo_update.removes_tiny_polygons(%1$s,face_id,topo_area,%2$s)) 
- 	from ( 
+  command_string := Format('select sum(topo_update.removes_tiny_polygons(%1$s,face_id,topo_area,%2$s)) 
+ 	  from ( 
  		select g.*, topo_update.get_face_area(%1$s,face_id, %6$L) as topo_area 
  		from (
  			select g.* FROM (
                 SELECT CASE 
                 WHEN %6$L = false THEN 
-                  ST_Area(g.mbr,FALSE) 
+                  ST_Area(g.mbr,TRUE) 
                 ELSE 
                   ST_Area(g.mbr)
                 END AS mbr_area,
@@ -38,8 +37,10 @@ BEGIN
  			) as g
  			where  g.mbr_area < %5$s 
  		) as g
- 	) as g
- 	where g.topo_area < %2$s', Quote_literal(_atopology), _min_area, _table_name, _bb, min_mbr_area, _utm);
+ 	  ) as g
+  where g.topo_area < %2$s', Quote_literal(_atopology), _min_area, _table_name, _bb, min_mbr_area, _utm);
+ 	 
+  LOOP
     -- with 4000 it's to slow
     RAISE NOTICE 'execute command_string; %', command_string;
     EXECUTE command_string INTO num_rows;

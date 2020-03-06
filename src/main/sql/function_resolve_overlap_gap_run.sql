@@ -77,7 +77,7 @@ BEGIN
   EXECUTE command_string INTO num_cells;
   
   
-  FOR cell_job_type IN 1..4 LOOP
+  FOR cell_job_type IN 1..5 LOOP
     -- 1 ############################# START # add lines inside box and cut lines and save then in separate table,
     -- 2 ############################# START # add border lines saved in last run, we will here connect data from the different cell using he border lines.
     command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%L,%L,%s,%s,%L,%L,%s)', 

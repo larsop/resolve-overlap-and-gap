@@ -57,42 +57,33 @@ DECLARE
   v_context text;
 
 BEGIN
-  RAISE NOTICE 'start wwork at timeofday:% for layer %, with _cell_job_type %', Timeofday(), _topology_name || '_', _cell_job_type;
+	
+  command_string := Format('select id from %1$s where cell_geo = %2$L', _job_list_name, bb);
+  RAISE NOTICE '% ', command_string;
+  EXECUTE command_string INTO box_id;
+
+  RAISE NOTICE 'enter at timeofday:% for layer %, with _cell_job_type % and box id % .', 
+  Timeofday(), _topology_name || '_', _cell_job_type, box_id;
+  
+  
   -- check if job is done already
   command_string := Format('select count(*) from %s as gt, %s as done
     where gt.cell_geo && ST_PointOnSurface(%3$L) and gt.id = done.id', _job_list_name, _job_list_name || '_donejobs', bb);
   EXECUTE command_string INTO is_done;
   IF is_done = 1 THEN
-    RAISE NOTICE 'Job is_done for  : %', ST_astext (bb);
+    RAISE NOTICE 'Job is_done for  : %', box_id;
     RETURN;
   END IF;
   start_time := Clock_timestamp();
-  RAISE NOTICE 'enter work at timeofday:% for layer %, with _cell_job_type %', Timeofday(), _topology_name || '_' || box_id, _cell_job_type;
-  IF bb IS NULL AND input_table_name IS NOT NULL THEN
-    command_string := Format('select ST_Envelope(ST_Collect(geo)) from %s', input_table_name);
-    EXECUTE command_string INTO bb;
-  END IF;
+
   -- get area to block and set
   -- I don't see why we need this code ??????????? why cant we just the bb as it is so I test thi snow
   area_to_block := bb;
   -- area_to_block := resolve_overlap_gap_block_cell(input_table_name, input_table_geo_column_name, input_table_pk_column_name, _job_list_name, bb);
-  RAISE NOTICE 'area to block:% ', area_to_block;
+  -- RAISE NOTICE 'area to block:% ', area_to_block;
   border_topo_info.snap_tolerance := _simplify_tolerance;
-  --      --border_topo_info.border_layer_id = 317;
-  command_string := Format('select id from %1$s where cell_geo = %2$L', _job_list_name, bb);
-  RAISE NOTICE '% ', command_string;
-  EXECUTE command_string INTO box_id;
+  
   RAISE NOTICE 'start work at timeofday:% for layer %, with _cell_job_type %', Timeofday(), _topology_name || '_' || box_id, _cell_job_type;
-  -- Create a temp table name
-  temp_table_name := '_result_temp_' || box_id;
-  --now()::Date::Varchar
-  temp_table_id_column := '_id' || temp_table_name;
-  final_result_table_name := _table_name_result_prefix || '_result';
-  --  	  	array_agg(quote_ident(update_column)) AS update_fields,
-  --	  	array_agg('r.'||quote_ident(update_column)) as update_fields_source
-  -- 		  INTO
-  --		  	update_fields,
-  --		  	update_fields_source
   
       -- check if any 'SubtransControlLock' is there
         subtransControlLock_start = clock_timestamp();
@@ -209,8 +200,11 @@ BEGIN
     start_remove_small := Clock_timestamp();
     RAISE NOTICE 'Start clean small polygons for face_table_name % at %', face_table_name, Clock_timestamp();
     -- remove small polygons in temp
-    num_rows_removed := topo_update.do_remove_only_valid_small_areas (border_topo_info.topology_name, _min_area_to_keep, face_table_name, bb,
-      _utm);
+    --not working corectly num_rows_removed := topo_update.do_remove_only_valid_small_areas (
+    -- border_topo_info.topology_name, _min_area_to_keep, face_table_name, bb,_utm);
+   num_rows_removed := topo_update.do_remove_small_areas_no_block (
+   border_topo_info.topology_name, _min_area_to_keep, face_table_name, bb,_utm);
+    
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
     RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
     
@@ -236,16 +230,14 @@ BEGIN
 
     
     DROP TABLE IF EXISTS tmp_simplified_border_lines;
-    
  
   ELSIF _cell_job_type = 2 THEN
 
     has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;
-    command_string := Format('SELECT EXISTS(SELECT 1 from to_regclass(%L) where to_regclass is not null)',
-    has_edges_temp_table_name);
+    command_string := Format('SELECT EXISTS(SELECT 1 from to_regclass(%L) where to_regclass is not null)',has_edges_temp_table_name);
+    
     EXECUTE command_string into has_edges;
     RAISE NOTICE 'cell % cell_job_type %, has_edges %, _loop_number %', box_id, _cell_job_type, has_edges, _loop_number;
-
     IF (has_edges) THEN
      IF _loop_number = 1 THEN 
        command_string := Format('SELECT topology.TopoGeo_addLinestring(%3$L,r.geom,%1$s) FROM (SELECT geom from %2$s order by is_closed desc, num_points desc) as r', _snap_tolerance, has_edges_temp_table_name, _topology_name);
@@ -254,8 +246,9 @@ BEGIN
      END IF;
      EXECUTE command_string;
       
-     command_string := Format('drop table %s',has_edges_temp_table_name);
+     command_string := Format('DROP TABLE IF EXISTS %s',has_edges_temp_table_name);
      EXECUTE command_string;
+    
     END IF;
   ELSIF _cell_job_type = 3 THEN
     -- on cell border
@@ -308,11 +301,26 @@ BEGIN
       _utm);
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
     RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
-
-    
     -- remove small polygons in border sones
-    
   ELSIF _cell_job_type = 4 THEN
+     
+     -- remove 
+     face_table_name = _topology_name || '.face';
+     start_remove_small := Clock_timestamp();
+     RAISE NOTICE 'Start clean small polygons for border plygons face_table_name % at %', face_table_name, Clock_timestamp();
+     -- remove small polygons in temp
+     -- TODO 6 sould be based on other values
+     num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, _min_area_to_keep, face_table_name, ST_buffer(bb,(_snap_tolerance * 6)-1),
+      _utm);
+     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
+     RAISE NOTICE 'Removed % clean small polygons for after adding to main face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
+
+  ELSIF _cell_job_type = 5 THEN
+    -- Create a temp table name
+    temp_table_name := '_result_temp_' || box_id;
+    temp_table_id_column := '_id' || temp_table_name;
+    final_result_table_name := _table_name_result_prefix || '_result';
+
     -- Drop/Create a temp to hold data temporay for job
     EXECUTE Format('DROP TABLE IF EXISTS %s', temp_table_name);
     -- Create the temp for result simple feature result table  as copy of the input table
@@ -378,20 +386,19 @@ BEGIN
   END IF;
   RAISE NOTICE 'done work at timeofday:% for layer %, with _cell_job_type %', Timeofday(), border_topo_info.topology_name, _cell_job_type;
   command_string := Format('update %1$s set block_bb = %2$L where cell_geo = %3$L', _job_list_name, bb, bb);
-  RAISE NOTICE '% ', command_string;
   EXECUTE command_string;
-  RAISE NOTICE 'timeofday:% ,done job nocutline ready to start next', Timeofday();
+  
   done_time := Clock_timestamp();
   used_time := (Extract(EPOCH FROM (done_time - start_time)));
-  RAISE NOTICE 'work done proc :% border_layer_id %, using % sec', done_time, border_topo_info.border_layer_id, used_time;
+  RAISE NOTICE 'work done for cell % at % border_layer_id %, using % sec', box_id, done_time, border_topo_info.border_layer_id, used_time;
   -- This is a list of lines that fails
   -- this is used for debug
   IF used_time > 10 THEN
-    RAISE NOTICE 'very long a set of lines % time with geo for bb % ', used_time, bb;
+    RAISE NOTICE 'very long time used for lines, % time with geo for bb % ', used_time, box_id;
     EXECUTE Format('INSERT INTO %s (execute_time, info, sql, geo) VALUES (%s, %L, %L, %L)', _table_name_result_prefix || '_long_time_log2', used_time, 'simplefeature_c2_topo_surface_border_retry', command_string, bb);
   END IF;
   PERFORM topo_update.clear_blocked_area (area_to_block, _job_list_name);
-  RAISE NOTICE 'leave work at timeofday:% for layer %, with _cell_job_type %', Timeofday(), border_topo_info.topology_name, _cell_job_type;
+  RAISE NOTICE 'leave work at timeofday:% for layer %, with _cell_job_type % for cell %', Timeofday(), border_topo_info.topology_name, _cell_job_type, box_id;
   --RETURN added_rows;
 END
 $$;

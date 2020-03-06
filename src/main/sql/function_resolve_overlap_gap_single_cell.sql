@@ -214,9 +214,12 @@ BEGIN
     EXECUTE command_string into has_edges;
     IF (has_edges) THEN
       has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;
-      command_string := Format('create unlogged table %1$s as (SELECT geom, ST_IsClosed(geom) as is_closed, ST_NPoints(geom) as num_points from  %2$s.edge_data)',
+      command_string := Format('create unlogged table %1$s as 
+       (SELECT geom, ST_IsClosed(geom) as is_closed, ST_NPoints(geom) as num_points 
+       from  %2$s.edge_data where ST_Length(geom) >= %3$s)',
       has_edges_temp_table_name,
-      border_topo_info.topology_name);
+      border_topo_info.topology_name,
+      _snap_tolerance);
       EXECUTE command_string;
       
       EXECUTE Format('CREATE INDEX ON %s(is_closed,num_points)', has_edges_temp_table_name);

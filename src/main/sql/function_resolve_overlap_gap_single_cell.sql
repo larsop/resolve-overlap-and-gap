@@ -35,7 +35,8 @@ DECLARE
   face_table_name varchar;
   -- This is used when adding lines hte tolrannce is different when adding lines inside and box and the border;
   snap_tolerance_fixed float = _snap_tolerance;
-  glue_snap_tolerance_fixed float = _snap_tolerance / 10000;
+  glue_snap_tolerance_fixed float = _snap_tolerance/10000;
+  min_length_line float = _min_area_to_keep/1000;
   temp_table_name varchar;
   temp_table_id_column varchar;
   final_result_table_name varchar;
@@ -83,7 +84,8 @@ BEGIN
   -- RAISE NOTICE 'area to block:% ', area_to_block;
   border_topo_info.snap_tolerance := _simplify_tolerance;
   
-  RAISE NOTICE 'start work at timeofday:% for layer %, with _cell_job_type %', Timeofday(), _topology_name || '_' || box_id, _cell_job_type;
+  RAISE NOTICE 'start work at timeofday:% for layer %, with _cell_job_type % and min_length_line %s', 
+  Timeofday(), _topology_name || '_' || box_id, _cell_job_type, min_length_line;
   
       -- check if any 'SubtransControlLock' is there
         subtransControlLock_start = clock_timestamp();
@@ -166,7 +168,7 @@ BEGIN
        EXECUTE Format('SELECT topology.droptopology(%s)', Quote_literal(border_topo_info.topology_name));
     END IF;
     --drop this schema in case it exists
-    EXECUTE Format('DROP SCHEMA IF EXISTS %s CASCADE', border_topo_info.layer_schema_name);
+    EXECUTE Format('DROP SCHEMA IF EXISTS %s CASCADE', border_topo_info.topology_name);
  
     PERFORM topology.CreateTopology (border_topo_info.topology_name, _srid, snap_tolerance_fixed);
     EXECUTE Format('ALTER table %s.edge_data set unlogged', border_topo_info.topology_name);
@@ -214,12 +216,24 @@ BEGIN
     EXECUTE command_string into has_edges;
     IF (has_edges) THEN
       has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;
-      command_string := Format('create unlogged table %1$s as 
+
+      IF (_utm = false) THEN
+       command_string := Format('create unlogged table %1$s as 
+       (SELECT geom, ST_IsClosed(geom) as is_closed, ST_NPoints(geom) as num_points 
+       from  %2$s.edge_data where ST_Length(geom,true) >= %3$s)',
+       has_edges_temp_table_name,
+       border_topo_info.topology_name,
+       min_length_line);
+      ELSE
+       command_string := Format('create unlogged table %1$s as 
        (SELECT geom, ST_IsClosed(geom) as is_closed, ST_NPoints(geom) as num_points 
        from  %2$s.edge_data where ST_Length(geom) >= %3$s)',
-      has_edges_temp_table_name,
-      border_topo_info.topology_name,
-      _snap_tolerance);
+       has_edges_temp_table_name,
+       border_topo_info.topology_name,
+       min_length_line);
+      END IF;
+
+      
       EXECUTE command_string;
       
       EXECUTE Format('CREATE INDEX ON %s(is_closed,num_points)', has_edges_temp_table_name);

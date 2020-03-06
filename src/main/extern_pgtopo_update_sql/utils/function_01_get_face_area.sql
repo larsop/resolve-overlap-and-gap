@@ -8,6 +8,12 @@ DECLARE
   -- holds dynamic sql to be able to use the same code for different
   command_string text;
   face_area float = 0;
+  v_state text;
+  v_msg text;
+  v_detail text;
+  v_hint text;
+  v_context text;
+
 BEGIN
   BEGIN
 	IF (utm = false) THEN
@@ -15,10 +21,12 @@ BEGIN
     ELSE
       face_area := ST_Area (st_getFaceGeometry (_atopology, _face_id)); 
     END IF;
-    EXCEPTION
-    WHEN OTHERS THEN
-      RAISE NOTICE 'WARNING failed to find area for face % ', _face_id;
-    face_area := 0;
+  	EXCEPTION WHEN OTHERS THEN
+	    GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
+                    v_context = PG_EXCEPTION_CONTEXT;
+        RAISE NOTICE 'Failed failed to area for face_id % in topo % state  : %  message: % detail : % hint   : % context: %', 
+        _face_id, _atopology, v_state, v_msg, v_detail, v_hint, v_context;
+  face_area := 0;
     END;
   RETURN face_area;
 END;

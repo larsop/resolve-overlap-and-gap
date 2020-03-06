@@ -41,8 +41,7 @@ BEGIN
   where g.topo_area < %2$s', Quote_literal(_atopology), _min_area, _table_name, _bb, min_mbr_area, _utm);
  	 
   LOOP
-    -- with 4000 it's to slow
-    RAISE NOTICE 'execute command_string; %', command_string;
+    -- RAISE NOTICE 'execute command_string; %', command_string;
     EXECUTE command_string INTO num_rows;
     RAISE NOTICE 'removed num_rows v3 % tiny polygons from %', num_rows, _table_name;
     IF num_rows = 0 OR num_rows IS NULL THEN

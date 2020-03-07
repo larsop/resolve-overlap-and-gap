@@ -355,7 +355,24 @@ BEGIN
  		  ) as keys', ',', 'r.', ',', temp_table_name, '{}', temp_table_id_column, input_table_geo_column_name, '_other_intersect_id_list');
     RAISE NOTICE '% ', command_string;
     EXECUTE command_string INTO update_fields, update_fields_source;
-    -- Insert new geos based on all face id
+   
+-- TO get only this with values    
+--    command_string := Format('insert into %3$s(%5$s)
+-- --select * from (select (ST_dump(st_getFaceGeometry(%1$L,face_id))).geom as %5$s from (
+-- --SELECT f.face_id, min(jl.id) as cell_id  FROM
+-- --%1$s.face f, 
+-- --%4$s jl
+-- --WHERE f.mbr && %2$L and jl.cell_geo && f.mbr 
+-- --GROUP BY f.face_id
+-- --) as r
+--    where cell_id = %6$s) as r,
+--    %7$s i
+--    where i.%5$s && r.%5$s and ST_Intersects(ST_pointOnSurface(r.%5$s),i.%5$s)', 
+-- --_topology_name, bb, temp_table_name, 
+-- --_table_name_result_prefix || '_job_list', 
+-- --input_table_geo_column_name, box_id, input_table_name);
+ 
+    -- Insert new geos based on all face id do not check on input table
     command_string := Format('insert into %3$s(%5$s)
  	select (ST_dump(st_getFaceGeometry(%1$L,face_id))).geom as %5$s from (
  	SELECT f.face_id, min(jl.id) as cell_id  FROM

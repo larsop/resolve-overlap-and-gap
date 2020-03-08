@@ -16,7 +16,7 @@ DECLARE
   num_rows int;
   num_rows_total int = 0;
   -- Based on testing and it's not accurate at all
-  min_mbr_area float = _min_area * 30;
+  min_mbr_area float = _min_area * 1000;
 BEGIN
   command_string := Format('select sum(topo_update.removes_tiny_polygons(%1$s,face_id,topo_area,%2$s)) 
  	  from ( 
@@ -43,7 +43,7 @@ BEGIN
   LOOP
     -- RAISE NOTICE 'execute command_string; %', command_string;
     EXECUTE command_string INTO num_rows;
-    RAISE NOTICE 'removed num_rows v3 % tiny polygons from %', num_rows, _table_name;
+    RAISE NOTICE 'removed num_rows %  (num_rows_total %) tiny polygons from % using min_mbr_area %', num_rows, num_rows_total, _table_name, min_mbr_area;
     IF num_rows = 0 OR num_rows IS NULL THEN
       EXIT;
       -- exit loop
@@ -53,4 +53,8 @@ BEGIN
   RETURN num_rows_total;
 END
 $function$;
+
+--SELECT face_ST_area(mbr,true) as t from test_topo_jm.face g where ST_Area(g.mbr,true) < 3000000 and topo_update.get_face_area('test_topo_jm', face_id, false) < 49 and '0103000020A2100000010000000500000055C79BC51EAC154060761052225F4D4055C79BC51EAC15407BDC4F921F6C4D408FB9A38BB47916407BDC4F921F6C4D408FB9A38BB479164060761052225F4D4055C79BC51EAC154060761052225F4D40' && mbr; 
+
+select topo_update.do_remove_small_areas_no_block ('test_topo_jm', 49, 'test_topo_jm.face', ST_buffer('0103000020A210000001000000050000004490F4321DAC15407E8FBB1F225F4D404490F4321DAC15405DC3A4C41F6C4D40A0F04A1EB67916405DC3A4C41F6C4D40A0F04A1EB67916407E8FBB1F225F4D404490F4321DAC15407E8FBB1F225F4D40',(1e-06 * -6)),false);
 

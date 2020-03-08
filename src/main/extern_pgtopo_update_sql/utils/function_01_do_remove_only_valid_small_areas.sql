@@ -62,7 +62,7 @@ BEGIN
     -- with 4000 it's to slow
     RAISE NOTICE 'execute command_string; %', command_string;
     EXECUTE command_string INTO num_rows;
-    RAISE NOTICE 'removed num_rows v3 % tiny polygons from %', num_rows, _table_name;
+    RAISE NOTICE 'removed num_rows %  (num_rows_total %) tiny polygons from % using min_mbr_area %', num_rows, num_rows_total, _table_name, min_mbr_area;
     IF num_rows = 0 OR num_rows IS NULL THEN
       EXIT;
       -- exit loop
@@ -72,4 +72,6 @@ BEGIN
   RETURN num_rows_total;
 END
 $function$;
+
+
 

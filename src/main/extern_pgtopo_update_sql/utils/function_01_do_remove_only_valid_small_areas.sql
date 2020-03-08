@@ -16,7 +16,7 @@ DECLARE
   num_rows int;
   num_rows_total int = 0;
   -- Based on testing and it's not accurate at all
-  min_mbr_area float = _min_area * 30;
+  min_mbr_area float = _min_area * 1000;
   invalid_face_topo_table text = 'temp_invalid_topos_table_'||_atopology;
   v_cnt int;
 BEGIN

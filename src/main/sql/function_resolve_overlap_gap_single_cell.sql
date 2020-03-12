@@ -210,16 +210,16 @@ BEGIN
   
     
     IF _simplify_tolerance > 0 THEN
-      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(%1$L,e.edge_id, 
-      ST_simplifyPreserveTopology(geom,%2$s)
+      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,e.edge_id, 
+      ST_simplifyPreserveTopology(e.geom,%2$s)
       ) FROM %1$s.edge_data e',border_topo_info.topology_name,_simplify_tolerance);
       RAISE NOTICE 'command_string %', command_string;
       EXECUTE command_string;
     END IF;
 
     IF _do_chaikins = true THEN
-      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(%1$L,e.edge_id, 
-      topo_update.chaikinsAcuteAngle(geom,%2$s,%3$L,%4$s,%5$s,%6$s)
+      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom, %1$L,e.edge_id, 
+      topo_update.chaikinsAcuteAngle(e.geom,%2$s,%3$L,%4$s,%5$s,%6$s)
       ) FROM %1$s.edge_data e',border_topo_info.topology_name,_chaikins__max_length,_utm,_chaikins_min_degrees,_chaikins_max_degrees,_chaikins_nIterations);
       RAISE NOTICE 'command_string %', command_string;
       EXECUTE command_string;
@@ -426,7 +426,7 @@ BEGIN
  				FROM 
  				%1$s f,
  				%2$s i
- 				where f.%4$s && i.%4$s and ST_Intersects(f.%4$s,i.%4$s) and ST_IsValid(f.%4$s) and ST_IsValid(i.%4$s)
+ 				where f.%4$s && i.%4$s and ST_IsValid(f.%4$s) and ST_IsValid(i.%4$s) and ST_Intersects(f.%4$s,i.%4$s)
  				order by %5$s, area_coverarge desc,  i.%3$s
  			) as r where area_coverarge > 0.1
  			order by %5$s, area_neighbour desc

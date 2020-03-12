@@ -1,6 +1,6 @@
 
 CREATE OR REPLACE FUNCTION 
-topo_update.try_ST_ChangeEdgeGeom(_atopology varchar, _edge int, _geom Geometry)
+topo_update.try_ST_ChangeEdgeGeom(_org_geom Geometry, _atopology varchar, _edge int, _geom Geometry)
 RETURNS int AS $$
 DECLARE
   result int = 0;
@@ -13,6 +13,10 @@ DECLARE
   command_string text;
   
   BEGIN                                                                                                                       
+
+	IF ST_Equals(_org_geom, _geom) THEN
+	  RETURN 0;
+	END IF;
 
     BEGIN                                                                                                                       
 

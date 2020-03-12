@@ -5,10 +5,12 @@ _table_to_resolve varchar, -- The table to resolv, imcluding schema name
 _table_pk_column_name varchar, -- The primary of the input table
 _table_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
 _table_srid int, -- the srid for the given geo column on the table analyze
-_utm boolean,
+_utm boolean, 
 _topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset and th efinal result
 -- NB. Any exting data will related to topology_name will be deleted
-_tolerance  double precision, -- this is tolerance used as base when creating the the top layer
+_tolerance double precision, -- this is tolerance used as base when creating the the top layer
+_do_chaikins boolean, -- here we will use chaikins togehter with simply to smooth lines
+_min_area_to_keep float, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
 _max_parallel_jobs int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
 _max_rows_in_each_cell int -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
 );

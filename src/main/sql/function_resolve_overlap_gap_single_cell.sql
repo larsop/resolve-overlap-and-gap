@@ -197,7 +197,14 @@ BEGIN
                   from tmp_simplified_border_lines g where line_type = 0 order by is_closed desc, num_points desc', border_topo_info);
     --RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
+    
+    command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(%1$L,e.edge_id, 
+    topo_update.chaikinsAcuteAngle(geom,%2$s,%3$L,120,240)
+    ) FROM %1$s.edge_data e',border_topo_info.topology_name,100000,_utm);
+    RAISE NOTICE 'command_string %', command_string;
+    EXECUTE command_string;
 
+     
     face_table_name = border_topo_info.topology_name || '.face';
     start_remove_small := Clock_timestamp();
     RAISE NOTICE 'Start clean small polygons for face_table_name % at %', face_table_name, Clock_timestamp();
@@ -209,6 +216,8 @@ BEGIN
     
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
     RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
+    
+    
     
     command_string := Format('SELECT EXISTS(SELECT 1 from  %1$s.edge limit 1)',
     border_topo_info.topology_name);

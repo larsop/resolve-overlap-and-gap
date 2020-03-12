@@ -86,25 +86,25 @@ BEGIN
     FROM tmp_data_all_lines AS rings
   );
     
-  IF (_snap_tolerance > 0 AND _do_chaikins IS TRUE) THEN
-    UPDATE
-      tmp_inner_lines_final_result  lg
-    SET geo = ST_simplifyPreserveTopology (topo_update.chaikinsAcuteAngle (lg.geo, 120, 240), _snap_tolerance);
-    RAISE NOTICE ' do snap_tolerance % and do do_chaikins %', _snap_tolerance, _do_chaikins;
-    -- TODO send paratmeter if this org data or not. _do_chaikins
-    -- insert into tmp_inner_lines_final_result (geo,line_type)
-    -- SELECT e1.geom as geo , 2 as line_type from  topo_ar5_forest_sysdata.edge e1
-    -- where e1.geom && bb_inner_glue_geom;
-  ELSE
-    IF (_snap_tolerance > 0) THEN
-      UPDATE
-        tmp_inner_lines_final_result  lg
-      SET geo = ST_simplifyPreserveTopology (lg.geo, _snap_tolerance);
-      RAISE NOTICE ' do snap_tolerance % and not do do_chaikins %', _snap_tolerance, _do_chaikins;
-    END IF;
-    --update tmp_inner_lines_final_result  lg
-    --set geo = ST_Segmentize(geo, 1);
-  END IF;
+--  IF (_snap_tolerance > 0 AND _do_chaikins IS TRUE) THEN
+--    UPDATE
+--      tmp_inner_lines_final_result  lg
+--    SET geo = ST_simplifyPreserveTopology (topo_update.chaikinsAcuteAngle (lg.geo, 120, 240), _snap_tolerance);
+--    RAISE NOTICE ' do snap_tolerance % and do do_chaikins %', _snap_tolerance, _do_chaikins;
+--    -- TODO send paratmeter if this org data or not. _do_chaikins
+--    -- insert into tmp_inner_lines_final_result (geo,line_type)
+--    -- SELECT e1.geom as geo , 2 as line_type from  topo_ar5_forest_sysdata.edge e1
+--    -- where e1.geom && bb_inner_glue_geom;
+--  ELSE
+--    IF (_snap_tolerance > 0) THEN
+--      UPDATE
+--        tmp_inner_lines_final_result  lg
+--     SET geo = ST_simplifyPreserveTopology (lg.geo, _snap_tolerance);
+--      RAISE NOTICE ' do snap_tolerance % and not do do_chaikins %', _snap_tolerance, _do_chaikins;
+--    END IF;
+--    --update tmp_inner_lines_final_result  lg
+--    --set geo = ST_Segmentize(geo, 1);
+--  END IF;
 
   -- make linns for glue parts.
   --#############################

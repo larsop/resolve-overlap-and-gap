@@ -230,7 +230,7 @@ IMMUTABLE;
 
 --create table test_topo_ar50.test_24202 as (SELECT sl_sdeid, ST_simplifyPreserveTopology(topo_update.chaikinsAcuteAngle(ST_ExteriorRing(ST_simplifyPreserveTopology (geo,5)),10000,'t',180,300,3),5) FROM sl_esh.ar50_utvikling_flate where sl_sdeid = 24202 );
 
---create table test_topo_ar50.test_24202 as (SELECT sl_sdeid, topo_update.chaikinsAcuteAngle(ST_ExteriorRing(ST_simplifyPreserveTopology (geo,10)),10000,'t',180,300,1) as geom FROM sl_esh.ar50_utvikling_flate where sl_sdeid = 24202 );
+--create table test_topo_ar50.test_24202 as (SELECT sl_sdeid, topo_update.chaikinsAcuteAngle(ST_ExteriorRing(ST_simplifyPreserveTopology (geo,10)),10000,'t',120,240,1) as geom FROM sl_esh.ar50_utvikling_flate where sl_sdeid = 24202 );
 
 --create table test_topo_ar50.test_24202 as (SELECT sl_sdeid, ST_ExteriorRing(ST_simplifyPreserveTopology (geo,10)) as geom FROM sl_esh.ar50_utvikling_flate where sl_sdeid = 24202 );
 

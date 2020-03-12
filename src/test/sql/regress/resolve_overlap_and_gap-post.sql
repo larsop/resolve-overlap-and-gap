@@ -8,7 +8,8 @@ _table_srid int, -- the srid for the given geo column on the table analyze
 _utm boolean, 
 _topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset and th efinal result
 -- NB. Any exting data will related to topology_name will be deleted
-_tolerance double precision, -- this is tolerance used as base when creating the the top layer
+_topology_snap_tolerance float, -- this is tolerance used as base when creating the the postgis topolayer
+_simplify_tolerance float, -- is this is more than zero simply will called with
 _do_chaikins boolean, -- here we will use chaikins togehter with simply to smooth lines
 _min_area_to_keep float, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
 _max_parallel_jobs int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
@@ -23,42 +24,44 @@ _srid int, -- the srid for the given geo column on the table analyze
 _max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes
 _overlapgap_grid varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
 _topology_schema_name varchar, -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,
-_snap_tolerance double precision
+_snap_tolerance float
 );
 
 
-DROP FUNCTION IF EXISTS resolve_overlap_gap_job_list(
+DROP PROCEDURE IF EXISTS resolve_overlap_gap_single_cell (
+input_table_name character varying, 
+input_table_geo_column_name character varying, 
+input_table_pk_column_name character varying, 
+_table_name_result_prefix varchar, 
+_topology_name character varying, 
+_topology_snap_tolerance float, -- this is tolerance used as base when creating the the postgis topolayer
+_srid int, 
+_utm boolean, 
+_simplify_tolerance float,
+_do_chaikins boolean, 
+_min_area_to_keep float, 
+_job_list_name character varying, 
+overlapgap_grid varchar, 
+bb geometry, 
+_cell_job_type int, -- add lines 1 inside cell, 2 boderlines, 3 exract simple
+_loop_number int
+);
+
+DROP FUNCTION IF EXISTS resolve_overlap_gap_job_list (
 table_to_resolve_ varchar, -- The table to resolve
 geo_collumn_name_ varchar, -- the name of geometry column on the table to analyze
 _srid int, -- the srid for the given geo column on the table analyze
 _utm boolean, 
 overlapgap_grid_ varchar, -- the name of the content based grid table
-_topology_schema_name varchar, -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,  
+_table_name_result_prefix varchar,
 topology_name_ varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset. -- NB. Any exting data will related to topology_name will be deleted
+_topology_snap_tolerance float, -- the tolrence to be used when add data
 job_list_name_ varchar, -- the name of job_list table, this table is ued to track of done jobs
 input_table_pk_column_name_ varchar, -- the nam eof the promary collum
-simplify_tolerance_ double precision, -- the tolerance to be used when creating topolayer
-snap_tolerance_ double precision, -- the tolrence to be used when add data
+_simplify_tolerance float, -- the tolerance to be used when creating topolayer
 do_chaikins_ boolean, -- simlyfy lines by using chaikins and simlify
 _min_area_to_keep float, -- surfaces with area less than this will merge with a neightbor
-_cell_job_type int
-);
-
-DROP PROCEDURE IF EXISTS resolve_overlap_gap_job_list (
-table_to_resolve_ varchar, -- The table to resolve
-geo_collumn_name_ varchar, -- the name of geometry column on the table to analyze
-_srid int, -- the srid for the given geo column on the table analyze
-_utm boolean, 
-overlapgap_grid_ varchar, -- the name of the content based grid table
-_topology_schema_name varchar, -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,  
-topology_name_ varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset. -- NB. Any exting data will related to topology_name will be deleted
-job_list_name_ varchar, -- the name of job_list table, this table is ued to track of done jobs
-input_table_pk_column_name_ varchar, -- the nam eof the promary collum
-simplify_tolerance_ double precision, -- the tolerance to be used when creating topolayer
-snap_tolerance_ double precision, -- the tolrence to be used when add data
-do_chaikins_ boolean, -- simlyfy lines by using chaikins and simlify
-_min_area_to_keep float, -- surfaces with area less than this will merge with a neightbor
-cell_job_type_ int -- add lines inside cell, or boderlines
+_cell_job_type int -- add lines 1 inside cell, 2 boderlines, 3 exract simple
 );
 
 DROP FUNCTION IF EXISTS resolve_overlap_gap_block_cell(

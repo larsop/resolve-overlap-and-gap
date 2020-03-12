@@ -4,9 +4,10 @@ input_table_geo_column_name character varying,
 input_table_pk_column_name character varying, 
 _table_name_result_prefix varchar, 
 _topology_name character varying, 
-_srid int, _utm boolean, 
-_simplify_tolerance double precision,
-_snap_tolerance double precision, 
+_topology_snap_tolerance float, -- this is tolerance used as base when creating the the postgis topolayer
+_srid int, 
+_utm boolean, 
+_simplify_tolerance float,
 _do_chaikins boolean, 
 _min_area_to_keep float, 
 _job_list_name character varying, 
@@ -34,8 +35,8 @@ DECLARE
   box_id integer;
   face_table_name varchar;
   -- This is used when adding lines hte tolrannce is different when adding lines inside and box and the border;
-  snap_tolerance_fixed float = _snap_tolerance;
-  glue_snap_tolerance_fixed float = _snap_tolerance/10000;
+  snap_tolerance_fixed float = _topology_snap_tolerance;
+  glue_snap_tolerance_fixed float = _topology_snap_tolerance/10000;
   min_length_line float = _min_area_to_keep/1000;
   temp_table_name varchar;
   temp_table_id_column varchar;
@@ -62,8 +63,8 @@ DECLARE
   _chaikins__max_length int = 10000; --edge that are longer than this value will not be touched   
 --_utm boolean, -- utm og degrees coodinates, wee need this to compute correct length  
 -- The basic idea idea is to use smooth out sharp edges in another way than  
-  _chaikins_min_degrees int = 180; -- The angle has to be less this given value, This is used to avoid to touch all angles. 
-  _chaikins_max_degrees int = 300; -- The angle has to be greather than this given value, This is used to avoid to touch all angles 
+  _chaikins_min_degrees int = 120; -- The angle has to be less this given value, This is used to avoid to touch all angles. 
+  _chaikins_max_degrees int = 240; -- The angle has to be greather than this given value, This is used to avoid to touch all angles 
   _chaikins_nIterations int = 1; -- A big value here make no sense because the number of points will increaes exponential )
 
 BEGIN
@@ -91,10 +92,10 @@ BEGIN
   area_to_block := bb;
   -- area_to_block := resolve_overlap_gap_block_cell(input_table_name, input_table_geo_column_name, input_table_pk_column_name, _job_list_name, bb);
   -- RAISE NOTICE 'area to block:% ', area_to_block;
-  border_topo_info.snap_tolerance := _simplify_tolerance;
+  border_topo_info.snap_tolerance := _topology_snap_tolerance;
   
-  RAISE NOTICE 'start work at timeofday:% for layer %, with _cell_job_type % and min_length_line %s', 
-  Timeofday(), _topology_name || '_' || box_id, _cell_job_type, min_length_line;
+  RAISE NOTICE 'start work at timeofday:% for layer %, _topology_snap_tolerance %, with _cell_job_type % and min_length_line %s', 
+  Timeofday(), _topology_name || '_' || box_id, _topology_snap_tolerance, _cell_job_type, min_length_line;
   
       -- check if any 'SubtransControlLock' is there
         subtransControlLock_start = clock_timestamp();
@@ -132,7 +133,7 @@ BEGIN
     command_string := Format('create temp table tmp_simplified_border_lines_1 as 
     (select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
      FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L,%L) g)', 
-    input_table_name, input_table_geo_column_name, bb, _simplify_tolerance, _do_chaikins, _table_name_result_prefix);
+    input_table_name, input_table_geo_column_name, bb, _topology_snap_tolerance, _do_chaikins, _table_name_result_prefix);
     EXECUTE command_string ;
     
     EXECUTE Format('CREATE INDEX ON tmp_simplified_border_lines_1(is_closed)');
@@ -164,7 +165,7 @@ BEGIN
 --       RAISE NOTICE 'Start clean small polygons at _loop_number 1 for face_table_name % at %', face_table_name, Clock_timestamp();
 --       -- remove small polygons in temp
 --       face_table_name = _topology_name || '.face';
---       num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, _min_area_to_keep, face_table_name, ST_buffer(bb,_snap_tolerance * -6),
+--       num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, _min_area_to_keep, face_table_name, ST_buffer(bb,_topology_snap_tolerance * -6),
 --       _utm);
 --       used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
 --       RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
@@ -216,13 +217,13 @@ BEGIN
       EXECUTE command_string;
     END IF;
 
-     
-    
-    command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(%1$L,e.edge_id, 
-    topo_update.chaikinsAcuteAngle(geom,%2$s,%3$L,%4$s,%5$s,%6$s)
-    ) FROM %1$s.edge_data e',border_topo_info.topology_name,_chaikins__max_length,_utm,_chaikins_min_degrees,_chaikins_max_degrees,_chaikins_nIterations);
-    RAISE NOTICE 'command_string %', command_string;
-    EXECUTE command_string;
+    IF _do_chaikins = true THEN
+      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(%1$L,e.edge_id, 
+      topo_update.chaikinsAcuteAngle(geom,%2$s,%3$L,%4$s,%5$s,%6$s)
+      ) FROM %1$s.edge_data e',border_topo_info.topology_name,_chaikins__max_length,_utm,_chaikins_min_degrees,_chaikins_max_degrees,_chaikins_nIterations);
+      RAISE NOTICE 'command_string %', command_string;
+      EXECUTE command_string;
+    END IF;
 
      
     face_table_name = border_topo_info.topology_name || '.face';
@@ -286,9 +287,9 @@ BEGIN
     RAISE NOTICE 'cell % cell_job_type %, has_edges %, _loop_number %', box_id, _cell_job_type, has_edges, _loop_number;
     IF (has_edges) THEN
      IF _loop_number = 1 THEN 
-       command_string := Format('SELECT topology.TopoGeo_addLinestring(%3$L,r.geom,%1$s) FROM (SELECT geom from %2$s order by is_closed desc, num_points desc) as r', _snap_tolerance, has_edges_temp_table_name, _topology_name);
+       command_string := Format('SELECT topology.TopoGeo_addLinestring(%3$L,r.geom,%1$s) FROM (SELECT geom from %2$s order by is_closed desc, num_points desc) as r', _topology_snap_tolerance, has_edges_temp_table_name, _topology_name);
      ELSE
-       command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (SELECT geom from %2$s order by is_closed desc, num_points desc) as r', _snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
+       command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L) FROM (SELECT geom from %2$s order by is_closed desc, num_points desc) as r', _topology_snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (bb), _topology_name, _table_name_result_prefix);
      END IF;
      EXECUTE command_string;
       
@@ -343,7 +344,7 @@ BEGIN
     RAISE NOTICE 'Start clean small polygons for border plygons face_table_name % at %', face_table_name, Clock_timestamp();
     -- remove small polygons in temp
     -- TODO 6 sould be based on other values
-    num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, _min_area_to_keep, face_table_name, ST_buffer(ST_ExteriorRing(bb),_snap_tolerance * 6),
+    num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, _min_area_to_keep, face_table_name, ST_buffer(ST_ExteriorRing(bb),_topology_snap_tolerance * 6),
       _utm);
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
     RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
@@ -356,7 +357,7 @@ BEGIN
      RAISE NOTICE 'Start clean small polygons for border plygons face_table_name % at %', face_table_name, Clock_timestamp();
      -- remove small polygons in temp
      -- TODO 6 sould be based on other values
-     num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, _min_area_to_keep, face_table_name, ST_buffer(bb,(_snap_tolerance * -6)),
+     num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, _min_area_to_keep, face_table_name, ST_buffer(bb,(_topology_snap_tolerance * -6)),
       _utm);
      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
      RAISE NOTICE 'Removed % clean small polygons for after adding to main face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;

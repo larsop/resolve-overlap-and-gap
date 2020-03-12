@@ -9,7 +9,7 @@ _srid int, -- the srid for the given geo column on the table analyze
 _max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes
 _overlapgap_grid varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
 _topology_schema_name varchar, -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,
-_snap_tolerance double precision
+_topology_snap_tolerance double precision
 )
   RETURNS INTEGER
   AS $$
@@ -40,7 +40,7 @@ BEGIN
   -- drop this schema in case it exists
   EXECUTE Format('DROP SCHEMA IF EXISTS %s CASCADE', _topology_schema_name);
   -- create topology
-  EXECUTE Format('SELECT topology.createtopology(%s,%s,%s)', Quote_literal(_topology_schema_name), _srid, _snap_tolerance);
+  EXECUTE Format('SELECT topology.createtopology(%s,%s,%s)', Quote_literal(_topology_schema_name), _srid, _topology_snap_tolerance);
   -- Set unlogged to increase performance
   EXECUTE Format('ALTER TABLE %s.edge_data SET unlogged', _topology_schema_name);
   EXECUTE Format('ALTER TABLE %s.node SET unlogged', _topology_schema_name);
@@ -105,7 +105,7 @@ BEGIN
   EXECUTE command_string INTO overlapgap_grid_threads_num_cells;
  
   EXECUTE Format('UPDATE %s set %s = ST_Buffer(%s,-%s)', 
-  overlapgap_grid_threads, _geo_collumn_name, _geo_collumn_name, _snap_tolerance);
+  overlapgap_grid_threads, _geo_collumn_name, _geo_collumn_name, _topology_snap_tolerance);
   
   -- Create Index
   EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', overlapgap_grid_threads, _geo_collumn_name);

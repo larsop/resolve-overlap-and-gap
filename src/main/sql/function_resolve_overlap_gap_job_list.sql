@@ -7,10 +7,10 @@ _utm boolean,
 overlapgap_grid_ varchar, -- the name of the content based grid table
 _table_name_result_prefix varchar,
 topology_name_ varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset. -- NB. Any exting data will related to topology_name will be deleted
+_topology_snap_tolerance float, -- the tolrence to be used when add data
 job_list_name_ varchar, -- the name of job_list table, this table is ued to track of done jobs
 input_table_pk_column_name_ varchar, -- the nam eof the promary collum
-simplify_tolerance_ double precision, -- the tolerance to be used when creating topolayer
-snap_tolerance_ double precision, -- the tolrence to be used when add data
+_simplify_tolerance float, -- the tolerance to be used when creating topolayer
 do_chaikins_ boolean, -- simlyfy lines by using chaikins and simlify
 _min_area_to_keep float, -- surfaces with area less than this will merge with a neightbor
 _cell_job_type int -- add lines 1 inside cell, 2 boderlines, 3 exract simple
@@ -44,13 +44,15 @@ BEGIN
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
 
+
   sql_to_run_grid := Format('CALL resolve_overlap_gap_single_cell(%s,%s,%s,
   %s,%s,%s,%s,
   %s,%s,%s,
   %s,%s,%s,', 
   Quote_literal(table_to_resolve_), Quote_literal(geo_collumn_name_), Quote_literal(input_table_pk_column_name_), 
-  Quote_literal(_table_name_result_prefix), Quote_literal(topology_name_), _srid, 
-  Quote_literal(_utm), simplify_tolerance_, snap_tolerance_, Quote_literal(do_chaikins_), _min_area_to_keep ,
+  Quote_literal(_table_name_result_prefix), Quote_literal(topology_name_) ,_topology_snap_tolerance, _srid, 
+  Quote_literal(_utm), _simplify_tolerance, 
+  Quote_literal(do_chaikins_), _min_area_to_keep ,
   Quote_literal(job_list_name_), Quote_literal(overlapgap_grid_));
   RAISE NOTICE 'sql_to_run_grid %', sql_to_run_grid;
 

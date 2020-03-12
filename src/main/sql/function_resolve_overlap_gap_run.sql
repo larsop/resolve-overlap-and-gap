@@ -7,7 +7,8 @@ _table_srid int, -- the srid for the given geo column on the table analyze
 _utm boolean, 
 _topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset and th efinal result
 -- NB. Any exting data will related to topology_name will be deleted
-_tolerance double precision, -- this is tolerance used as base when creating the the top layer
+_topology_snap_tolerance float, -- this is tolerance used as base when creating the the postgis topolayer
+_simplify_tolerance float, -- is this is more than zero simply will called with
 _do_chaikins boolean, -- here we will use chaikins togehter with simply to smooth lines
 _min_area_to_keep float, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
 _max_parallel_jobs int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
@@ -42,11 +43,6 @@ DECLARE
   sql_to_block_cmd varchar;
   -- just to create sql
   command_string_var varchar;
-  -- TODO send as parameter or compute
-  -- TODO send as parameter or fix in another way
-  simplify_tolerance double precision = (_tolerance * 2);
-  -- this is the tolerance used when adding new lines s
-  snap_tolerance double precision = _tolerance;
   -- this is the tolerance used when creating the topo layer
   cell_job_type int;
   -- add lines 1 inside cell, 2 boderlines, 3 exract simple
@@ -73,7 +69,7 @@ BEGIN
   job_list_name := table_name_result_prefix || '_job_list';
   -- Call init method to create content based create and main topology schema
   command_string := Format('SELECT resolve_overlap_gap_init(%L,%s,%s,%s,%s,%s,%s,%s)', 
-  table_name_result_prefix, Quote_literal(_table_to_resolve), Quote_literal(_table_geo_collumn_name), _table_srid, _max_rows_in_each_cell, Quote_literal(overlapgap_grid), Quote_literal(_topology_name), snap_tolerance);
+  table_name_result_prefix, Quote_literal(_table_to_resolve), Quote_literal(_table_geo_collumn_name), _table_srid, _max_rows_in_each_cell, Quote_literal(overlapgap_grid), Quote_literal(_topology_name), _topology_snap_tolerance);
   -- execute the string
   EXECUTE command_string INTO num_cells;
   
@@ -81,8 +77,8 @@ BEGIN
   FOR cell_job_type IN 1..5 LOOP
     -- 1 ############################# START # add lines inside box and cut lines and save then in separate table,
     -- 2 ############################# START # add border lines saved in last run, we will here connect data from the different cell using he border lines.
-    command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%L,%L,%s,%s,%L,%L,%s)', 
-    _table_to_resolve, _table_geo_collumn_name, _table_srid, _utm, overlapgap_grid, table_name_result_prefix, _topology_name, job_list_name, _table_pk_column_name, simplify_tolerance, snap_tolerance, _do_chaikins, _min_area_to_keep, cell_job_type);
+    command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%s,%L,%L,%s)', 
+    _table_to_resolve, _table_geo_collumn_name, _table_srid, _utm, overlapgap_grid, table_name_result_prefix, _topology_name,  _topology_snap_tolerance, job_list_name, _table_pk_column_name, _simplify_tolerance, _do_chaikins, _min_area_to_keep, cell_job_type);
     EXECUTE command_string;
     COMMIT;
 

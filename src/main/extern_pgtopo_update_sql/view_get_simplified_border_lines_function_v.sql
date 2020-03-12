@@ -1,7 +1,8 @@
 CREATE OR REPLACE FUNCTION topo_update.get_simplified_border_lines (
 _input_table_name varchar, 
 _input_table_geo_column_name varchar, 
-_bb geometry, _snap_tolerance float8, 
+_bb geometry, 
+_topology_snap_tolerance float, 
 _do_chaikins boolean,
 _table_name_result_prefix varchar -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,
 )
@@ -25,9 +26,9 @@ DECLARE
   --boundary_with real = 1.5;
   --glue_boundary_with real = 0.5;
   --overlap_width_inner real = 1;
-  boundary_with real = _snap_tolerance * 1.5;
-  glue_boundary_with real = _snap_tolerance * 0.5;
-  overlap_width_inner real = _snap_tolerance;
+  boundary_with float = _topology_snap_tolerance * 1.5;
+  glue_boundary_with float = _topology_snap_tolerance * 0.5;
+  overlap_width_inner float = _topology_snap_tolerance;
   try_update_invalid_rows int;
   
   _max_point_in_line int = 10000;
@@ -61,7 +62,7 @@ BEGIN
      ST_NPoints(geom) as npoints,
      ST_Intersects(geom,%5$L) as touch_outside 
     from lines where  ST_IsEmpty(geom) is false', 
- 	_input_table_name, bb_boundary_outer, _input_table_geo_column_name, _snap_tolerance, boundary_geom);
+ 	_input_table_name, bb_boundary_outer, _input_table_geo_column_name, _topology_snap_tolerance, boundary_geom);
   EXECUTE command_string;
   command_string := Format('create index %1$s on tmp_data_all_lines using gist(geom)', 'idx1' || Md5(ST_AsBinary (_bb)));
   EXECUTE command_string;
@@ -86,21 +87,21 @@ BEGIN
     FROM tmp_data_all_lines AS rings
   );
     
---  IF (_snap_tolerance > 0 AND _do_chaikins IS TRUE) THEN
+--  IF (_topology_snap_tolerance > 0 AND _do_chaikins IS TRUE) THEN
 --    UPDATE
 --      tmp_inner_lines_final_result  lg
---    SET geo = ST_simplifyPreserveTopology (topo_update.chaikinsAcuteAngle (lg.geo, 120, 240), _snap_tolerance);
---    RAISE NOTICE ' do snap_tolerance % and do do_chaikins %', _snap_tolerance, _do_chaikins;
+--    SET geo = ST_simplifyPreserveTopology (topo_update.chaikinsAcuteAngle (lg.geo, 120, 240), _topology_snap_tolerance);
+--    RAISE NOTICE ' do snap_tolerance % and do do_chaikins %', _topology_snap_tolerance, _do_chaikins;
 --    -- TODO send paratmeter if this org data or not. _do_chaikins
 --    -- insert into tmp_inner_lines_final_result (geo,line_type)
 --    -- SELECT e1.geom as geo , 2 as line_type from  topo_ar5_forest_sysdata.edge e1
 --    -- where e1.geom && bb_inner_glue_geom;
 --  ELSE
---    IF (_snap_tolerance > 0) THEN
+--    IF (_topology_snap_tolerance > 0) THEN
 --      UPDATE
 --        tmp_inner_lines_final_result  lg
---     SET geo = ST_simplifyPreserveTopology (lg.geo, _snap_tolerance);
---      RAISE NOTICE ' do snap_tolerance % and not do do_chaikins %', _snap_tolerance, _do_chaikins;
+--     SET geo = ST_simplifyPreserveTopology (lg.geo, _topology_snap_tolerance);
+--      RAISE NOTICE ' do snap_tolerance % and not do do_chaikins %', _topology_snap_tolerance, _do_chaikins;
 --    END IF;
 --    --update tmp_inner_lines_final_result  lg
 --    --set geo = ST_Segmentize(geo, 1);

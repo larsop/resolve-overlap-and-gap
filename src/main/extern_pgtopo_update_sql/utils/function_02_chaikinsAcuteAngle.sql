@@ -1,12 +1,13 @@
 
 
 CREATE OR REPLACE FUNCTION topo_update.chaikinsAcuteAngle (
-_geom geometry, 
-_max_length int, --max edge length  
-_utm boolean, -- utm og degrees coodinates 
-_min_degrees int DEFAULT 90, 
-_max_degrees int DEFAULT 270, 
-_nIterations int DEFAULT 5)
+_geom geometry, -- the edge to fix
+_max_length int, --edge that are longer than this value will not be touched   
+_utm boolean, -- utm og degrees coodinates, wee need this to compute correct length  
+-- The basic idea idea is to use smooth out sharp edges in another way than  
+_min_degrees int DEFAULT 90, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
+_max_degrees int DEFAULT 270, -- The angle has to be greather than this given value, This is used to avoid to touch all angles 
+_nIterations int DEFAULT 5) -- A big value here make no sense because the number of points will increaes exponential )
   RETURNS geometry
   AS $$
 DECLARE
@@ -22,7 +23,7 @@ BEGIN
   -- loop max 5 times, will this ever happen
   -- TODO find a way to 
   IF _utm THEN
-  FOR counter IN 1..5 LOOP
+  FOR counter IN 1.._nIterations LOOP
     SELECT Array_agg(org_index) INTO sharp_angle_index
     FROM (
       SELECT Abs(Degrees(azimuth_1 - azimuth_2)) AS angle, org_index
@@ -217,3 +218,21 @@ IMMUTABLE;
   
 --SELECT  topo_update.chaikinsAcuteAngle(ST_ExteriorRing(geom),100000,'f',120,240) FROM test_data.overlap_gap_input_t1 where c1 = 1502 ;
   
+--drop table test_topo_ar50.test_24202;
+
+-- ok
+-- create table test_topo_ar50.test_24202 as (SELECT sl_sdeid, topo_update.chaikinsAcuteAngle(ST_ExteriorRing(geo),100,'t',120,240,20) FROM sl_esh.ar50_utvikling_flate where sl_sdeid = 24202 );
+
+
+--create table test_topo_ar50.test_24202 as (SELECT sl_sdeid, topo_update.chaikinsAcuteAngle(ST_ExteriorRing(ST_simplifyPreserveTopology (geo,12)),100,'t',300,10,10000) FROM sl_esh.ar50_utvikling_flate where sl_sdeid = 24202 );
+
+-- create table test_topo_ar50.test_24202 as (SELECT sl_sdeid, ST_simplifyPreserveTopology(topo_update.chaikinsAcuteAngle(ST_ExteriorRing(ST_simplifyPreserveTopology (geo,5)),10000,'t',180,300,3),10) FROM sl_esh.ar50_utvikling_flate where sl_sdeid = 24202 );
+
+--create table test_topo_ar50.test_24202 as (SELECT sl_sdeid, ST_simplifyPreserveTopology(topo_update.chaikinsAcuteAngle(ST_ExteriorRing(ST_simplifyPreserveTopology (geo,5)),10000,'t',180,300,3),5) FROM sl_esh.ar50_utvikling_flate where sl_sdeid = 24202 );
+
+--create table test_topo_ar50.test_24202 as (SELECT sl_sdeid, topo_update.chaikinsAcuteAngle(ST_ExteriorRing(ST_simplifyPreserveTopology (geo,10)),10000,'t',180,300,1) as geom FROM sl_esh.ar50_utvikling_flate where sl_sdeid = 24202 );
+
+--create table test_topo_ar50.test_24202 as (SELECT sl_sdeid, ST_ExteriorRing(ST_simplifyPreserveTopology (geo,10)) as geom FROM sl_esh.ar50_utvikling_flate where sl_sdeid = 24202 );
+
+
+--SELECT ST_Numpoints(ST_ExteriorRing(geom)) FROM test_data.overlap_gap_input_t1 where c1 = 1502 ;

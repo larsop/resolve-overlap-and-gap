@@ -56,6 +56,15 @@ DECLARE
   v_detail text;
   v_hint text;
   v_context text;
+  
+
+  -- Test Values for ar50
+  _chaikins__max_length int = 10000; --edge that are longer than this value will not be touched   
+--_utm boolean, -- utm og degrees coodinates, wee need this to compute correct length  
+-- The basic idea idea is to use smooth out sharp edges in another way than  
+  _chaikins_min_degrees int = 180; -- The angle has to be less this given value, This is used to avoid to touch all angles. 
+  _chaikins_max_degrees int = 300; -- The angle has to be greather than this given value, This is used to avoid to touch all angles 
+  _chaikins_nIterations int = 1; -- A big value here make no sense because the number of points will increaes exponential )
 
 BEGIN
 	
@@ -197,10 +206,21 @@ BEGIN
                   from tmp_simplified_border_lines g where line_type = 0 order by is_closed desc, num_points desc', border_topo_info);
     --RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
+  
+    
+    IF _simplify_tolerance > 0 THEN
+      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(%1$L,e.edge_id, 
+      ST_simplifyPreserveTopology(geom,%2$s)
+      ) FROM %1$s.edge_data e',border_topo_info.topology_name,_simplify_tolerance);
+      RAISE NOTICE 'command_string %', command_string;
+      EXECUTE command_string;
+    END IF;
+
+     
     
     command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(%1$L,e.edge_id, 
-    topo_update.chaikinsAcuteAngle(geom,%2$s,%3$L,120,240)
-    ) FROM %1$s.edge_data e',border_topo_info.topology_name,100000,_utm);
+    topo_update.chaikinsAcuteAngle(geom,%2$s,%3$L,%4$s,%5$s,%6$s)
+    ) FROM %1$s.edge_data e',border_topo_info.topology_name,_chaikins__max_length,_utm,_chaikins_min_degrees,_chaikins_max_degrees,_chaikins_nIterations);
     RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
 
@@ -383,13 +403,14 @@ BEGIN
  
     -- Insert new geos based on all face id do not check on input table
     command_string := Format('insert into %3$s(%5$s)
- 	select (ST_dump(st_getFaceGeometry(%1$L,face_id))).geom as %5$s from (
+ 	select * from (select (ST_dump(st_getFaceGeometry(%1$L,face_id))).geom as %5$s from (
  	SELECT f.face_id, min(jl.id) as cell_id  FROM
  	%1$s.face f, 
  	%4$s jl 
  	WHERE f.mbr && %2$L and jl.cell_geo && f.mbr
  	GROUP BY f.face_id
- 	) as r where cell_id = %6$s', _topology_name, bb, temp_table_name, _table_name_result_prefix || '_job_list', input_table_geo_column_name, box_id);
+ 	) as r where cell_id = %6$s 
+    ) as r where ST_IsValid(r.%5$s)', _topology_name, bb, temp_table_name, _table_name_result_prefix || '_job_list', input_table_geo_column_name, box_id);
     RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
     -- update/add primary key and _other_intersect_id_list based on geo

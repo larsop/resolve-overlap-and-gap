@@ -29,7 +29,7 @@ SELECT 'degrees', topology.droptopology('test_topo_t2');
 
 
 -- Call function to resolve overlap and gap in the function in test_data.overlap_gap_input_t1 which we just testet for overlap
-CALL resolve_overlap_gap_run('test_data.overlap_gap_input_t3','c1t3','geo',25833,true,'test_topo_t3',1,true,49,5,4);
+CALL resolve_overlap_gap_run('test_data.overlap_gap_input_t3','c1t3','geo',25833,true,'test_topo_t3',10,true,49,5,4);
 
 SELECT 'utm_check_failed_lines', count(geo) from test_topo_t3.overlap_gap_input_t3_no_cut_line_failed;
 

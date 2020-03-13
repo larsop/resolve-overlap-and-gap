@@ -21,3 +21,25 @@ CREATE TYPE resolve_overlap_data_clean_type AS (
   do_chaikins boolean -- here we will use chaikins togehter with simply to smooth lines
 );
 
+CREATE OR REPLACE FUNCTION resolve_overlap_data_clean_type_func(
+_min_area_to_keep float default 0, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
+_simplify_tolerance float default 0, -- is this is more than zero simply will called with
+_do_chaikins boolean default false -- here we will use chaikins togehter with simply to smooth lines
+
+)
+RETURNS resolve_overlap_data_clean_type
+  AS $$
+DECLARE
+  ct resolve_overlap_data_clean_type;
+BEGIN
+  ct = (
+    _min_area_to_keep,
+    _simplify_tolerance,
+    _do_chaikins
+  );
+  
+  return ct;
+END;
+$$
+LANGUAGE plpgsql;
+

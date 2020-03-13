@@ -42,6 +42,9 @@ BEGIN
   -- create topology
   EXECUTE Format('SELECT topology.createtopology(%s,%s,%s)', Quote_literal(_topology_schema_name), _srid, _topology_snap_tolerance);
   -- Set unlogged to increase performance
+ 
+  EXECUTE Format('GRANT USAGE ON SCHEMA %s TO PUBLIC', _topology_schema_name);
+   
   EXECUTE Format('ALTER TABLE %s.edge_data SET unlogged', _topology_schema_name);
   EXECUTE Format('ALTER TABLE %s.node SET unlogged', _topology_schema_name);
   EXECUTE Format('ALTER TABLE %s.face SET unlogged', _topology_schema_name);
@@ -183,6 +186,10 @@ EXECUTE Format('CREATE UNLOGGED TABLE %s AS TABLE %s with NO DATA',_table_name_r
 
 -- Add an extra column to hold a list of other intersections surfaces
 EXECUTE Format('ALTER TABLE %s ADD column _other_intersect_id_list int[]',_table_name_result_prefix||'_result');
+
+-- Add an extra column to hold a list of other intersections surfaces
+EXECUTE Format('GRANT select ON TABLE %s TO PUBLIC',_table_name_result_prefix||'_result');
+
 
   RETURN num_cells;
 END;

@@ -10,8 +10,17 @@ CREATE table test_data.overlap_gap_input_t3 AS (SELECT distinct c1 as c1t3, c2 a
 CALL resolve_overlap_gap_run(
 ('test_data.overlap_gap_input_t2','c1','geom',4258,false), -- TYPE resolve_overlap_data_input
 ('test_topo_t2',0.00001), -- TYPE resolve_overlap_data_topology
-resolve_overlap_data_clean_type_func(49), -- TYPE resolve_overlap_data_clean
-5,4);
+resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
+
+49,
+0,
+false, -- if false the parameters below are used.
+10000, --edge that are longer than this value will not be touched, The basic idea idea is to use smooth out sharp edges in another way than    
+120,  -- The angle has to be less this given value, This is used to avoid to touch all angles. 
+240, -- The angle has to be greather than this given value, This is used to avoid to touch all angles 
+1 -- A big value here make no sense because the number of points will increaes exponential )
+)
+,5,4);
 
 SELECT 'degrees_check_failed_lines', count(geo) from test_topo_t2.overlap_gap_input_t2_no_cut_line_failed;
 

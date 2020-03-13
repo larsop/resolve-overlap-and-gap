@@ -60,14 +60,6 @@ DECLARE
   v_context text;
   
 
-  -- Test Values for ar50
-  _chaikins__max_length int = 10000; --edge that are longer than this value will not be touched   
---_utm boolean, -- utm og degrees coodinates, wee need this to compute correct length  
--- The basic idea idea is to use smooth out sharp edges in another way than  
-  _chaikins_min_degrees int = 120; -- The angle has to be less this given value, This is used to avoid to touch all angles. 
-  _chaikins_max_degrees int = 240; -- The angle has to be greather than this given value, This is used to avoid to touch all angles 
-  _chaikins_nIterations int = 1; -- A big value here make no sense because the number of points will increaes exponential )
-
 BEGIN
 	
   command_string := Format('select id from %1$s where cell_geo = %2$L', _job_list_name, bb);
@@ -221,7 +213,7 @@ BEGIN
     IF (_clean_info).do_chaikins = true THEN
       command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom, %1$L,e.edge_id, 
       topo_update.chaikinsAcuteAngle(e.geom,%2$s,%3$L,%4$s,%5$s,%6$s)
-      ) FROM %1$s.edge_data e',border_topo_info.topology_name,_chaikins__max_length,_utm,_chaikins_min_degrees,_chaikins_max_degrees,_chaikins_nIterations);
+      ) FROM %1$s.edge_data e',border_topo_info.topology_name,(_clean_info).chaikins_max_length,_utm,(_clean_info).chaikins_min_degrees,(_clean_info).chaikins_max_degrees,(_clean_info).chaikins_nIterations);
       RAISE NOTICE 'command_string %', command_string;
       EXECUTE command_string;
     END IF;

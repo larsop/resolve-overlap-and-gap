@@ -7,7 +7,7 @@ _topology_name character varying,
 _topology_snap_tolerance float, -- this is tolerance used as base when creating the the postgis topolayer
 _srid int, 
 _utm boolean, 
-_clean_info resolve_overlap_data_clean, -- different parameters used if need to clean up your data
+_clean_info resolve_overlap_data_clean_type, -- different parameters used if need to clean up your data
 --(_clean_info).simplify_tolerance float, -- is this is more than zero simply will called with
 --(_clean_info).do_chaikins boolean, -- here we will use chaikins togehter with simply to smooth lines
 --(_clean_info).min_area_to_keep float, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 

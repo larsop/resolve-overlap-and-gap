@@ -361,28 +361,6 @@ BEGIN
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
     RAISE NOTICE 'Removed % clean small polygons for after adding to main face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
 
-    command_string = null;
-    IF (_clean_info).simplify_tolerance > 0 and (_clean_info).do_chaikins = false THEN
-      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,e.edge_id, 
-      ST_simplifyPreserveTopology(e.geom,%2$s)
-      ) FROM %1$s.edge_data e',border_topo_info.topology_name,(_clean_info).simplify_tolerance);
-    ELSIF (_clean_info).do_chaikins = true THEN
-      IF (_clean_info).simplify_tolerance > 0 THEN
-        command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom, %1$L,e.edge_id, 
-        topo_update.chaikinsAcuteAngle(ST_simplifyPreserveTopology(e.geom,%7$s),%2$s,%3$L,%4$s,%5$s,%6$s)
-        ) FROM %1$s.edge_data e',
-        border_topo_info.topology_name,(_clean_info).chaikins_max_length,_utm,(_clean_info).chaikins_min_degrees,
-        (_clean_info).chaikins_max_degrees,(_clean_info).chaikins_nIterations,(_clean_info).simplify_tolerance);
-      ELSE
-        command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom, %1$L,e.edge_id, 
-        topo_update.chaikinsAcuteAngle(e.geom,%2$s,%3$L,%4$s,%5$s,%6$s)
-        ) FROM %1$s.edge_data e',border_topo_info.topology_name,(_clean_info).chaikins_max_length,_utm,(_clean_info).chaikins_min_degrees,(_clean_info).chaikins_max_degrees,(_clean_info).chaikins_nIterations);
-      END IF;
-    END IF;
-    IF command_string is not null THEN
-      RAISE NOTICE 'command_string %', command_string;
-      EXECUTE command_string;
-    END IF;
 
   ELSIF _cell_job_type = 5 THEN
     -- Create a temp table name

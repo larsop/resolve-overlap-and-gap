@@ -271,9 +271,6 @@ BEGIN
     END IF;
     execute Format('SET CONSTRAINTS ALL IMMEDIATE');
     PERFORM topology.DropTopology (border_topo_info.topology_name);
-
---    END IF;
-
     
     DROP TABLE IF EXISTS tmp_simplified_border_lines;
  
@@ -309,12 +306,25 @@ BEGIN
     IF num_boxes_intersect != num_boxes_free THEN
       RETURN;
     END IF;
+
     
 
+
     border_topo_info.topology_name := _topology_name;
+
+    command_string := Format('CREATE TEMP table temp_left_over_borders as select  (ST_Dump(ST_LineMerge(ST_Union(geo)))).geom as geo from topo_update.get_left_over_borders(%1$L,%2$L,%3$L,%4$L)', 
+    overlapgap_grid, input_table_geo_column_name, bb, _table_name_result_prefix);
+    EXECUTE command_string;
+ 
+    
+    
     IF _loop_number = 1 THEN 
-      command_string := Format('SELECT topology.TopoGeo_addLinestring(%1$L,geo,%3$s) from topo_update.get_left_over_borders(%4$L,%6$L,%2$L,%5$L)', 
-      _topology_name, bb, snap_tolerance_fixed, overlapgap_grid, _table_name_result_prefix, input_table_geo_column_name);
+      command_string := Format('SELECT topology.TopoGeo_addLinestring(%1$L,geo,%2$s) from temp_left_over_borders order by ST_Length(geo) asc', 
+      _topology_name,snap_tolerance_fixed);
+      EXECUTE command_string;
+      
+      command_string := Format('SELECT topo_update.heal_cellborder_edges_no_block(%1$L,ST_Expand(ST_Envelope(geo),%2$s)) from temp_left_over_borders order by ST_Length(geo) asc', 
+      _topology_name, _topology_snap_tolerance*8);
       EXECUTE command_string;
       
       command_string := Format('SELECT topology.TopoGeo_addLinestring(%1$L,r.geo,%3$s) from %7$s r where ST_StartPoint(r.geo) && %2$L', 
@@ -323,8 +333,12 @@ BEGIN
       _table_name_result_prefix||'_border_line_many_points');
       EXECUTE command_string;
     ELSE
-      command_string := Format('SELECT topo_update.add_border_lines(%1$L,geo,%3$s,%5$L) from topo_update.get_left_over_borders(%4$L,%6$L,%2$L,%5$L)', 
-      _topology_name, bb, snap_tolerance_fixed, overlapgap_grid, _table_name_result_prefix, input_table_geo_column_name);
+      command_string := Format('SELECT topo_update.add_border_lines(%1$L,geo,%2$s,%3$L)  from temp_left_over_borders order by ST_Length(geo) asc', 
+      _topology_name, snap_tolerance_fixed, _table_name_result_prefix);
+      EXECUTE command_string;
+      
+      command_string := Format('SELECT topo_update.heal_cellborder_edges_no_block(%1$L,ST_Expand(ST_Envelope(geo),%2$s)) from temp_left_over_borders order by ST_Length(geo) asc', 
+      _topology_name, _topology_snap_tolerance*8);
       EXECUTE command_string;
       
       command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%3$s,%5$L) from %7$s r where ST_StartPoint(r.geo) && %2$L' , 
@@ -333,7 +347,8 @@ BEGIN
       _table_name_result_prefix||'_border_line_many_points');
       EXECUTE command_string;
     END IF;
-    
+
+    drop table temp_left_over_borders;
     
     face_table_name = _topology_name || '.face';
     start_remove_small := Clock_timestamp();

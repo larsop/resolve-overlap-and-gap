@@ -25,7 +25,7 @@ SELECT 'degrees_check_failed_lines', count(geo) from test_topo_t2.overlap_gap_in
 
 SELECT 'degrees_check_border_lines', count(geo) from test_topo_t2.overlap_gap_input_t2_border_line_segments;
 
-SELECT 'degrees_check_added_lines', count(geom) from test_topo_t2.edge;
+--SELECT 'degrees_check_added_lines', count(geom) from test_topo_t2.edge;
 
 SELECT 'degrees_check_added_faces', count(mbr) from test_topo_t2.face;
 
@@ -59,7 +59,7 @@ SELECT 'utm_check_failed_lines', count(geo) from test_topo_t3.overlap_gap_input_
 
 SELECT 'utm_check_border_lines', count(geo) from test_topo_t3.overlap_gap_input_t3_border_line_segments;
 
-SELECT 'utm_check_added_lines', count(geom) from test_topo_t3.edge;
+--SELECT 'utm_check_added_lines', count(geom) from test_topo_t3.edge;
 
 SELECT 'utm_check_added_faces', count(mbr) from test_topo_t3.face;
 

@@ -1,27 +1,3 @@
-CREATE TYPE resolve_overlap_data_input AS (
- table_to_resolve varchar, -- The table to resolv, imcluding schema name
- table_pk_column_name varchar, -- The primary of the input table
- table_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
- table_srid int, -- the srid for the given geo column on the table analyze
- utm boolean
-);
-
-
---((felles_egenskaper).kvalitet).maalemetode
-
-CREATE TYPE resolve_overlap_data_topology AS (
-  topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset and th efinal result
-  -- NB. Any exting data will related to topology_name will be deleted
-  topology_snap_tolerance float -- this is tolerance used as base when creating the the postgis topolayer
-);
-
-CREATE TYPE resolve_overlap_data_clean AS (
-  simplify_tolerance float, -- is this is more than zero simply will called with
-  do_chaikins boolean, -- here we will use chaikins togehter with simply to smooth lines
-  min_area_to_keep float -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
-);
-
-
 -- This is the main funtion used resolve overlap and gap
 CREATE OR REPLACE PROCEDURE resolve_overlap_gap_run (
 _input resolve_overlap_data_input, 
@@ -107,8 +83,8 @@ BEGIN
   FOR cell_job_type IN 1..5 LOOP
     -- 1 ############################# START # add lines inside box and cut lines and save then in separate table,
     -- 2 ############################# START # add border lines saved in last run, we will here connect data from the different cell using he border lines.
-    command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%s,%L,%L,%s)', 
-    (_input).table_to_resolve, (_input).table_geo_collumn_name, (_input).table_srid, (_input).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input).table_pk_column_name, (_clean_info).simplify_tolerance, (_clean_info).do_chaikins, (_clean_info).min_area_to_keep, cell_job_type);
+    command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%L,%s)', 
+    (_input).table_to_resolve, (_input).table_geo_collumn_name, (_input).table_srid, (_input).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input).table_pk_column_name, _clean_info, cell_job_type);
     EXECUTE command_string;
     COMMIT;
 

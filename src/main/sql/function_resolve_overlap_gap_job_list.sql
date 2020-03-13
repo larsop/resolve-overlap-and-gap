@@ -10,9 +10,10 @@ topology_name_ varchar, -- The topology schema name where we store store sufaces
 _topology_snap_tolerance float, -- the tolrence to be used when add data
 job_list_name_ varchar, -- the name of job_list table, this table is ued to track of done jobs
 input_table_pk_column_name_ varchar, -- the nam eof the promary collum
-_simplify_tolerance float, -- the tolerance to be used when creating topolayer
-do_chaikins_ boolean, -- simlyfy lines by using chaikins and simlify
-_min_area_to_keep float, -- surfaces with area less than this will merge with a neightbor
+_clean_info resolve_overlap_data_clean, -- different parameters used if need to clean up your data
+--(_clean_info).simplify_tolerance float, -- is this is more than zero simply will called with
+--(_clean_info).do_chaikins boolean, -- here we will use chaikins togehter with simply to smooth lines
+--(_clean_info).min_area_to_keep float, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
 _cell_job_type int -- add lines 1 inside cell, 2 boderlines, 3 exract simple
 )
   RETURNS void
@@ -45,15 +46,22 @@ BEGIN
   EXECUTE command_string;
 
 
-  sql_to_run_grid := Format('CALL resolve_overlap_gap_single_cell(%s,%s,%s,
+  sql_to_run_grid := Format('CALL resolve_overlap_gap_single_cell(
   %s,%s,%s,%s,
-  %s,%s,%s,
-  %s,%s,%s,', 
-  Quote_literal(table_to_resolve_), Quote_literal(geo_collumn_name_), Quote_literal(input_table_pk_column_name_), 
-  Quote_literal(_table_name_result_prefix), Quote_literal(topology_name_) ,_topology_snap_tolerance, _srid, 
-  Quote_literal(_utm), _simplify_tolerance, 
-  Quote_literal(do_chaikins_), _min_area_to_keep ,
-  Quote_literal(job_list_name_), Quote_literal(overlapgap_grid_));
+  %s,%s,%s,%s,
+  %L,
+  %s,%s,', 
+  Quote_literal(table_to_resolve_), 
+  Quote_literal(geo_collumn_name_), 
+  Quote_literal(input_table_pk_column_name_), 
+  Quote_literal(_table_name_result_prefix), 
+  Quote_literal(topology_name_),
+  _topology_snap_tolerance, 
+  _srid, 
+  Quote_literal(_utm), 
+  _clean_info,
+  Quote_literal(job_list_name_), 
+  Quote_literal(overlapgap_grid_));
   RAISE NOTICE 'sql_to_run_grid %', sql_to_run_grid;
 
   sql_to_block_cmd := Format('select resolve_overlap_gap_block_cell(%s,%s,%s,%s,', 

@@ -62,6 +62,12 @@ for my $file (glob '../../../main/extern_pgtopo_update_sql/utils/func*') {
 	copy_file_into($file,$fh_out);
 }
 
+
+# get SQL code resolve for overlap gap 
+for my $file (glob '../../../main/sql/types*') {
+	copy_file_into($file,$fh_out);
+}
+
 # get SQL code resolve for overlap gap 
 for my $file (glob '../../../main/sql/func*') {
 	copy_file_into($file,$fh_out);

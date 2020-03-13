@@ -1,16 +1,46 @@
+CREATE TYPE resolve_overlap_data_input AS (
+ table_to_resolve varchar, -- The table to resolv, imcluding schema name
+ table_pk_column_name varchar, -- The primary of the input table
+ table_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
+ table_srid int, -- the srid for the given geo column on the table analyze
+ utm boolean
+);
+
+
+--((felles_egenskaper).kvalitet).maalemetode
+
+CREATE TYPE resolve_overlap_data_topology AS (
+  topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset and th efinal result
+  -- NB. Any exting data will related to topology_name will be deleted
+  topology_snap_tolerance float -- this is tolerance used as base when creating the the postgis topolayer
+);
+
+CREATE TYPE resolve_overlap_data_clean AS (
+  simplify_tolerance float, -- is this is more than zero simply will called with
+  do_chaikins boolean, -- here we will use chaikins togehter with simply to smooth lines
+  min_area_to_keep float -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
+);
+
+
 -- This is the main funtion used resolve overlap and gap
 CREATE OR REPLACE PROCEDURE resolve_overlap_gap_run (
-_table_to_resolve varchar, -- The table to resolv, imcluding schema name
-_table_pk_column_name varchar, -- The primary of the input table
-_table_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
-_table_srid int, -- the srid for the given geo column on the table analyze
-_utm boolean, 
-_topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset and th efinal result
+_input resolve_overlap_data_input, 
+--(_input).table_to_resolve varchar, -- The table to resolv, imcluding schema name
+--(_input).table_pk_column_name varchar, -- The primary of the input table
+--(_input).table_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
+--(_input).table_srid int, -- the srid for the given geo column on the table analyze
+--(_input).utm boolean, 
+
+_topology_info resolve_overlap_data_topology,
+---(_topology_info).topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset and th efinal result
 -- NB. Any exting data will related to topology_name will be deleted
-_topology_snap_tolerance float, -- this is tolerance used as base when creating the the postgis topolayer
-_simplify_tolerance float, -- is this is more than zero simply will called with
-_do_chaikins boolean, -- here we will use chaikins togehter with simply to smooth lines
-_min_area_to_keep float, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
+--(_topology_info).topology_snap_tolerance float, -- this is tolerance used as base when creating the the postgis topolayer
+
+_clean_info resolve_overlap_data_clean, -- different parameters used if need to clean up your data
+--(_clean_info).simplify_tolerance float, -- is this is more than zero simply will called with
+--(_clean_info).do_chaikins boolean, -- here we will use chaikins togehter with simply to smooth lines
+--(_clean_info).min_area_to_keep float, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
+
 _max_parallel_jobs int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
 _max_rows_in_each_cell int -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
 )
@@ -46,7 +76,7 @@ DECLARE
   -- this is the tolerance used when creating the topo layer
   cell_job_type int;
   -- add lines 1 inside cell, 2 boderlines, 3 exract simple
-  topology_schema_name varchar = _topology_name;
+  topology_schema_name varchar = (_topology_info).topology_name;
   -- for now we use the same schema as the topology structure
   loop_number int;
   
@@ -55,7 +85,7 @@ DECLARE
   
 
 BEGIN
-  table_name_result_prefix := _topology_name || Substring(_table_to_resolve FROM (Position('.' IN _table_to_resolve)));
+  table_name_result_prefix := (_topology_info).topology_name || Substring((_input).table_to_resolve FROM (Position('.' IN (_input).table_to_resolve)));
   -- This is table name prefix including schema used for the result tables
   -- || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell
   -- || '_gap'; -- The schema.table name for the gaps/holes found in each cell
@@ -69,7 +99,7 @@ BEGIN
   job_list_name := table_name_result_prefix || '_job_list';
   -- Call init method to create content based create and main topology schema
   command_string := Format('SELECT resolve_overlap_gap_init(%L,%s,%s,%s,%s,%s,%s,%s)', 
-  table_name_result_prefix, Quote_literal(_table_to_resolve), Quote_literal(_table_geo_collumn_name), _table_srid, _max_rows_in_each_cell, Quote_literal(overlapgap_grid), Quote_literal(_topology_name), _topology_snap_tolerance);
+  table_name_result_prefix, Quote_literal((_input).table_to_resolve), Quote_literal((_input).table_geo_collumn_name), (_input).table_srid, _max_rows_in_each_cell, Quote_literal(overlapgap_grid), Quote_literal((_topology_info).topology_name), (_topology_info).topology_snap_tolerance);
   -- execute the string
   EXECUTE command_string INTO num_cells;
   
@@ -78,7 +108,7 @@ BEGIN
     -- 1 ############################# START # add lines inside box and cut lines and save then in separate table,
     -- 2 ############################# START # add border lines saved in last run, we will here connect data from the different cell using he border lines.
     command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%s,%L,%L,%s)', 
-    _table_to_resolve, _table_geo_collumn_name, _table_srid, _utm, overlapgap_grid, table_name_result_prefix, _topology_name,  _topology_snap_tolerance, job_list_name, _table_pk_column_name, _simplify_tolerance, _do_chaikins, _min_area_to_keep, cell_job_type);
+    (_input).table_to_resolve, (_input).table_geo_collumn_name, (_input).table_srid, (_input).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input).table_pk_column_name, (_clean_info).simplify_tolerance, (_clean_info).do_chaikins, (_clean_info).min_area_to_keep, cell_job_type);
     EXECUTE command_string;
     COMMIT;
 
@@ -101,13 +131,13 @@ BEGIN
          stmts_final[i_stmts+analyze_stmts] = stmts[i_stmts];
          IF MOD(i_stmts,200) = 0 AND cell_job_type > 1 AND cell_job_type < 4 THEN
            analyze_stmts := analyze_stmts + 1;
-           stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.edge_data;', _topology_name);
+           stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.edge_data;', (_topology_info).topology_name);
            analyze_stmts := analyze_stmts + 1;
-           stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.node;', _topology_name);
+           stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.node;', (_topology_info).topology_name);
            analyze_stmts := analyze_stmts + 1;
-           stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.face;', _topology_name);
+           stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.face;', (_topology_info).topology_name);
            analyze_stmts := analyze_stmts + 1;
-           stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.relation;', _topology_name);
+           stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.relation;', (_topology_info).topology_name);
          END IF;
       END LOOP;
       
@@ -116,12 +146,12 @@ BEGIN
 
       
       RAISE NOTICE 'Start to run overlap for % stmts_final and gap for table % cell_job_type % at loop_number %', 
-      Array_length(stmts_final, 1), _table_to_resolve, cell_job_type, loop_number;
+      Array_length(stmts_final, 1), (_input).table_to_resolve, cell_job_type, loop_number;
 
       SELECT execute_parallel (stmts_final, _max_parallel_jobs,true) INTO call_result;
       IF (call_result = FALSE AND loop_number > 1) THEN
         RAISE EXCEPTION 'FFailed to run overlap and gap for % at loop_number % for the following statement list %', 
-        _table_to_resolve, loop_number, stmts_final;
+        (_input).table_to_resolve, loop_number, stmts_final;
       END IF;
       
       loop_number := loop_number + 1;

@@ -203,25 +203,16 @@ BEGIN
   
     
     command_string = null;
-    IF (_clean_info).simplify_tolerance > 0 and (_clean_info).do_chaikins = false THEN
+    IF (_clean_info).simplify_tolerance > 0 THEN
       command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,e.edge_id, 
       ST_simplifyPreserveTopology(e.geom,%2$s)
       ) FROM %1$s.edge_data e',border_topo_info.topology_name,(_clean_info).simplify_tolerance);
-    ELSIF (_clean_info).do_chaikins = true THEN
-      IF (_clean_info).simplify_tolerance > 0 THEN
-        command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom, %1$L,e.edge_id, 
-        topo_update.chaikinsAcuteAngle(ST_simplifyPreserveTopology(e.geom,%7$s),%2$s,%3$L,%4$s,%5$s,%6$s)
-        ) FROM %1$s.edge_data e',
-        border_topo_info.topology_name,(_clean_info).chaikins_max_length,_utm,(_clean_info).chaikins_min_degrees,
-        (_clean_info).chaikins_max_degrees,(_clean_info).chaikins_nIterations,(_clean_info).simplify_tolerance);
-      ELSE
-        command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom, %1$L,e.edge_id, 
-        topo_update.chaikinsAcuteAngle(e.geom,%2$s,%3$L,%4$s,%5$s,%6$s)
-        ) FROM %1$s.edge_data e',border_topo_info.topology_name,(_clean_info).chaikins_max_length,_utm,(_clean_info).chaikins_min_degrees,(_clean_info).chaikins_max_degrees,(_clean_info).chaikins_nIterations);
-      END IF;
-    END IF;
-    IF command_string is not null THEN
-      RAISE NOTICE 'command_string %', command_string;
+      EXECUTE command_string;
+    END IF ;
+    IF (_clean_info).do_chaikins = true THEN
+      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom, %1$L,e.edge_id, 
+      topo_update.chaikinsAcuteAngle(e.geom,%2$s,%3$L,%4$s,%5$s,%6$s)
+      ) FROM %1$s.edge_data e',border_topo_info.topology_name,(_clean_info).chaikins_max_length,_utm,(_clean_info).chaikins_min_degrees,(_clean_info).chaikins_max_degrees,(_clean_info).chaikins_nIterations);
       EXECUTE command_string;
     END IF;
      
@@ -318,22 +309,22 @@ BEGIN
     EXECUTE command_string;
  
     
-    
-    IF _loop_number = 1 THEN 
-      command_string := Format('SELECT topology.TopoGeo_addLinestring(%1$L,geo,%2$s) from temp_left_over_borders order by ST_Length(geo) asc', 
-      _topology_name,snap_tolerance_fixed);
-      EXECUTE command_string;
-      
-      command_string := Format('SELECT topo_update.heal_cellborder_edges_no_block(%1$L,bb_geo) from temp_left_over_borders order by ST_Length(geo) asc', 
-      _topology_name);
-      EXECUTE command_string;
-      
-      command_string := Format('SELECT topology.TopoGeo_addLinestring(%1$L,r.geo,%3$s) from %7$s r where ST_StartPoint(r.geo) && %2$L', 
-      _topology_name, bb, snap_tolerance_fixed, overlapgap_grid, 
-      _table_name_result_prefix, input_table_geo_column_name,
-      _table_name_result_prefix||'_border_line_many_points');
-      EXECUTE command_string;
-    ELSE
+-- Try with out try catch     
+--    IF _loop_number = 1 THEN 
+--      command_string := Format('SELECT topology.TopoGeo_addLinestring(%1$L,geo,%2$s) from temp_left_over_borders order by ST_Length(geo) asc', 
+--      _topology_name,snap_tolerance_fixed);
+--      EXECUTE command_string;
+--      
+--      command_string := Format('SELECT topo_update.heal_cellborder_edges_no_block(%1$L,bb_geo) from temp_left_over_borders order by ST_Length(geo) asc', 
+--      _topology_name);
+--      EXECUTE command_string;
+--      
+--      command_string := Format('SELECT topology.TopoGeo_addLinestring(%1$L,r.geo,%3$s) from %7$s r where ST_StartPoint(r.geo) && %2$L', 
+--      _topology_name, bb, snap_tolerance_fixed, overlapgap_grid, 
+--      _table_name_result_prefix, input_table_geo_column_name,
+--      _table_name_result_prefix||'_border_line_many_points');
+--      EXECUTE command_string;
+--    ELSE
       command_string := Format('SELECT topo_update.add_border_lines(%1$L,geo,%2$s,%3$L)  from temp_left_over_borders order by ST_Length(geo) asc', 
       _topology_name, snap_tolerance_fixed, _table_name_result_prefix);
       EXECUTE command_string;
@@ -347,31 +338,22 @@ BEGIN
       _table_name_result_prefix, input_table_geo_column_name,
       _table_name_result_prefix||'_border_line_many_points');
       EXECUTE command_string;
-    END IF;
+--    END IF;
 
-    IF (_clean_info).simplify_tolerance > 0 and (_clean_info).do_chaikins = false THEN
-      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(distinct e.geom,%1$L,e.edge_id, 
+    IF (_clean_info).simplify_tolerance > 0  THEN
+      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,e.edge_id, 
       ST_simplifyPreserveTopology(e.geom,%2$s)) 
       FROM %1$s.edge_data e, temp_left_over_borders l
       WHERE l.bb_geo && e.geom',
       border_topo_info.topology_name,(_clean_info).simplify_tolerance);
-    ELSIF (_clean_info).do_chaikins = true THEN
-      IF (_clean_info).simplify_tolerance > 0 THEN
-        command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom, %1$L,e.edge_id, 
-        topo_update.chaikinsAcuteAngle(ST_simplifyPreserveTopology(e.geom,%7$s),%2$s,%3$L,%4$s,%5$s,%6$s)
-        ) FROM %1$s.edge_data e, temp_left_over_borders l
-        WHERE l.bb_geo && e.geom',
-        border_topo_info.topology_name,(_clean_info).chaikins_max_length,_utm,(_clean_info).chaikins_min_degrees,
-        (_clean_info).chaikins_max_degrees,(_clean_info).chaikins_nIterations,(_clean_info).simplify_tolerance);
-      ELSE
-        command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom, %1$L,e.edge_id, 
-        topo_update.chaikinsAcuteAngle(e.geom,%2$s,%3$L,%4$s,%5$s,%6$s)
-        ) FROM %1$s.edge_data e, temp_left_over_borders l
-        WHERE l.bb_geo && e.geom',border_topo_info.topology_name,(_clean_info).chaikins_max_length,_utm,(_clean_info).chaikins_min_degrees,(_clean_info).chaikins_max_degrees,(_clean_info).chaikins_nIterations);
-      END IF;
+      EXECUTE command_string;
     END IF;
-    IF command_string is not null THEN
-      RAISE NOTICE 'command_string %', command_string;
+    
+    IF (_clean_info).do_chaikins = true THEN
+      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom, %1$L,e.edge_id, 
+      topo_update.chaikinsAcuteAngle(e.geom,%2$s,%3$L,%4$s,%5$s,%6$s)
+      ) FROM %1$s.edge_data e, temp_left_over_borders l
+      WHERE l.bb_geo && e.geom',border_topo_info.topology_name,(_clean_info).chaikins_max_length,_utm,(_clean_info).chaikins_min_degrees,(_clean_info).chaikins_max_degrees,(_clean_info).chaikins_nIterations);
       EXECUTE command_string;
     END IF;
 

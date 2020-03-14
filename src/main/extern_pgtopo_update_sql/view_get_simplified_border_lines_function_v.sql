@@ -62,7 +62,7 @@ BEGIN
      ST_NPoints(geom) as npoints,
      ST_Intersects(geom,%5$L) as touch_outside 
     from lines where  ST_IsEmpty(geom) is false', 
- 	_input_table_name, bb_boundary_outer, _input_table_geo_column_name, _topology_snap_tolerance, boundary_geom);
+ 	_input_table_name, bb_boundary_outer, _input_table_geo_column_name, _topology_snap_tolerance, _bb);
   EXECUTE command_string;
   command_string := Format('create index %1$s on tmp_data_all_lines using gist(geom)', 'idx1' || Md5(ST_AsBinary (_bb)));
   EXECUTE command_string;
@@ -74,7 +74,8 @@ BEGIN
     WHERE npoints > %s and touch_outside = true and ST_StartPoint(r.geom) && %L'
   ,_table_name_result_prefix||'_border_line_many_points', _max_point_in_line, _bb);
   
-  DELETE FROM tmp_data_all_lines where npoints > _max_point_in_line and touch_outside = true;
+  DELETE FROM tmp_data_all_lines r
+  where npoints > _max_point_in_line and touch_outside = true and ST_StartPoint(r.geom) && _bb;
       
   
   -- 1 make line parts for inner box

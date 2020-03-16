@@ -215,7 +215,7 @@ BEGIN
          RAISE NOTICE 'failed to simplify ST_simplifyPreserveTopology: %', command_string;      
          command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,e.edge_id, 
          ST_simplifyPreserveTopology(e.geom,%2$s)
-         ) FROM %1$s.edge_data e',border_topo_info.topology_name,(_clean_info).simplify_tolerance)/2;
+         ) FROM %1$s.edge_data e',border_topo_info.topology_name,(_clean_info).simplify_tolerance/2);
          EXECUTE command_string into result_st_change_geom;
       END IF;
 

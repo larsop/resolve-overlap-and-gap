@@ -45,6 +45,7 @@ DECLARE
   update_fields varchar;
   update_fields_source varchar;
   
+  result_st_change_geom int; 
   
   subtransControlLock_start timestamp;
   subtransControlLock_count int;
@@ -207,13 +208,35 @@ BEGIN
       command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,e.edge_id, 
       ST_simplifyPreserveTopology(e.geom,%2$s)
       ) FROM %1$s.edge_data e',border_topo_info.topology_name,(_clean_info).simplify_tolerance);
-      EXECUTE command_string;
+      EXECUTE command_string into result_st_change_geom;
+      
+      -- if error try with smaller 
+      IF result_st_change_geom = -1 THEN
+         RAISE NOTICE 'failed to simplify ST_simplifyPreserveTopology: %', command_string;      
+         command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,e.edge_id, 
+         ST_simplifyPreserveTopology(e.geom,%2$s)
+         ) FROM %1$s.edge_data e',border_topo_info.topology_name,(_clean_info).simplify_tolerance)/2;
+         EXECUTE command_string into result_st_change_geom;
+      END IF;
+
+      
     END IF ;
     IF (_clean_info).do_chaikins = true THEN
       command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom, %1$L,e.edge_id, 
       topo_update.chaikinsAcuteAngle(e.geom,%2$s,%3$L,%4$s,%5$s,%6$s)
       ) FROM %1$s.edge_data e',border_topo_info.topology_name,(_clean_info).chaikins_max_length,_utm,(_clean_info).chaikins_min_degrees,(_clean_info).chaikins_max_degrees,(_clean_info).chaikins_nIterations);
       EXECUTE command_string;
+      
+      -- if error try with longer lines
+      IF result_st_change_geom = -1 THEN
+         RAISE NOTICE 'failed to simplify chaikinsAcuteAngle: %', command_string;      
+         command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom, %1$L,e.edge_id, 
+         topo_update.chaikinsAcuteAngle(e.geom,%2$s,%3$L,%4$s,%5$s,%6$s)
+         ) FROM %1$s.edge_data e',border_topo_info.topology_name,(_clean_info).chaikins_max_length*2,_utm,(_clean_info).chaikins_min_degrees,(_clean_info).chaikins_max_degrees,(_clean_info).chaikins_nIterations);
+      EXECUTE command_string;
+      END IF;
+
+      
     END IF;
      
     face_table_name = border_topo_info.topology_name || '.face';

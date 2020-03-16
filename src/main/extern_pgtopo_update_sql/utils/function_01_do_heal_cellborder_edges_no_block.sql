@@ -58,9 +58,9 @@ BEGIN
         order by edge_to_eat
     ) as r
     where r.edge_to_live != r.edge_to_eat', _atopology, bb_outer_geom);
-    RAISE NOTICE 'execute command_string; %', command_string;
+    -- RAISE NOTICE 'execute command_string; %', command_string;
     EXECUTE command_string;
-    RAISE NOTICE 'num edes healed % at loop number %', num_rows, loop_nr;
+    RAISE NOTICE 'num edes healed % at loop number % for topology %', num_rows, loop_nr, _atopology;
     GET DIAGNOSTICS num_rows = ROW_COUNT;
     IF num_rows = 0 OR num_rows IS NULL OR loop_nr > max_loops THEN
       EXIT;

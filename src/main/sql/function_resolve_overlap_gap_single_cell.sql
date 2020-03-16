@@ -305,7 +305,7 @@ BEGIN
 
     command_string := Format('CREATE TEMP table temp_left_over_borders as select geo, ST_Expand(ST_Envelope(geo),%5$s) as bb_geo FROM
     (select (ST_Dump(ST_LineMerge(ST_Union(geo)))).geom as geo from topo_update.get_left_over_borders(%1$L,%2$L,%3$L,%4$L) as r) as r', 
-    overlapgap_grid, input_table_geo_column_name, bb, _table_name_result_prefix,_topology_snap_tolerance*8);
+    overlapgap_grid, input_table_geo_column_name, bb, _table_name_result_prefix,_topology_snap_tolerance*100);
     EXECUTE command_string;
  
     
@@ -344,6 +344,7 @@ BEGIN
       command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,e.edge_id, 
       ST_simplifyPreserveTopology(e.geom,%2$s)) 
       FROM %1$s.edge_data e, temp_left_over_borders l
+
       WHERE l.bb_geo && e.geom',
       border_topo_info.topology_name,(_clean_info).simplify_tolerance);
       EXECUTE command_string;
@@ -488,3 +489,4 @@ BEGIN
   --RETURN added_rows;
 END
 $$;
+

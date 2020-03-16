@@ -2,8 +2,6 @@
 -- This line will be applied the data in the line layer
 -- The result is a set of id's of the new line objects created
 
-DROP FUNCTION IF EXISTS topo_update.create_nocutline_edge_domain_obj_retry (json_feature text, border_topo_info topo_update.input_meta_info, server_json_feature text);
-
 -- {
 CREATE OR REPLACE FUNCTION topo_update.create_nocutline_edge_domain_obj_retry (json_feature text, border_topo_info topo_update.input_meta_info, server_json_feature text DEFAULT NULL)
   RETURNS TABLE (
@@ -29,7 +27,9 @@ DECLARE
   spltt_line geometry;
   failed_to_insert boolean;
   feat json;
+  to_big boolean = false;
   rec record;
+  max_num_points_in_nomal_line int = 2000;
 BEGIN
   start_time := Clock_timestamp();
   -- TODO totally rewrite this code
@@ -42,15 +42,15 @@ BEGIN
     --test remove reptead points
     inGeom := ST_RemoveRepeatedPoints (json_input_structure.input_geo, start_tolerance);
     json_input_structure.input_geo := inGeom;
-    IF ST_NumPoints (json_input_structure.input_geo) < 1000 THEN
+    IF ST_NumPoints (json_input_structure.input_geo) < max_num_points_in_nomal_line THEN
       --			RAISE NOTICE 'work start, ok :% border_layer_id %, with a line containing % points', start_time, border_topo_info.border_layer_id, ST_NumPoints(json_input_structure.input_geo);
       PERFORM topo_update.create_nocutline_edge_domain_try_one (border_topo_info, json_input_structure);
     ELSE
-      RAISE NOTICE 'work start, to big:% border_layer_id %, with a line containing % points', start_time, border_topo_info.border_layer_id, ST_NumPoints (json_input_structure.input_geo);
-      json_input_structure_tmp := topo_update.handle_input_json_props (json_feature::Json, server_json_feature::Json, border_topo_info.srid);
-      inGeom := json_input_structure.input_geo;
+      RAISE NOTICE 'work start, to big at:% border_layer_id %, with a line containing % points', 
+      start_time, border_topo_info.border_layer_id, ST_NumPoints (json_input_structure.input_geo);
+      to_big := true;
       LOOP
-        counter := counter + 1000;
+        counter := counter + max_num_points_in_nomal_line;
         -- some computations
         IF counter > (ST_NPoints (inGeom) - 1) THEN
           EXIT;
@@ -79,8 +79,9 @@ EXCEPTION
   WHEN OTHERS THEN
     RAISE NOTICE 'failed ::::::1 %', border_topo_info.border_layer_id;
     counter := 0;
-    json_input_structure_tmp := topo_update.handle_input_json_props (json_feature::Json, server_json_feature::Json, border_topo_info.srid);
+    --json_input_structure_tmp := topo_update.handle_input_json_props (json_feature::Json, server_json_feature::Json, border_topo_info.srid);
     inGeom := json_input_structure.input_geo;
+    json_input_structure.input_geo := inGeom;
     --	    BEGIN
     --		inGeom := ST_RemoveRepeatedPoints(inGeom,start_tolerance);
     --		json_input_structure_tmp.input_geo := inGeom;
@@ -137,7 +138,7 @@ END;
   used_time := (Extract(EPOCH FROM (done_time - start_time)));
   --	RAISE NOTICE 'work done proc :% border_layer_id %, using % secs, num of % rows', done_time, border_topo_info.border_layer_id, used_time,  ST_NumPoints(json_input_structure.input_geo);
   IF used_time > 10 THEN
-    RAISE NOTICE 'very long single line % time with geo for % ', used_time, json_input_structure.input_geo;
+    RAISE NOTICE 'Long time for to_big % line at % used % seconds with geo for % ', to_big, done_time, used_time, json_input_structure.input_geo;
   --  INSERT INTO topo_update.long_time_log1 (execute_time, info, geo)
   --    VALUES (used_time, 'long ' || used_time::Varchar || ' num points ' || ST_NumPoints (json_input_structure.input_geo), json_input_structure.input_geo);
   END IF;
@@ -147,4 +148,3 @@ END;
 $$
 LANGUAGE plpgsql;
 
---}

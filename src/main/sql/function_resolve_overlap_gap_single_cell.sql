@@ -329,7 +329,7 @@ BEGIN
       _topology_name, snap_tolerance_fixed, _table_name_result_prefix);
       EXECUTE command_string;
       
-      command_string := Format('SELECT topo_update.heal_cellborder_edges_no_block(%1$L,bb_geo) from temp_left_over_borders order by ST_Length(geo) asc', 
+      command_string := Format('SELECT topo_update.heal_cellborder_edges_no_block(%1$L,bb_geo) from (SELECT (ST_dump(ST_Union(bb_geo))).geom as bb_geo from temp_left_over_borders) as r', 
       _topology_name);
       EXECUTE command_string;
       

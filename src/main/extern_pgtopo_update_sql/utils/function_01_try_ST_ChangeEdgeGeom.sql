@@ -14,7 +14,7 @@ DECLARE
   
   BEGIN                                                                                                                       
 
-	IF ST_Equals(_org_geom, _geom) THEN
+	IF ST_Equals(ST_AsBinary(_org_geom), ST_AsBinary(_geom)) THEN
 	  RETURN 0;
 	END IF;
 
@@ -22,6 +22,7 @@ DECLARE
 
 	command_string := Format('select topology.ST_ChangeEdgeGeom(%1$L,%2$s,%3$L)', _atopology, _edge, _geom);    
 	execute command_string into result_var;
+	result := 1;
 
 	EXCEPTION WHEN OTHERS THEN
 	  	
@@ -39,4 +40,17 @@ $$  LANGUAGE plpgsql STABLE;
 --}
 
 --select topo_update.try_ST_ChangeEdgeGeom('topo_ar5_forest_sysdata', 4240268,1812214);
+
+--SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,'test_topo_sr16',e.edge_id, ST_simplifyPreserveTopology(e.geom,5.0)) from test_topo_sr16.edge_data e where edge_id = 2219308
+
+--SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom, 'test_topo_sr16',e.edge_id, topo_update.chaikinsAcuteAngle(e.geom,25,true,120,240,2)) FROM test_topo_sr16.edge_data e where edge_id = 2219308
+
+--\timing
+--SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,'test_topo_sr16',e.edge_id, ST_simplifyPreserveTopology(e.geom,5.0)) from test_topo_sr16.edge_data e where edge_id = 29855;
+
+--SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom, 'test_topo_sr16',e.edge_id, topo_update.chaikinsAcuteAngle(e.geom,25,true,120,240,2)) FROM test_topo_sr16.edge_data e where edge_id = 29855;
+
+ 
+--select topo_update.chaikinsAcuteAngle(e.geom,25,true,120,240,2) FROM test_topo_sr16.edge_data e where edge_id = 2219308;
+--SELECT ST_simplifyPreserveTopology(e.geom,5.0) from test_topo_sr16.edge_data e where edge_id = 2219308
 

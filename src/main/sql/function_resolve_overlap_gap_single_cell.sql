@@ -467,18 +467,32 @@ BEGIN
  		select distinct %5$s, array_agg(%3$s) OVER (PARTITION BY %5$s) as intersect_id_list from (
  		select %5$s, %3$s 
  			from (
- 				SELECT %5$s, i.%3$s, ST_Area(ST_Intersection(f.%4$s,i.%4$s))/ST_area(f.%4$s) as area_coverarge, ST_Area(i.%4$s) as area_neighbour
- 				FROM 
- 				%1$s f,
- 				%2$s i
- 				where f.%4$s && i.%4$s and ST_IsValid(f.%4$s) and ST_IsValid(i.%4$s) and ST_Intersects(f.%4$s,i.%4$s)
- 				order by %5$s, area_coverarge desc,  i.%3$s
+              SELECT * FROM (   
+                select %5$s, i.%3$s, intersection_coverarge/ST_Area(i.%4$s) as area_coverarge
+                FROM
+                (
+ 				  SELECT %5$s, i.%3$s, ST_Area(ST_Collect(ST_Intersection(f.%4$s,i.%4$s))) as intersection_coverarge 
+ 				  FROM 
+ 				  %1$s f,
+ 				  %2$s i
+ 				  where f.%4$s && i.%4$s and ST_IsValid(f.%4$s) and ST_IsValid(i.%4$s) and ST_Intersects(f.%4$s,i.%4$s)
+                  group by %5$s, i.%3$s
+                ) ii,
+                %2$s i
+                WHERE i.%3$s = ii.%3$s
+              ) as r1
+  			  order by r1.area_coverarge desc
  			) as r where area_coverarge > 0.1
- 			order by %5$s, area_neighbour desc
+ 			order by %5$s, area_coverarge desc
  		) as r
  	) as r
  ) r where r.%5$s = t.%5$s', temp_table_name, input_table_name, input_table_pk_column_name, input_table_geo_column_name, temp_table_id_column);
+ 
+ RAISE NOTICE 'upate attributes % ', command_string;
+    
     EXECUTE command_string;
+    
+    
     -- Remove extra column column to hold a list of other intersections surfaces
     EXECUTE Format('ALTER TABLE %s DROP column %s', temp_table_name, temp_table_id_column);
     -- update/add primary key and _other_intersect_id_list based on geo

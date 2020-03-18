@@ -3,9 +3,9 @@ degrees_check_failed_lines|0
 degrees_check_border_lines|38
 degrees_check_added_faces|7
 degrees_check_added_simple_feature_geom|7
-degrees_check_added_simple_feature_c1|4
-degrees_check_added_simple_feature_c2|4
-degrees_check_added_simple_feature_c3|4
+degrees_check_added_simple_feature_c1|6
+degrees_check_added_simple_feature_c2|6
+degrees_check_added_simple_feature_c3|6
 degrees|Topology 'test_topo_t2' dropped
 CALL
 utm_check_failed_lines|0

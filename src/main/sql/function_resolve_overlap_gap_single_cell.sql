@@ -468,15 +468,15 @@ BEGIN
  		select %5$s, %3$s 
  			from (
               SELECT * FROM (   
-                select %5$s, i.%3$s, intersection_coverarge/ST_Area(i.%4$s) as area_coverarge
+                select %5$s, i.%3$s, abs(intersection_coverarge/new_geo_area) as area_coverarge
                 FROM
                 (
- 				  SELECT %5$s, i.%3$s, ST_Area(ST_Collect(ST_Intersection(f.%4$s,i.%4$s))) as intersection_coverarge 
+ 				  SELECT %5$s, i.%3$s, ST_Area(ST_Collect(ST_Intersection(f.%4$s,i.%4$s))) as intersection_coverarge, ST_area(f.%4$s) as new_geo_area 
  				  FROM 
  				  %1$s f,
  				  %2$s i
  				  where f.%4$s && i.%4$s and ST_IsValid(f.%4$s) and ST_IsValid(i.%4$s) and ST_Intersects(f.%4$s,i.%4$s)
-                  group by %5$s, i.%3$s
+                  group by %5$s, i.%3$s, new_geo_area
                 ) ii,
                 %2$s i
                 WHERE i.%3$s = ii.%3$s

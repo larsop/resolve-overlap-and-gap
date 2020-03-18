@@ -1,13 +1,15 @@
 
+--(_clean_info).chaikins_max_length int, --edge that are longer than this value will not be touched   
+-- The basic idea idea is to use smooth out sharp edges in another way than  
+--(_clean_info).chaikins_min_degrees int DEFAULT 90, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
+--(_clean_info).chaikins_max_degrees int DEFAULT 270, -- The angle has to be greather than this given value, This is used to avoid to touch all angles 
+--(_clean_info).chaikins_nIterations int DEFAULT 5) -- A big value here make no sense because the number of points will increaes exponential )
+
 
 CREATE OR REPLACE FUNCTION topo_update.chaikinsAcuteAngle (
-_geom geometry, -- the edge to fix
-_max_length int, --edge that are longer than this value will not be touched   
+_geom geometry, -- the edge to fix,
 _utm boolean, -- utm og degrees coodinates, wee need this to compute correct length  
--- The basic idea idea is to use smooth out sharp edges in another way than  
-_min_degrees int DEFAULT 90, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
-_max_degrees int DEFAULT 270, -- The angle has to be greather than this given value, This is used to avoid to touch all angles 
-_nIterations int DEFAULT 5) -- A big value here make no sense because the number of points will increaes exponential )
+_clean_info resolve_overlap_data_clean_type)
   RETURNS geometry
   AS $$
 DECLARE
@@ -16,14 +18,14 @@ DECLARE
   --dump_point_list geometry_dump[];
   num_points int;
   counter int = 0;
-  --_max_length int = 40;
+  --(_clean_info).chaikins_max_length int = 40;
   command_string text;
 
 BEGIN
   -- loop max 5 times, will this ever happen
   -- TODO find a way to 
   IF _utm THEN
-  FOR counter IN 1.._nIterations LOOP
+  FOR counter IN 1..(_clean_info).chaikins_nIterations LOOP
     SELECT Array_agg(org_index) INTO sharp_angle_index
     FROM (
       SELECT Abs(Degrees(azimuth_1 - azimuth_2)) AS angle, org_index
@@ -34,12 +36,12 @@ BEGIN
           SELECT (dp).path[1] AS org_index, Lead((dp).geom) OVER () AS lead_p, (dp).geom AS p, Lag((dp).geom) OVER () AS lag_p
           FROM (
             SELECT ST_DumpPoints (_geom) AS dp) AS r) AS r
-        WHERE ST_distance (lead_p, p) < _max_length
-          AND ST_distance (p, lag_p) < _max_length) AS r
+        WHERE ST_distance (lead_p, p) < (_clean_info).chaikins_max_length
+          AND ST_distance (p, lag_p) < (_clean_info).chaikins_max_length) AS r
       WHERE azimuth_1 IS NOT NULL
         AND azimuth_2 IS NOT NULL) AS r
-  WHERE angle <= _min_degrees
-      OR angle >= _max_degrees;
+  WHERE angle <= (_clean_info).chaikins_min_degrees
+      OR angle >= (_clean_info).chaikins_max_degrees;
     -- if there are no sharp angles use return input as it is
     IF sharp_angle_index IS NULL THEN
       EXIT;
@@ -108,7 +110,7 @@ BEGIN
                 SELECT (dp).path[1] AS org_index, (dp).geom AS p1, Lead((dp).geom) OVER () AS p2
                 FROM (
                   SELECT ST_DumpPoints (_geom) AS dp) AS r) AS r) AS r) AS r) AS r) AS r) AS r) AS r;
-    IF counter >= _nIterations THEN
+    IF counter >= (_clean_info).chaikins_nIterations THEN
       EXIT;
     END IF;
   END LOOP;
@@ -124,12 +126,12 @@ BEGIN
           SELECT (dp).path[1] AS org_index, Lead((dp).geom) OVER () AS lead_p, (dp).geom AS p, Lag((dp).geom) OVER () AS lag_p
           FROM (
             SELECT ST_DumpPoints (_geom) AS dp) AS r) AS r
-        WHERE ST_distance (lead_p, p, true) < _max_length
-          AND ST_distance (p, lag_p,true) < _max_length) AS r
+        WHERE ST_distance (lead_p, p, true) < (_clean_info).chaikins_max_length
+          AND ST_distance (p, lag_p,true) < (_clean_info).chaikins_max_length) AS r
       WHERE azimuth_1 IS NOT NULL
         AND azimuth_2 IS NOT NULL) AS r
-  WHERE angle <= _min_degrees
-      OR angle >= _max_degrees;
+  WHERE angle <= (_clean_info).chaikins_min_degrees
+      OR angle >= (_clean_info).chaikins_max_degrees;
     -- if there are no sharp angles use return input as it is
     IF sharp_angle_index IS NULL THEN
       EXIT;
@@ -198,7 +200,7 @@ BEGIN
                 SELECT (dp).path[1] AS org_index, (dp).geom AS p1, Lead((dp).geom) OVER () AS p2
                 FROM (
                   SELECT ST_DumpPoints (_geom) AS dp) AS r) AS r) AS r) AS r) AS r) AS r) AS r) AS r;
-    IF counter >= _nIterations THEN
+    IF counter >= (_clean_info).chaikins_nIterations THEN
       EXIT;
   END IF;
   END LOOP;

@@ -7,6 +7,13 @@ if (-d "../../../../submodule") {
 
 	open($fh_out, ">", 'resolve_overlap_and_gap-pre-def.sql');
 	
+	# get type resolve for overlap gap 
+    for my $file (glob '../../../main/sql/types*') {
+	    copy_file_into($file,$fh_out);
+    }
+
+	
+	
 	# git submodule add --force https://github.com/larsop/content_balanced_grid submodule/content_balanced_grid
 	# get functions for content_balanced_grid
 	for my $file (glob '../../../../submodule/content_balanced_grid/func_grid/func*') {
@@ -59,12 +66,6 @@ for my $file (glob '../../../main/extern_pgtopo_update_sql/view*') {
 	copy_file_into($file,$fh_out);
 }
 for my $file (glob '../../../main/extern_pgtopo_update_sql/utils/func*') {
-	copy_file_into($file,$fh_out);
-}
-
-
-# get SQL code resolve for overlap gap 
-for my $file (glob '../../../main/sql/types*') {
 	copy_file_into($file,$fh_out);
 }
 

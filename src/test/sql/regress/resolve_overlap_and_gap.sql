@@ -11,13 +11,14 @@ CALL resolve_overlap_gap_run(
 ('test_data.overlap_gap_input_t2','c1','geom',4258,false), -- TYPE resolve_overlap_data_input
 ('test_topo_t2',0.00001), -- TYPE resolve_overlap_data_topology
 resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
-49,
-0,
-false, -- if false the parameters below are used.
-10000, --edge that are longer than this value will not be touched, The basic idea idea is to use smooth out sharp edges in another way than    
-120,  -- The angle has to be less this given value, This is used to avoid to touch all angles. 
-240, -- The angle has to be greather than this given value, This is used to avoid to touch all angles 
-1 -- A big value here make no sense because the number of points will increaes exponential )
+49,  -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
+0, -- is this is more than zero simply will called with
+0, -- IF 0 NO CHAKINS WILL BE DONE A big value here make no sense because the number of points will increaes exponential )
+10000, --edge that are longer than this value will not be touched by _chaikins_min_degrees and _chaikins_max_degrees  
+120, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
+240, -- OR the angle has to be greather than this given value, This is used to avoid to touch all angles 
+40, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
+320 -- OR The angle has to be greather than this given value, This is used to avoid to touch all angles 
 )
 ,5,4);
 
@@ -45,13 +46,14 @@ CALL resolve_overlap_gap_run(
 ('test_data.overlap_gap_input_t3','c1t3','geo',25833,true), -- TYPE resolve_overlap_data_input
 ('test_topo_t3',1.0), -- TYPE resolve_overlap_data_topology
 resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
-49,
-30,
-true, -- if false the parameters below are used.
-10000, --edge that are longer than this value will not be touched, The basic idea idea is to use smooth out sharp edges in another way than    
-120,  -- The angle has to be less this given value, This is used to avoid to touch all angles. 
-240, -- The angle has to be greather than this given value, This is used to avoid to touch all angles 
-1 -- A big value here make no sense because the number of points will increaes exponential )
+49,  -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
+30, -- is this is more than zero simply will called with
+1, -- IF 0 NO CHAKINS WILL BE DONE A big value here make no sense because the number of points will increaes exponential )
+10000, --edge that are longer than this value will not be touched by _chaikins_min_degrees and _chaikins_max_degrees  
+120, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
+240, -- OR the angle has to be greather than this given value, This is used to avoid to touch all angles 
+40, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
+320 -- OR The angle has to be greather than this given value, This is used to avoid to touch all angles 
 ),
 5,4);
 

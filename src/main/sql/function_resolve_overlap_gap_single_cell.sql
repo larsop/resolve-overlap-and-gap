@@ -126,8 +126,8 @@ BEGIN
     -- the boundery linnes are saved in a table for later usage
     command_string := Format('create temp table tmp_simplified_border_lines_1 as 
     (select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
-     FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L,%L) g)', 
-    input_table_name, input_table_geo_column_name, bb, _topology_snap_tolerance, (_clean_info).do_chaikins, _table_name_result_prefix);
+     FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L) g)', 
+    input_table_name, input_table_geo_column_name, bb, _topology_snap_tolerance, _table_name_result_prefix);
     EXECUTE command_string ;
     
     EXECUTE Format('CREATE INDEX ON tmp_simplified_border_lines_1(is_closed)');
@@ -221,7 +221,7 @@ BEGIN
 
       
     END IF ;
-    IF (_clean_info).do_chaikins = true THEN
+    IF (_clean_info).chaikins_nIterations > 0 THEN
       command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom, %1$L,e.edge_id, 
       topo_update.chaikinsAcuteAngle(e.geom,%2$L,%3$L)
       ) FROM %1$s.edge_data e',border_topo_info.topology_name,_utm,_clean_info);
@@ -369,7 +369,7 @@ BEGIN
       EXECUTE command_string;
     END IF;
     
-    IF (_clean_info).do_chaikins = true THEN
+    IF (_clean_info).chaikins_nIterations > 0 THEN
       command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom, %1$L,e.edge_id, 
       topo_update.chaikinsAcuteAngle(e.geom,%2$L,%3$L)
       ) FROM %1$s.edge_data e, temp_left_over_borders l

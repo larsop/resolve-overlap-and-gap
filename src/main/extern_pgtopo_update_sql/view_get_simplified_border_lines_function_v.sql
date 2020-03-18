@@ -3,7 +3,6 @@ _input_table_name varchar,
 _input_table_geo_column_name varchar, 
 _bb geometry, 
 _topology_snap_tolerance float, 
-_do_chaikins boolean,
 _table_name_result_prefix varchar -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,
 )
   RETURNS TABLE (

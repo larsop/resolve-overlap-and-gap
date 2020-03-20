@@ -225,7 +225,7 @@ BEGIN
     EXECUTE command_string;
   
     --heal border edges 
-    command_string := Format('SELECT topo_update.heal_cellborder_edges_no_block(%1$L,%2$L)', 
+    command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
     border_topo_info.topology_name,outer_cell_boundary_geom);
     EXECUTE command_string;
     

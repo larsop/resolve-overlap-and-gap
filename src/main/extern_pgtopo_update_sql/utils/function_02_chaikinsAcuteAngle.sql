@@ -28,20 +28,22 @@ BEGIN
   FOR counter IN 1..(_clean_info).chaikins_nIterations LOOP
     SELECT Array_agg(org_index) INTO sharp_angle_index
     FROM (
-      SELECT Abs(Degrees(azimuth_1 - azimuth_2)) AS angle, org_index
+      SELECT Abs(Degrees(azimuth_1 - azimuth_2)) AS angle, org_index , distance_line_1, distance_line_2
         --select 100 as angle, 1 as org_index
       FROM (
-        SELECT org_index, ST_Azimuth (p, lead_p) AS azimuth_2, ST_Azimuth (p, lag_p) AS azimuth_1
+        SELECT org_index, ST_Azimuth (p, lead_p) AS azimuth_2, ST_Azimuth (p, lag_p) AS azimuth_1, ST_distance (lead_p, p) distance_line_1, ST_distance (p, lag_p) distance_line_2
         FROM (
           SELECT (dp).path[1] AS org_index, Lead((dp).geom) OVER () AS lead_p, (dp).geom AS p, Lag((dp).geom) OVER () AS lag_p
           FROM (
-            SELECT ST_DumpPoints (_geom) AS dp) AS r) AS r
-        WHERE ST_distance (lead_p, p) < (_clean_info).chaikins_max_length
-          AND ST_distance (p, lag_p) < (_clean_info).chaikins_max_length) AS r
+            SELECT ST_DumpPoints (_geom) AS dp) AS r) AS r)
+          AS r
       WHERE azimuth_1 IS NOT NULL
         AND azimuth_2 IS NOT NULL) AS r
-  WHERE angle <= (_clean_info).chaikins_min_degrees
-      OR angle >= (_clean_info).chaikins_max_degrees;
+     WHERE 
+        (distance_line_1 < (_clean_info).chaikins_max_length AND distance_line_2 < (_clean_info).chaikins_max_length
+        AND (angle <= (_clean_info).chaikins_min_degrees OR angle >= (_clean_info).chaikins_max_degrees)) 
+        OR
+        (angle <= (_clean_info).chaikins_min_steep_angle_degrees OR angle >= (_clean_info).chaikins_max_steep_angle_degrees);
     -- if there are no sharp angles use return input as it is
     IF sharp_angle_index IS NULL THEN
       EXIT;
@@ -115,23 +117,25 @@ BEGIN
     END IF;
   END LOOP;
   ELSE
-  FOR counter IN 1..5 LOOP
+  FOR counter IN 1..(_clean_info).chaikins_nIterations LOOP
     SELECT Array_agg(org_index) INTO sharp_angle_index
     FROM (
-      SELECT Abs(Degrees(azimuth_1 - azimuth_2)) AS angle, org_index
+      SELECT Abs(Degrees(azimuth_1 - azimuth_2)) AS angle, org_index , distance_line_1, distance_line_2
         --select 100 as angle, 1 as org_index
       FROM (
-        SELECT org_index, ST_Azimuth (p, lead_p) AS azimuth_2, ST_Azimuth (p, lag_p) AS azimuth_1
+        SELECT org_index, ST_Azimuth (p, lead_p) AS azimuth_2, ST_Azimuth (p, lag_p) AS azimuth_1, ST_distance (lead_p, p,true) distance_line_1, ST_distance (p, lag_p,true) distance_line_2
         FROM (
           SELECT (dp).path[1] AS org_index, Lead((dp).geom) OVER () AS lead_p, (dp).geom AS p, Lag((dp).geom) OVER () AS lag_p
           FROM (
-            SELECT ST_DumpPoints (_geom) AS dp) AS r) AS r
-        WHERE ST_distance (lead_p, p, true) < (_clean_info).chaikins_max_length
-          AND ST_distance (p, lag_p,true) < (_clean_info).chaikins_max_length) AS r
+            SELECT ST_DumpPoints (_geom) AS dp) AS r) AS r)
+          AS r
       WHERE azimuth_1 IS NOT NULL
         AND azimuth_2 IS NOT NULL) AS r
-  WHERE angle <= (_clean_info).chaikins_min_degrees
-      OR angle >= (_clean_info).chaikins_max_degrees;
+     WHERE 
+        (distance_line_1 < (_clean_info).chaikins_max_length AND distance_line_2 < (_clean_info).chaikins_max_length
+        AND (angle <= (_clean_info).chaikins_min_degrees OR angle >= (_clean_info).chaikins_max_degrees)) 
+        OR
+        (angle <= (_clean_info).chaikins_min_steep_angle_degrees OR angle >= (_clean_info).chaikins_max_steep_angle_degrees);
     -- if there are no sharp angles use return input as it is
     IF sharp_angle_index IS NULL THEN
       EXIT;

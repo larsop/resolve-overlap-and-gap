@@ -10,15 +10,12 @@ _table_name_result_prefix varchar
   AS $function$
 DECLARE
 BEGIN
-  RETURN QUERY EXECUTE 'SELECT 
- 	distinct lg3.geo 
- 	FROM ' || _table_name_result_prefix||'_border_line_segments 	lg3
- 	where ST_IsValid(lg3.geo) and ST_Intersects(lg3.geo,$1)
- 	and (
- 	ST_StartPoint(lg3.geo) && $1 or 
- 	(ST_EndPoint(lg3.geo) && $1 and NOT EXISTS (SELECT 1 FROM ' || _overlapgap_grid || ' gt where ST_StartPoint(lg3.geo) && gt.'||_input_table_geo_column_name||'))
- 	)'
+   	
+
+
+  RETURN QUERY EXECUTE ' DELETE FROM ' || _table_name_result_prefix||'_border_line_segments lg3
+ 	WHERE ST_IsValid(lg3.geo) and ST_Intersects(lg3.geo,$1)
+    RETURNING lg3.geo '
   USING _bb;
 END
 $function$;
-

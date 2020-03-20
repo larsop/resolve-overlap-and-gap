@@ -1,8 +1,7 @@
 CREATE OR REPLACE FUNCTION topo_update.add_border_lines (_topology_name character varying, _new_line geometry, _snap_tolerance float, _table_name_result_prefix varchar)
-  RETURNS integer
+  RETURNS integer[]
   AS $$
 DECLARE
-  update_egde_id int;
   old_egde_geom geometry;
   new_egde_geom geometry;
   tmp_egde_geom geometry;
@@ -27,15 +26,18 @@ DECLARE
   num_not_done_ok int = 0;
   max_num_not_done_ok int = 3;
   lost_data boolean;
+  -- returns a set of edge identifiers forming it up
+  edges_added integer[];
 
 BEGIN
   no_cutline_filename = _table_name_result_prefix || '_no_cut_line_failed';
   BEGIN
-    command_string := Format('select topology.TopoGeo_addLinestring(%s,%L,%s)', Quote_literal(_topology_name), _new_line, _snap_tolerance);
-    EXECUTE command_string;
+	
+    command_string := Format('SELECT ARRAY(SELECT topology.TopoGeo_addLinestring(%s,%L,%s))', Quote_literal(_topology_name), _new_line, _snap_tolerance);
+    EXECUTE command_string into edges_added;
+ 
     EXCEPTION
     WHEN OTHERS THEN
-      RAISE NOTICE 'failed topo_update.add_border_lines ::::::::::::::::::::::::::::::::::::::::::::::::::: % for edge_id % ', ST_GeometryType (new_egde_geom), update_egde_id;
     GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
     v_context = PG_EXCEPTION_CONTEXT;
     RAISE NOTICE 'failed: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
@@ -178,7 +180,7 @@ BEGIN
       EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, TRUE, 'Failed3, topo_update.add_border_lines ', v_state, v_msg, v_detail, v_hint, v_context, _new_line);
       END;
     END;
-  RETURN update_egde_id;
+  RETURN edges_added;
 END;
 
 $$

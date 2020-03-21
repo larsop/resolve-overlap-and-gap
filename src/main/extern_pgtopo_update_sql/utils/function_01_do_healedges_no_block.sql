@@ -5,22 +5,24 @@ CREATE OR REPLACE FUNCTION topo_update.do_healedges_no_block (_atopology varchar
   AS $function$
 DECLARE
   command_string text;
-  data_env geometry;
-  num_rows int;
-  last_num_rows int = 0;
-  num_rows_total int = 0;
-  maxtolerance float8 = 5.0;
-  area_to_block geometry;
-  is_done integer = 0;
-  num_boxes_intersect integer;
-  num_boxes_free integer;
   loop_nr int = 0;
-  max_loops int = 20;
+  max_loops int = 3000;
+  num_rows int;
+  
+  this_edge_to_live int;
+  this_edge_to_eat int;
+  heal_result int;
+  
+  
 BEGIN
 	
   LOOP
     loop_nr := loop_nr + 1;
-    command_string := Format('select topo_update.try_ST_ModEdgeHeal(%1$L, r.edge_to_live,r.edge_to_eat) 
+    
+    this_edge_to_live := null;
+    this_edge_to_eat := null;
+
+    command_string := Format('select r.edge_to_live, r.edge_to_eat 
     FROM (
         SELECT DISTINCT ON (r.edge_to_eat) r.edge_to_eat, r.edge_to_live
         from (
@@ -59,21 +61,30 @@ BEGIN
         ) as r
         order by edge_to_eat
     ) as r
-    where r.edge_to_live != r.edge_to_eat', _atopology, _bb);
-    --	RAISE NOTICE 'execute command_string; %', command_string;
-    EXECUTE command_string;
-    RAISE NOTICE 'num edes healed % at loop number %', num_rows, loop_nr;
+    where r.edge_to_live != r.edge_to_eat limit 1', _atopology, _bb);
+    EXECUTE command_string into this_edge_to_live,this_edge_to_eat;
+
     GET DIAGNOSTICS num_rows = ROW_COUNT;
-    IF last_num_rows = num_rows OR num_rows = 0 OR num_rows IS NULL OR loop_nr > max_loops THEN
-      RAISE NOTICE 'Done healing, num edes tried to heal now % , num edges healed in privous loop % , at loop number % for topology %', num_rows, last_num_rows, loop_nr, _atopology;
+    -- if I heal more than one each time I get a lot this  NOTICE:  00000: FAILED select ST_ModEdgeHeal('test_topo_ar50_t3', 852, 11601) state  : XX000  message: SQL/MM Spatial exception - non-existent edge 852 detail :  hint   :  context: SQL statement "SELECT topology.ST_ModEdgeHeal (_atopology, _edge_to_live, _edge_to_eat)"
+    --	RAISE NOTICE 'execute command_string; %', command_string;
+
+    IF num_rows = 0 OR this_edge_to_live is null THEN
       EXIT;
-      -- exit loop
     END IF;
-    RAISE NOTICE 'Contiune healing, num edes tried to heal now % , num edges healed in privous loop % , at loop number % for topology %', num_rows, last_num_rows, loop_nr, _atopology;
-    last_num_rows = num_rows;
-    num_rows_total := num_rows_total + num_rows;
+    
+    EXECUTE command_string into this_edge_to_live,this_edge_to_eat;
+    select topo_update.try_ST_ModEdgeHeal(_atopology, this_edge_to_live,this_edge_to_eat) into heal_result; 
+    
+    RAISE NOTICE 'healed result % for this_edge_to_live %, this_edge_to_eat % at loop number % for _atopology %' ,
+    heal_result, this_edge_to_live, this_edge_to_eat, loop_nr, _atopology;
+    
+    IF heal_result = -1 OR loop_nr > max_loops THEN
+      EXIT;
+    END IF;
   END LOOP;
-  RETURN num_rows_total;
+  RETURN loop_nr;
 END
 $function$;
 
+
+--select topo_update.do_healedges_no_block('test_topo_ar50_t3','0103000020E9640000010000000500000000000000804F0241000000005ACC5A4100000000804F024100000000C4E45A4100000000C05C054100000000C4E45A4100000000C05C0541000000005ACC5A4100000000804F0241000000005ACC5A41');

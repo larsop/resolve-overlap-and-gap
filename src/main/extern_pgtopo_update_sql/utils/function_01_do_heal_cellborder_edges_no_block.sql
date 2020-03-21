@@ -1,25 +1,23 @@
 
-CREATE OR REPLACE FUNCTION topo_update.heal_cellborder_edges_no_block(_atopology varchar, bb_outer_geom Geometry, _valid_edges_list integer[] default null)
+CREATE OR REPLACE FUNCTION topo_update.heal_cellborder_edges_no_block(_atopology varchar, _bb Geometry, _valid_edges_list integer[] default null)
   RETURNS integer
   LANGUAGE 'plpgsql'
   AS $function$
 DECLARE
   command_string text;
-  data_env geometry;
-  last_num_rows int;
-  num_rows int;
-  num_rows_total int = 0;
-  maxtolerance float8 = 5.0;
-  area_to_block geometry;
-  is_done integer = 0;
-  num_boxes_intersect integer;
-  num_boxes_free integer;
   loop_nr int = 0;
-  max_loops int = 20;
+  max_loops int = 3000;
+  num_rows int;
+  
+  this_edge_to_live int;
+  this_edge_to_eat int;
+  heal_result int;
+  
+  
 BEGIN
   LOOP
     loop_nr := loop_nr + 1;
-    command_string := Format( 'select topo_update.try_ST_ModEdgeHeal(%1$L, r.edge_to_live,r.edge_to_eat) 
+    command_string := Format('select r.edge_to_live, r.edge_to_eat 
     FROM (
         SELECT DISTINCT ON (r.edge_to_eat) r.edge_to_eat, r.edge_to_live
         from (
@@ -51,7 +49,6 @@ BEGIN
    				    (ST_Intersects(e1fl.mbr,%2$L) and ST_Intersects(e1fr.mbr,%2$L)) and 
                     e1.left_face != e1.right_face and 
                     e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face and
-                    -- (%3$L is null OR e1.edge_id=ANY(%3$L)) and
                     (e1.start_node = n1.node_id or e1.end_node = n1.node_id)
                     group by n1.node_id
                 ) as r
@@ -74,26 +71,33 @@ BEGIN
             e1.start_node != e1.end_node and
             e2.start_node != e2.end_node --to avoid a closed surface ending in a line 
             -- ST_intersects(n1.geom,%2$L) and 
-            --(%3$L is null OR (e1.edge_id=ANY(%3$L) AND e2.edge_id=ANY(%3$L)) )
         ) as r
         ) as r
         order by edge_to_eat
     ) as r
-    where r.edge_to_live != r.edge_to_eat', _atopology, bb_outer_geom, _valid_edges_list );
-    -- RAISE NOTICE 'execute command_string; %', command_string;
-    EXECUTE command_string;
+    where r.edge_to_live != r.edge_to_eat limit 1', _atopology, _bb); 
+    EXECUTE command_string into this_edge_to_live,this_edge_to_eat;
+
     GET DIAGNOSTICS num_rows = ROW_COUNT;
-    IF last_num_rows = num_rows OR num_rows = 0 OR num_rows IS NULL OR loop_nr > max_loops THEN
-      RAISE NOTICE 'Done healing, num edes tried to heal now % , num edges healed in privous loop % , at loop number % for topology %', num_rows, last_num_rows, loop_nr, _atopology;
+    -- if I heal more than one each time I get a lot this  NOTICE:  00000: FAILED select ST_ModEdgeHeal('test_topo_ar50_t3', 852, 11601) state  : XX000  message: SQL/MM Spatial exception - non-existent edge 852 detail :  hint   :  context: SQL statement "SELECT topology.ST_ModEdgeHeal (_atopology, _edge_to_live, _edge_to_eat)"
+    --	RAISE NOTICE 'execute command_string; %', command_string;
+
+    IF num_rows = 0 OR this_edge_to_live is null THEN
       EXIT;
-      -- exit loop
     END IF;
-    RAISE NOTICE 'Contiune healing, num edes tried to heal now % , num edges healed in privous loop % , at loop number % for topology %', num_rows, last_num_rows, loop_nr, _atopology;
-    last_num_rows = num_rows;
     
-    num_rows_total := num_rows_total + num_rows;
-  END LOOP;
-  RETURN num_rows_total;
+    EXECUTE command_string into this_edge_to_live,this_edge_to_eat;
+    select topo_update.try_ST_ModEdgeHeal(_atopology, this_edge_to_live,this_edge_to_eat) into heal_result; 
+    
+    RAISE NOTICE 'healed result % for this_edge_to_live %, this_edge_to_eat % at loop number % for _atopology %' ,
+    heal_result, this_edge_to_live, this_edge_to_eat, loop_nr, _atopology;
+    
+    IF heal_result = -1 OR loop_nr > max_loops THEN
+      EXIT;
+    END IF;
+    
+   END LOOP;
+  RETURN loop_nr;
 END
 $function$;
 

@@ -110,8 +110,8 @@ BEGIN
   -- RAISE NOTICE 'area to block:% ', area_to_block;
   border_topo_info.snap_tolerance := _topology_snap_tolerance;
   
-  RAISE NOTICE 'start work at timeofday:% for layer %, _topology_snap_tolerance %, with _cell_job_type % and min_length_line %s', 
-  Timeofday(), _topology_name || '_' || box_id, _topology_snap_tolerance, _cell_job_type, min_length_line;
+  RAISE NOTICE 'start work at timeofday:% for layer %, _topology_snap_tolerance %, with _cell_job_type % and min_length_line %s, (_clean_info).chaikins_max_degrees) %', 
+  Timeofday(), _topology_name || '_' || box_id, _topology_snap_tolerance, _cell_job_type, min_length_line, (_clean_info).chaikins_max_degrees;
   
       -- check if any 'SubtransControlLock' is there
         subtransControlLock_start = clock_timestamp();
@@ -223,7 +223,8 @@ BEGIN
                   from tmp_simplified_border_lines g where line_type = 0 order by is_closed desc, num_points desc', border_topo_info);
     --RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
-  
+
+    
     --heal border edges 
     command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
     border_topo_info.topology_name,outer_cell_boundary_geom);
@@ -270,18 +271,24 @@ BEGIN
       EXECUTE command_string;
     END IF;
      
-    face_table_name = border_topo_info.topology_name || '.face';
-    start_remove_small := Clock_timestamp();
-    RAISE NOTICE 'Start clean small polygons for face_table_name % at %', face_table_name, Clock_timestamp();
-    -- remove small polygons in temp
-    --not working corectly num_rows_removed := topo_update.do_remove_only_valid_small_areas (
-    -- border_topo_info.topology_name, (_clean_info).min_area_to_keep, face_table_name, _bb,_utm);
-    num_rows_removed := topo_update.do_remove_small_areas_no_block (
-    border_topo_info.topology_name, (_clean_info).min_area_to_keep, face_table_name, _bb,_utm);
+
+    IF (_clean_info).chaikins_nIterations > 0 OR (_clean_info).simplify_tolerance > 0 THEN
+      face_table_name = border_topo_info.topology_name || '.face';
+      start_remove_small := Clock_timestamp();
+      RAISE NOTICE 'Start clean small polygons for face_table_name % at %', face_table_name, Clock_timestamp();
+      -- remove small polygons in temp
+      num_rows_removed := topo_update.do_remove_small_areas_no_block (
+      border_topo_info.topology_name, (_clean_info).min_area_to_keep, face_table_name, _bb,_utm);
     
-    used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
-    RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
+      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
+      RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
     
+      --heal border edges remove small polygins
+      command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
+      border_topo_info.topology_name,outer_cell_boundary_geom);
+      EXECUTE command_string;
+    END IF;
+
     
     
     command_string := Format('SELECT EXISTS(SELECT 1 from  %1$s.edge limit 1)',
@@ -408,12 +415,11 @@ BEGIN
 
 
 
-       select ARRAY(select unnest(line_edges_added)) into line_edges_tmp;
-      
-      RAISE NOTICE 'Added edges for border lines for box % into line_edges_tmp %',  box_id, line_edges_tmp;
+      -- select ARRAY(select unnest(line_edges_added)) into line_edges_tmp;
+      --RAISE NOTICE 'Added edges for border lines for box % into line_edges_tmp %',  box_id, line_edges_tmp;
       
      command_string := Format('SELECT topo_update.heal_cellborder_edges_no_block(%1$L,%2$L,%3$L)', 
-      _topology_name, outer_cell_boundary_geom, line_edges_tmp);
+      _topology_name, outer_cell_boundary_geom,null);
       EXECUTE command_string;
 
      IF (_clean_info).simplify_tolerance > 0  THEN
@@ -428,7 +434,7 @@ BEGIN
       WHERE
 	    (e1fl.mbr && %2$L or e1fr.mbr && %2$L) and 
    		(ST_Intersects(e1fl.mbr,%2$L) AND ST_Intersects(e1fr.mbr,%2$L)) and 
-        e1.left_face != e1.right_face and e1.left_face != 0 and
+        e1.left_face != e1.right_face and
         e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face
       ) e',
       border_topo_info.topology_name, outer_cell_boundary_geom, (_clean_info).simplify_tolerance);
@@ -447,7 +453,7 @@ BEGIN
       WHERE
 	    (e1fl.mbr && %2$L AND e1fr.mbr && %2$L) and 
    		(ST_Intersects(e1fl.mbr,%2$L) AND ST_Intersects(e1fr.mbr,%2$L)) and 
-        e1.left_face != e1.right_face and e1.left_face != 0 and
+        e1.left_face != e1.right_face and
         e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face
       ) e',
       border_topo_info.topology_name, outer_cell_boundary_geom, _utm, _clean_info);

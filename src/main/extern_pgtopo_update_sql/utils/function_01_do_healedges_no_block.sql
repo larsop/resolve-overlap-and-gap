@@ -56,6 +56,10 @@ BEGIN
     		r.node_id = n1.node_id and
             e1.start_node != e1.end_node and
             e2.start_node != e2.end_node and --to avoid a closed surface ending in a line 
+
+            e2.left_face = e1.left_face and
+            e2.right_face = e1.right_face and
+
             ST_CoveredBy(n1.geom,%2$L) 
         ) as r
         ) as r

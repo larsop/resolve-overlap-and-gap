@@ -55,6 +55,7 @@ BEGIN
                 where r.num_edges_end_here = 2
             ) as r
             where 
+
    			(e1fl.mbr && %2$L and e1fr.mbr && %2$L) and 
    			(ST_Intersects(e1fl.mbr,%2$L) and ST_Intersects(e1fr.mbr,%2$L)) and 
             e1.left_face != e1.right_face and
@@ -64,6 +65,10 @@ BEGIN
    			(ST_Intersects(e2fl.mbr,%2$L) and ST_Intersects(e2fr.mbr,%2$L)) and 
             e2.left_face != e2.right_face and
             e2fl.face_id = e2.left_face and e2fr.face_id = e2.right_face and
+
+            e2.left_face = e1.left_face and
+            e2.right_face = e1.right_face and
+
             (e1.start_node = r.node_id or e1.end_node = r.node_id) and
             (e2.start_node = r.node_id or e2.end_node = r.node_id) and
 

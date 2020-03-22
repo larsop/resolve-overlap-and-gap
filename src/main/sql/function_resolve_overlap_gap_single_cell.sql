@@ -397,7 +397,7 @@ BEGIN
 --    ELSE
 
       -- add border smale border lines
-      command_string := Format('SELECT ARRAY_AGG(topo_update.add_border_lines(%1$L,geo,%2$s,%3$L)) from temp_left_over_borders group by geo order by ST_Length(geo) asc', 
+      command_string := Format('SELECT topo_update.add_border_lines(%1$L,geo,%2$s,%3$L) from temp_left_over_borders group by geo order by ST_Length(geo) asc', 
       _topology_name, snap_tolerance_fixed, _table_name_result_prefix);
       EXECUTE command_string;
 

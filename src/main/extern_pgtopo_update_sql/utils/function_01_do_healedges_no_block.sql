@@ -1,4 +1,3 @@
-
 CREATE OR REPLACE FUNCTION topo_update.do_healedges_no_block (_atopology varchar, _bb geometry)
   RETURNS integer
   LANGUAGE 'plpgsql'
@@ -6,23 +5,23 @@ CREATE OR REPLACE FUNCTION topo_update.do_healedges_no_block (_atopology varchar
 DECLARE
   command_string text;
   loop_nr int = 0;
-  max_loops int = 3000;
-  num_rows int;
+  max_loops int = 15;
   
-  this_edge_to_live int;
-  this_edge_to_eat int;
-  heal_result int;
+  edges_to_fix  integer[][]; 
+  edges integer[]; 
+  edge_ids_found int; 
   
+  heal_result int; 
+  edges_fixed int; 
+  edges_mising int; 
+
   
 BEGIN
 	
   LOOP
     loop_nr := loop_nr + 1;
     
-    this_edge_to_live := null;
-    this_edge_to_eat := null;
-
-    command_string := Format('select r.edge_to_live, r.edge_to_eat 
+    command_string := Format('SELECT ARRAY( SELECT ARRAY[r.edge_to_live, r.edge_to_eat] 
     FROM (
         SELECT DISTINCT ON (r.edge_to_eat) r.edge_to_eat, r.edge_to_live
         from (
@@ -65,26 +64,46 @@ BEGIN
         ) as r
         order by edge_to_eat
     ) as r
-    where r.edge_to_live != r.edge_to_eat limit 1', _atopology, _bb);
-    EXECUTE command_string into this_edge_to_live,this_edge_to_eat;
+    where r.edge_to_live != r.edge_to_eat)', _atopology, _bb);
+    EXECUTE command_string into edges_to_fix;
 
-    GET DIAGNOSTICS num_rows = ROW_COUNT;
     -- if I heal more than one each time I get a lot this  NOTICE:  00000: FAILED select ST_ModEdgeHeal('test_topo_ar50_t3', 852, 11601) state  : XX000  message: SQL/MM Spatial exception - non-existent edge 852 detail :  hint   :  context: SQL statement "SELECT topology.ST_ModEdgeHeal (_atopology, _edge_to_live, _edge_to_eat)"
     --	RAISE NOTICE 'execute command_string; %', command_string;
+    
+   edges_fixed := 0;
+   edges_mising := 0;
+   
+   IF (Array_length(edges_to_fix, 1) IS NULL OR edges_to_fix IS NULL) THEN
+      EXIT;
+   END IF;
+ 
+   FOREACH edges SLICE 1 IN ARRAY edges_to_fix
+   LOOP
+      command_string := FORMAT('SELECT count(*) from %1$s.edge_data where edge_id in (%2$s, %3$s)',
+      _atopology, edges[1],edges[2]);
+      execute command_string into edge_ids_found;
+      IF edge_ids_found = 2 THEN
+        select topo_update.try_ST_ModEdgeHeal(_atopology, edges[1],edges[2]) into heal_result; 
+        --RAISE NOTICE 'healed result % for this_edge_to_live %, this_edge_to_eat % at loop number % for _atopology %' ,heal_result, edges[1],edges[2], loop_nr, _atopology;
+        IF heal_result > 0 THEN
+          edges_fixed := edges_fixed + 1;
+        END IF;
+      ELSE
+        edges_mising := edges_mising + 1;
+        RAISE NOTICE 'Missing edge data, found % of, for this_edge_to_live %, this_edge_to_eat % at loop number % for _atopology % , edges_mising %' ,
+        edge_ids_found, edges[1],edges[2], loop_nr, _atopology, edges_mising;
+      END IF;
+      
+      IF edges_mising > 50 THEN
+        EXIT;
+      END IF;
+   END LOOP;
 
-    IF num_rows = 0 OR this_edge_to_live is null THEN
+   RAISE NOTICE 'Healed % of edges found % for _atopology %' , edges_fixed, Array_length(edges_to_fix,1), _atopology; 
+
+   IF edges_fixed = 0 OR loop_nr > max_loops THEN
       EXIT;
-    END IF;
-    
-    EXECUTE command_string into this_edge_to_live,this_edge_to_eat;
-    select topo_update.try_ST_ModEdgeHeal(_atopology, this_edge_to_live,this_edge_to_eat) into heal_result; 
-    
-    RAISE NOTICE 'healed result % for this_edge_to_live %, this_edge_to_eat % at loop number % for _atopology %' ,
-    heal_result, this_edge_to_live, this_edge_to_eat, loop_nr, _atopology;
-    
-    IF heal_result = -1 OR loop_nr > max_loops THEN
-      EXIT;
-    END IF;
+   END IF;
   END LOOP;
   RETURN loop_nr;
 END

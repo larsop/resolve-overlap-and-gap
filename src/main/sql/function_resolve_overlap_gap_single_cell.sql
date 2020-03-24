@@ -181,7 +181,7 @@ BEGIN
 --       RAISE NOTICE 'Start clean small polygons at _loop_number 1 for face_table_name % at %', face_table_name, Clock_timestamp();
 --       -- remove small polygons in temp
 --       face_table_name = _topology_name || '.face';
---       num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, (_clean_info).min_area_to_keep, face_table_name, ST_buffer(_bb,_topology_snap_tolerance * -6),
+--       num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, (_clean_info).min_area_to_keep, face_table_name, ST_Expand(_bb,_topology_snap_tolerance * -6),
 --       _utm);
 --       used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
 --       RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
@@ -227,7 +227,7 @@ BEGIN
     
     --heal border edges 
     command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
-    border_topo_info.topology_name,outer_cell_boundary_geom);
+    border_topo_info.topology_name,_bb);
     EXECUTE command_string;
     
     
@@ -348,27 +348,30 @@ BEGIN
 
      command_string := Format('DROP TABLE IF EXISTS %s',has_edges_temp_table_name);
      EXECUTE command_string;
-    
+
+     command_string := Format('SELECT topo_update.heal_cellborder_edges_no_block(%1$L,%2$L,%3$L)', 
+      _topology_name, _bb,null);
+     EXECUTE command_string;
+
     END IF;
+    
+
   ELSIF _cell_job_type = 3 THEN
     -- on cell border
     -- test with  area to block like _bb
     -- area_to_block := _bb;
     -- count the number of rows that intersects
-    area_to_block := ST_BUffer (_bb, glue_snap_tolerance_fixed);
+    area_to_block := ST_Expand (_bb, glue_snap_tolerance_fixed);
     command_string := Format('select count(*) from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
     EXECUTE command_string INTO num_boxes_intersect;
     command_string := Format('select count(*) from (select * from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L) for update SKIP LOCKED) as r;', _job_list_name, area_to_block);
     EXECUTE command_string INTO num_boxes_free;
     IF num_boxes_intersect != num_boxes_free THEN
-      RAISE NOTICE 'Wait to handle add cell border edges for box %, num_boxes_intersect %, num_boxes_free %, for area_to_block % ',  
-      box_id, num_boxes_intersect, num_boxes_free, area_to_block;
+      RAISE NOTICE 'Wait to handle add cell border edges for _cell_job_type %, num_boxes_intersect %, num_boxes_free %, for area_to_block % ',  
+      _cell_job_type, num_boxes_intersect, num_boxes_free, area_to_block;
       RETURN;
     END IF;
 
-    RAISE NOTICE 'Start to handle add cell border edges for box %, num_boxes_intersect %, num_boxes_free %, for area_to_block % ',  
-    box_id, num_boxes_intersect, num_boxes_free, area_to_block;
-   
     border_topo_info.topology_name := _topology_name;
 
     command_string := Format('CREATE TEMP table temp_left_over_borders as select geo FROM
@@ -413,13 +416,30 @@ BEGIN
       EXECUTE command_string;
 --    END IF;
 
+   
 
+    drop table temp_left_over_borders;
+    
+    
+     
+  ELSIF _cell_job_type = 4 THEN
+
+    area_to_block := ST_Expand (_bb, glue_snap_tolerance_fixed);
+    command_string := Format('select count(*) from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
+    EXECUTE command_string INTO num_boxes_intersect;
+    command_string := Format('select count(*) from (select * from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L) for update SKIP LOCKED) as r;', _job_list_name, area_to_block);
+    EXECUTE command_string INTO num_boxes_free;
+    IF num_boxes_intersect != num_boxes_free THEN
+      RAISE NOTICE 'Wait to handle add cell border edges for _cell_job_type %, num_boxes_intersect %, num_boxes_free %, for area_to_block % ',  
+      _cell_job_type, num_boxes_intersect, num_boxes_free, area_to_block;
+      RETURN;
+    END IF;
 
       -- select ARRAY(select unnest(line_edges_added)) into line_edges_tmp;
       --RAISE NOTICE 'Added edges for border lines for box % into line_edges_tmp %',  box_id, line_edges_tmp;
       
      command_string := Format('SELECT topo_update.heal_cellborder_edges_no_block(%1$L,%2$L,%3$L)', 
-      _topology_name, outer_cell_boundary_geom,null);
+      _topology_name, _bb,null);
       EXECUTE command_string;
 
      IF (_clean_info).simplify_tolerance > 0  THEN
@@ -437,7 +457,7 @@ BEGIN
         e1.left_face != e1.right_face and
         e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face
       ) e',
-      border_topo_info.topology_name, outer_cell_boundary_geom, (_clean_info).simplify_tolerance);
+      _topology_name, _bb, (_clean_info).simplify_tolerance);
       EXECUTE command_string;
     END IF;
     
@@ -456,37 +476,26 @@ BEGIN
         e1.left_face != e1.right_face and
         e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face
       ) e',
-      border_topo_info.topology_name, outer_cell_boundary_geom, _utm, _clean_info);
+      _topology_name, _bb, _utm, _clean_info);
       EXECUTE command_string;
     END IF;
-
-    drop table temp_left_over_borders;
     
-    face_table_name = _topology_name || '.face';
-    start_remove_small := Clock_timestamp();
-    RAISE NOTICE 'Start clean small polygons for border plygons face_table_name % at %', face_table_name, Clock_timestamp();
-    -- remove small polygons in temp
-    -- TODO 6 sould be based on other values
-    num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, (_clean_info).min_area_to_keep, face_table_name, ST_buffer(ST_ExteriorRing(_bb),_topology_snap_tolerance * 6),
-      _utm);
-    used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
-    RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
-    -- remove small polygons in border sones
-  ELSIF _cell_job_type = 4 THEN
-     
+    
+    
+  ELSIF _cell_job_type = 5 THEN
     -- remove 
     face_table_name = _topology_name || '.face';
     start_remove_small := Clock_timestamp();
     RAISE NOTICE 'Start clean small polygons for border plygons face_table_name % at %', face_table_name, Clock_timestamp();
     -- remove small polygons in temp
     -- TODO 6 sould be based on other values
-    num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, (_clean_info).min_area_to_keep, face_table_name, ST_buffer(_bb,(_topology_snap_tolerance * -6)),
+    num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, (_clean_info).min_area_to_keep, face_table_name, ST_Expand(_bb,(_topology_snap_tolerance * -6)),
       _utm);
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
     RAISE NOTICE 'Removed % clean small polygons for after adding to main face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
 
 
-  ELSIF _cell_job_type = 5 THEN
+  ELSIF _cell_job_type = 6 THEN
     -- Create a temp table name
     temp_table_name := '_result_temp_' || box_id;
     temp_table_id_column := '_id' || temp_table_name;

@@ -27,7 +27,7 @@ DECLARE
   --overlap_width_inner real = 1;
   boundary_with float = _topology_snap_tolerance * 1.5;
   glue_boundary_with float = _topology_snap_tolerance * 0.5;
-  overlap_width_inner float = _topology_snap_tolerance;
+  overlap_width_inner float = 0;
   try_update_invalid_rows int;
   
   _max_point_in_line int = 10000;

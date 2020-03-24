@@ -67,9 +67,83 @@ BEGIN
   sql_to_block_cmd := Format('select resolve_overlap_gap_block_cell(%s,%s,%s,%s,', 
   Quote_literal(table_to_resolve_), Quote_literal(geo_collumn_name_), Quote_literal(input_table_pk_column_name_), Quote_literal(job_list_name_));
   
+  
+  -- make       
+ -- select ST_asText( ST_Expand ( (ST_Dump( get_single_lineparts)).geom, 0000.1)) from  topo_update.get_single_lineparts(ST_ExteriorRing('0103000020E964000001000000050000000000000060E30641000000005ACC5A410000000060E30641000000008FD85A4100000000006A0841000000008FD85A4100000000006A0841000000005ACC5A410000000060E30641000000005ACC5A41'));      
+
+--  select ST_asText( ST_Expand ( (ST_Dump( get_single_lineparts)).geom, 0000.1)) 
+--  from  topo_update.get_single_lineparts(ST_ExteriorRing(geo_collumn_name_));      
+
+
+	 
+-- select * from (
+-- select 
+--    r.inside_cell,
+--    r.grid_thread_cell,
+--    r.num_polygons,
+--    r.row_number,
+-- 
+-- l.geom as geo , 
+-- ROW_NUMBER() OVER(PARTITION BY l.geom order by r.num_polygons desc) as cell_number from
+-- (
+-- select distinct ST_Expand((ST_Dump(geo)).geom,0.0001) as geom from (
+-- select topo_update.get_single_lineparts((ST_Dump(ST_Union(geo))).geom) as geo 
+-- from (
+--   select ST_ExteriorRing(geo) as geo from  test_topo_ar50_t3.ar50_utvikling_flate_grid
+-- ) as r
+-- ) as r
+-- ) as l,
+-- test_topo_ar50_t3.ar50_utvikling_flate_grid as r
+-- where r.geo && l.geom
+-- ) as r where cell_number= 1 order by num_polygons desc
+-- ;
+ 
   -- add inside cell polygons
   -- TODO solve how to find r.geom
-  command_string := Format('
+  IF _cell_job_type = 3 or _cell_job_type = 4 THEN 
+    command_string := Format('
+ 	INSERT INTO %s(inside_cell,grid_thread_cell,num_polygons,row_number,sql_to_run,cell_geo,sql_to_block) 
+ 	SELECT
+    r.inside_cell, 
+    r.grid_thread_cell,
+    r.num_polygons,
+    r.row_number,
+    %s||quote_literal(r.'||geo_collumn_name_||'::Varchar)||%s as sql_to_run, 
+    r.'||geo_collumn_name_||' as cell_geo, 
+    %s||quote_literal(r.'||geo_collumn_name_||'::Varchar)||%s as sql_to_block
+ 	from (
+    select 
+    r.inside_cell,
+    r.grid_thread_cell,
+    r.num_polygons,
+    r.row_number,
+    l.geom as %s , 
+    ROW_NUMBER() OVER(PARTITION BY l.geom order by r.num_polygons desc) as cell_number from
+    (
+      select ST_Expand((ST_Dump(geom)).geom,%s) as geom from (
+        select topo_update.get_single_lineparts((ST_Dump(ST_Union(geom))).geom) as geom 
+        from (
+          select ST_ExteriorRing(%s) as geom from %s
+        ) as r
+      ) as r
+    ) as l,
+    %s as r 
+    where r.%s && l.geom
+    ) as r WHERE r.cell_number = 1', 
+ 	job_list_name_, 
+ 	Quote_literal(sql_to_run_grid), 
+ 	Quote_literal(',' || _cell_job_type || ','), 
+ 	Quote_literal(sql_to_block_cmd), 
+ 	Quote_literal(');'),
+ 	
+    geo_collumn_name_,
+    _topology_snap_tolerance*12,
+    geo_collumn_name_,
+    overlapgap_grid_,
+ 	overlapgap_grid_,
+ 	geo_collumn_name_);
+  ELSE
+    command_string := Format('
  	INSERT INTO %s(inside_cell,grid_thread_cell,num_polygons,row_number,sql_to_run,cell_geo,sql_to_block) 
  	SELECT
     r.inside_cell, 
@@ -86,6 +160,8 @@ BEGIN
  	Quote_literal(sql_to_block_cmd), 
  	Quote_literal(');'), 
  	overlapgap_grid_);
+  END IF;
+  
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
   command_string := Format('CREATE INDEX ON %s USING GIST (cell_geo);', job_list_name_);

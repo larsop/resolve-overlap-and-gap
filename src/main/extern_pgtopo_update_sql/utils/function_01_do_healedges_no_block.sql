@@ -99,7 +99,7 @@ BEGIN
       END IF;
    END LOOP;
 
-   RAISE NOTICE 'Healed % of edges found % for _atopology %' , edges_fixed, Array_length(edges_to_fix,1), _atopology; 
+   RAISE NOTICE 'Healed % of edges found % for _atopology % for bb % ' , edges_fixed, Array_length(edges_to_fix,1), _atopology, _bb; 
 
    IF edges_fixed = 0 OR loop_nr > max_loops THEN
       EXIT;

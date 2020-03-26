@@ -63,9 +63,10 @@ DECLARE
   
   -- This is the area that will handle when glus cell together, this is very importan to avoid smooth lines to times
   outer_cell_boundary_geom geometry;
+  inner_cell_boundary_geom geometry;
 
   -- This is the inner area tha we safly can fix
-  inner_cell_boundary_geom geometry;
+  inner_cell_geom geometry;
   
   -- Distance to inner safe area
   -- TODo find a valid value  here
@@ -87,7 +88,7 @@ BEGIN
   
   -- check if job is done already
   command_string := Format('select count(*) from %s as gt, %s as done
-    where gt.cell_geo && ST_PointOnSurface(%3$L) and gt.id = done.id', _job_list_name, _job_list_name || '_donejobs', _bb);
+    where ST_Equals(gt.cell_geo,%3$L) and gt.id = done.id', _job_list_name, _job_list_name || '_donejobs', _bb);
   EXECUTE command_string INTO is_done;
   IF is_done = 1 THEN
     RAISE NOTICE 'Job is_done for  : %', box_id;
@@ -95,13 +96,19 @@ BEGIN
   END IF;
   start_time := Clock_timestamp();
   
-  inner_cell_boundary_geom := ST_MakePolygon ((
+  inner_cell_geom := ST_MakePolygon ((
       SELECT ST_ExteriorRing (ST_Expand (_bb, ((_topology_snap_tolerance) * -inner_cell_distance))) AS outer_ring));
 
+--  outer_cell_boundary_geom := ST_MakePolygon ((
+--      SELECT ST_ExteriorRing (ST_Expand (_bb, _topology_snap_tolerance)) AS outer_ring), ARRAY (
+--        SELECT ST_ExteriorRing (inner_cell_geom) AS inner_rings));
   outer_cell_boundary_geom := ST_MakePolygon ((
-      SELECT ST_ExteriorRing (ST_Expand (_bb, _topology_snap_tolerance)) AS outer_ring), ARRAY (
-        SELECT ST_ExteriorRing (inner_cell_boundary_geom) AS inner_rings));
+      SELECT ST_ExteriorRing (_bb) AS outer_ring), ARRAY (
+        SELECT ST_ExteriorRing (inner_cell_geom) AS inner_rings));
 
+  inner_cell_boundary_geom := ST_MakePolygon ((
+      SELECT ST_ExteriorRing (ST_Expand (_bb, ((_topology_snap_tolerance) * -(inner_cell_distance/2)))) AS outer_ring), ARRAY (
+        SELECT ST_ExteriorRing (ST_Expand (_bb, ((_topology_snap_tolerance) * -(inner_cell_distance*2)))) AS inner_rings));
 
   -- get area to block and set
   -- I don't see why we need this code ??????????? why cant we just the _bb as it is so I test thi snow
@@ -224,12 +231,9 @@ BEGIN
     --RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
 
-    
-    --heal border edges 
     command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
     border_topo_info.topology_name,_bb);
     EXECUTE command_string;
-    
     
     command_string = null;
     
@@ -248,7 +252,7 @@ BEGIN
         e1.left_face != e1.right_face and
         e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face
       ) e',
-      border_topo_info.topology_name, inner_cell_boundary_geom, (_clean_info).simplify_tolerance);
+      border_topo_info.topology_name, inner_cell_geom, (_clean_info).simplify_tolerance);
       EXECUTE command_string;
     END IF;
     
@@ -267,7 +271,7 @@ BEGIN
         e1.left_face != e1.right_face and
         e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face
       ) e',
-      border_topo_info.topology_name, inner_cell_boundary_geom, _utm, _clean_info);
+      border_topo_info.topology_name, inner_cell_geom, _utm, _clean_info);
       EXECUTE command_string;
     END IF;
      
@@ -349,9 +353,16 @@ BEGIN
      command_string := Format('DROP TABLE IF EXISTS %s',has_edges_temp_table_name);
      EXECUTE command_string;
 
-     command_string := Format('SELECT topo_update.heal_cellborder_edges_no_block(%1$L,%2$L,%3$L)', 
-      _topology_name, _bb,null);
+     command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
+     _topology_name, inner_cell_boundary_geom);
      EXECUTE command_string;
+
+-- >WARNING:  terminating connection because of crash of another server process at character 29
+--< postgres, 2020-03-25 09:41:04 CET, resolve_cha, 2020-03-25 09:41:04.879 CET >DETAIL:  The postmaster has commanded this server process to roll back the current transaction and exit, because another server process exited abnormally and possibly corrupted shared memory.
+--   Failes with      
+--     command_string := Format('SELECT topo_update.heal_cellborder_edges_no_block(%1$L,%2$L,%3$L)', 
+--      _topology_name, inner_cell_geom,null);
+--     EXECUTE command_string;
 
     END IF;
     
@@ -361,7 +372,15 @@ BEGIN
     -- test with  area to block like _bb
     -- area_to_block := _bb;
     -- count the number of rows that intersects
-    area_to_block := ST_Expand (_bb, glue_snap_tolerance_fixed);
+
+    command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
+    input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
+    EXECUTE command_string INTO area_to_block;
+    
+    IF area_to_block is NULL or ST_Area(area_to_block) = 0.0 THEN
+      area_to_block := _bb;
+    END IF;
+
     command_string := Format('select count(*) from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
     EXECUTE command_string INTO num_boxes_intersect;
     command_string := Format('select count(*) from (select * from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L) for update SKIP LOCKED) as r;', _job_list_name, area_to_block);
@@ -424,7 +443,14 @@ BEGIN
      
   ELSIF _cell_job_type = 4 THEN
 
-    area_to_block := ST_Expand (_bb, glue_snap_tolerance_fixed);
+    command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
+    input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
+    EXECUTE command_string INTO area_to_block;
+
+    IF area_to_block is NULL or ST_Area(area_to_block) = 0.0 THEN
+      area_to_block := _bb;
+    END IF;
+
     command_string := Format('select count(*) from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
     EXECUTE command_string INTO num_boxes_intersect;
     command_string := Format('select count(*) from (select * from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L) for update SKIP LOCKED) as r;', _job_list_name, area_to_block);
@@ -438,8 +464,8 @@ BEGIN
       -- select ARRAY(select unnest(line_edges_added)) into line_edges_tmp;
       --RAISE NOTICE 'Added edges for border lines for box % into line_edges_tmp %',  box_id, line_edges_tmp;
       
-     command_string := Format('SELECT topo_update.heal_cellborder_edges_no_block(%1$L,%2$L,%3$L)', 
-      _topology_name, _bb,null);
+     command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
+      _topology_name, _bb);
       EXECUTE command_string;
 
      IF (_clean_info).simplify_tolerance > 0  THEN
@@ -453,9 +479,11 @@ BEGIN
         %1$s.face e1fr
       WHERE
 	    (e1fl.mbr && %2$L or e1fr.mbr && %2$L) and 
-   		(ST_Intersects(e1fl.mbr,%2$L) AND ST_Intersects(e1fr.mbr,%2$L)) and 
+   		ST_Intersects(e1fl.mbr,%2$L) and 
+        ST_Intersects(e1fr.mbr,%2$L) and 
         e1.left_face != e1.right_face and
-        e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face
+        (e1fl.face_id = e1.left_face or e1.left_face=0) and 
+        (e1fr.face_id = e1.right_face or e1.right_face=0)
       ) e',
       _topology_name, _bb, (_clean_info).simplify_tolerance);
       EXECUTE command_string;
@@ -474,19 +502,48 @@ BEGIN
 	    (e1fl.mbr && %2$L AND e1fr.mbr && %2$L) and 
    		(ST_Intersects(e1fl.mbr,%2$L) AND ST_Intersects(e1fr.mbr,%2$L)) and 
         e1.left_face != e1.right_face and
-        e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face
+        (e1fl.face_id = e1.left_face or e1.left_face=0) and 
+        (e1fr.face_id = e1.right_face or e1.right_face=0)
       ) e',
       _topology_name, _bb, _utm, _clean_info);
       EXECUTE command_string;
     END IF;
     
-    
-    
-  ELSIF _cell_job_type = 5 THEN
-    -- remove 
+       -- remove 
     face_table_name = _topology_name || '.face';
     start_remove_small := Clock_timestamp();
     RAISE NOTICE 'Start clean small polygons for border plygons face_table_name % at %', face_table_name, Clock_timestamp();
+    -- remove small polygons in temp
+    -- TODO 6 sould be based on other values
+    num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, (_clean_info).min_area_to_keep, face_table_name, ST_Expand(_bb,(_topology_snap_tolerance * -6)),
+      _utm);
+    used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
+    RAISE NOTICE 'Removed % clean small polygons for after adding to main face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
+
+  ELSIF _cell_job_type = 5 THEN
+  
+    command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
+    input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
+    EXECUTE command_string INTO area_to_block;
+    
+    IF area_to_block is NULL or ST_Area(area_to_block) = 0.0 THEN
+      area_to_block := _bb;
+    END IF;
+
+    command_string := Format('select count(*) from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
+    EXECUTE command_string INTO num_boxes_intersect;
+    command_string := Format('select count(*) from (select * from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L) for update SKIP LOCKED) as r;', _job_list_name, area_to_block);
+    EXECUTE command_string INTO num_boxes_free;
+    IF num_boxes_intersect != num_boxes_free THEN
+      RAISE NOTICE 'Wait to handle add cell border edges for _cell_job_type %, num_boxes_intersect %, num_boxes_free %, for area_to_block % ',  
+      _cell_job_type, num_boxes_intersect, num_boxes_free, area_to_block;
+      RETURN;
+    END IF;
+
+    -- remove 
+    face_table_name = _topology_name || '.face';
+    start_remove_small := Clock_timestamp();
+    RAISE NOTICE 'Start clean small polygons for cell plygons face_table_name % at %', face_table_name, Clock_timestamp();
     -- remove small polygons in temp
     -- TODO 6 sould be based on other values
     num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, (_clean_info).min_area_to_keep, face_table_name, ST_Expand(_bb,(_topology_snap_tolerance * -6)),
@@ -609,7 +666,7 @@ BEGIN
     RAISE NOTICE 'very long time used for lines, % time with geo for _bb % ', used_time, box_id;
     EXECUTE Format('INSERT INTO %s (execute_time, info, sql, geo) VALUES (%s, %L, %L, %L)', _table_name_result_prefix || '_long_time_log2', used_time, 'simplefeature_c2_topo_surface_border_retry', command_string, _bb);
   END IF;
-  PERFORM topo_update.clear_blocked_area (area_to_block, _job_list_name);
+  PERFORM topo_update.clear_blocked_area (_bb, _job_list_name);
   RAISE NOTICE 'leave work at timeofday:% for layer %, with _cell_job_type % for cell %', Timeofday(), border_topo_info.topology_name, _cell_job_type, box_id;
   --RETURN added_rows;
 END

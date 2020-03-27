@@ -74,6 +74,13 @@ DECLARE
   
   line_edges_added integer[]; 
   line_edges_tmp integer[]; 
+  
+  edgelist_to_change integer[]; 
+  edge_id_heal integer;
+
+  heal_edge_status int;
+  heal_edge_retry_num int;
+  
 
 
 BEGIN
@@ -238,22 +245,41 @@ BEGIN
     command_string = null;
     
     IF (_clean_info).simplify_tolerance > 0  THEN
-      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,e.edge_id, 
-      ST_simplifyPreserveTopology(e.geom,%3$s)) 
-      FROM (
-      SELECT distinct e1.edge_id, e1.geom 
-      FROM 
-        %1$s.edge_data e1,
-        %1$s.face e1fl,
-        %1$s.face e1fr
-      WHERE
-	    (e1fl.mbr && %2$L OR e1fr.mbr && %2$L) and 
-   		(ST_CoveredBy(e1fl.mbr,%2$L) OR ST_CoveredBy(e1fr.mbr,%2$L)) and 
-        e1.left_face != e1.right_face and
-        e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face
-      ) e',
-      border_topo_info.topology_name, inner_cell_geom, (_clean_info).simplify_tolerance);
-      EXECUTE command_string;
+        command_string := Format('SELECT ARRAY(SELECT e.edge_id   
+        FROM (
+        SELECT distinct e1.edge_id 
+        FROM 
+          %1$s.edge_data e1,
+          %1$s.face e1fl,
+          %1$s.face e1fr
+        WHERE
+	      (e1fl.mbr && %2$L OR e1fr.mbr && %2$L) and 
+   		  (ST_CoveredBy(e1fl.mbr,%2$L) OR ST_CoveredBy(e1fr.mbr,%2$L)) and 
+          e1.left_face != e1.right_face and
+          e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face
+        ) e)',
+        border_topo_info.topology_name, inner_cell_geom);
+        EXECUTE command_string into edgelist_to_change;
+
+        
+        IF edgelist_to_change IS NOT NULL AND (Array_length(edgelist_to_change, 1)) IS NOT NULL THEN 
+          FOREACH edge_id_heal IN ARRAY edgelist_to_change 
+          LOOP
+            heal_edge_retry_num := 1;
+            LOOP
+              command_string := FORMAT('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,e.edge_id,ST_simplifyPreserveTopology(e.geom,%2$s)) 
+              from %1$s.edge_data e where e.edge_id = %3$s',
+              border_topo_info.topology_name, (_clean_info).simplify_tolerance/heal_edge_retry_num, edge_id_heal);
+              EXECUTE command_string into heal_edge_status;
+              EXIT WHEN heal_edge_status in (0,1) or heal_edge_retry_num > 5;
+              heal_edge_retry_num := heal_edge_retry_num  + 1;
+            END LOOP;
+            IF heal_edge_status = -1 THEN
+              RAISE NOTICE 'Failed to run topo_update.try_ST_ChangeEdgeGeom using ST_simplifyPreserveTopologyfor edge_id % for topology % using tolerance % .' , 
+              edge_id_heal, border_topo_info.topology_name, (_clean_info).simplify_tolerance;
+            END IF;
+          END LOOP;
+        END IF;
     END IF;
     
     IF (_clean_info).chaikins_nIterations > 0 THEN
@@ -469,24 +495,45 @@ BEGIN
       EXECUTE command_string;
 
      IF (_clean_info).simplify_tolerance > 0  THEN
-      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,e.edge_id, 
-      ST_simplifyPreserveTopology(e.geom,%3$s)) 
-      FROM (
-      SELECT distinct e1.edge_id, e1.geom 
-      FROM 
-        %1$s.edge_data e1,
-        %1$s.face e1fl,
-        %1$s.face e1fr
-      WHERE
+      
+      command_string := Format('SELECT ARRAY(SELECT e.edge_id   
+        FROM (
+        SELECT distinct e1.edge_id 
+        FROM 
+          %1$s.edge_data e1,
+          %1$s.face e1fl,
+          %1$s.face e1fr
+        WHERE
 	    (e1fl.mbr && %2$L or e1fr.mbr && %2$L) and 
    		ST_Intersects(e1fl.mbr,%2$L) and 
         ST_Intersects(e1fr.mbr,%2$L) and 
         e1.left_face != e1.right_face and
         (e1fl.face_id = e1.left_face or e1.left_face=0) and 
         (e1fr.face_id = e1.right_face or e1.right_face=0)
-      ) e',
-      _topology_name, _bb, (_clean_info).simplify_tolerance);
-      EXECUTE command_string;
+        ) e)',
+        _topology_name,  _bb);
+        EXECUTE command_string into edgelist_to_change;
+
+        
+        IF edgelist_to_change IS NOT NULL AND (Array_length(edgelist_to_change, 1)) IS NOT NULL THEN 
+          FOREACH edge_id_heal IN ARRAY edgelist_to_change 
+          LOOP
+            heal_edge_retry_num := 1;
+            LOOP
+              command_string := FORMAT('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,e.edge_id,ST_simplifyPreserveTopology(e.geom,%2$s)) 
+              from %1$s.edge_data e where e.edge_id = %3$s',
+              _topology_name, (_clean_info).simplify_tolerance/heal_edge_retry_num, edge_id_heal);
+              EXECUTE command_string into heal_edge_status;
+              EXIT WHEN heal_edge_status in (0,1) or heal_edge_retry_num > 5;
+              heal_edge_retry_num := heal_edge_retry_num  + 1;
+            END LOOP;
+            IF heal_edge_status = -1 THEN
+              RAISE NOTICE 'Failed to run topo_update.try_ST_ChangeEdgeGeom using ST_simplifyPreserveTopologyfor edge_id % for topology % using tolerance % .' , 
+              edge_id_heal, border_topo_info.topology_name, (_clean_info).simplify_tolerance;
+            END IF;
+          END LOOP;
+        END IF;
+
     END IF;
     
     IF (_clean_info).chaikins_nIterations > 0 THEN

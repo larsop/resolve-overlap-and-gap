@@ -28,21 +28,67 @@ DECLARE
   lost_data boolean;
   -- returns a set of edge identifiers forming it up
   edges_added integer[];
+  
+  tolerance_retry_num int;
+  tolerance_retry_diff real;
+  tolerance_retry_value real;
 
 BEGIN
   no_cutline_filename = _table_name_result_prefix || '_no_cut_line_failed';
   BEGIN
 	
-    command_string := Format('SELECT ARRAY(SELECT topology.TopoGeo_addLinestring(%s,%L,%s))', Quote_literal(_topology_name), _new_line, _snap_tolerance);
+	  
+    command_string := Format('SELECT ARRAY(SELECT topology.TopoGeo_addLinestring(%L,%L,%s))', _topology_name, _new_line, _snap_tolerance);
     EXECUTE command_string into edges_added;
  
     EXCEPTION
     WHEN OTHERS THEN
     GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
     v_context = PG_EXCEPTION_CONTEXT;
-    RAISE NOTICE 'failed: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
+    RAISE NOTICE 'failed with in default case  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
+    
+    tolerance_retry_num := 1;
+    tolerance_retry_diff := 0.75;
+    tolerance_retry_value := _snap_tolerance*tolerance_retry_num*tolerance_retry_diff;
+    
     EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, FALSE, 
-    'Warn1, will do retry, topo_update.add_border_lines ', v_state, v_msg, v_detail, v_hint, v_context, _new_line);
+    'Warn2, will do retry, topo_update.add_border_lines with tolerance :'||tolerance_retry_value||' and tolerance_retry_num '|| tolerance_retry_num ||'for topology '||_topology_name, 
+    v_state, v_msg, v_detail, v_hint, v_context, _new_line);
+    
+	-- Try with different snap to
+	
+    LOOP
+    
+      tolerance_retry_value := _snap_tolerance*tolerance_retry_num*tolerance_retry_diff;
+      BEGIN
+	    command_string := Format('SELECT ARRAY(SELECT topology.TopoGeo_addLinestring(%L,%L,%s))', 
+	    _topology_name, _new_line, tolerance_retry_value);
+        EXECUTE command_string into edges_added;
+        RETURN edges_added;
+
+      EXCEPTION
+      WHEN OTHERS THEN
+        GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
+        v_context = PG_EXCEPTION_CONTEXT;
+        RAISE NOTICE 'failed after trying with tolerance % : % message: % detail : % hint   : % context: %', 
+        tolerance_retry_value, v_state, v_msg, v_detail, v_hint, v_context;
+
+      END;	    
+
+
+      EXIT WHEN tolerance_retry_num > 8;
+      tolerance_retry_num := tolerance_retry_num  + 1;
+      
+      EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, FALSE, 
+      'Warn2, will do retry, topo_update.add_border_lines with tolerance :'||tolerance_retry_value||' and tolerance_retry_num '|| tolerance_retry_num ||'for topology '||_topology_name, 
+       v_state, v_msg, v_detail, v_hint, v_context, _new_line);
+
+    END LOOP;
+
+
+
+      -- Try with break up in smaller parts
+    
     BEGIN
       single_line_geo = ST_Multi (topo_update.get_single_lineparts (_new_line));
       SELECT ST_NumGeometries (single_line_geo) INTO dim;
@@ -61,7 +107,8 @@ BEGIN
           v_context = PG_EXCEPTION_CONTEXT;
           RAISE NOTICE 'failed: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
           EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, FALSE, 
-          'Warn2, will do retry, topo_update.add_border_lines ', v_state, v_msg, v_detail, v_hint, v_context, new_egde_geom);
+          'Warn2, will do retry, topo_update.add_border_lines ' || 'for topology '||_topology_name,
+          v_state, v_msg, v_detail, v_hint, v_context, new_egde_geom);
           --1
           BEGIN
             -- try extend line, that may help som time

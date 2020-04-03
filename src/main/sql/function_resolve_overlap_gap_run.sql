@@ -81,8 +81,14 @@ BEGIN
   
   
   FOR cell_job_type IN 1..6 LOOP
-    -- 1 ############################# START # add lines inside box and cut lines and save then in separate table,
-    -- 2 ############################# START # add border lines saved in last run, we will here connect data from the different cell using he border lines.
+
+    -- try fixed failed lines before make simple feature in single thread
+    IF cell_job_type = 6 THEN
+      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L) from %4$s r where line_geo_lost = true' , 
+      (_topology_info).topology_name, (_topology_info).topology_snap_tolerance, table_name_result_prefix, table_name_result_prefix||'_no_cut_line_failed');
+      EXECUTE command_string;
+    END IF;
+    
     command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%L,%s)', 
     (_input).table_to_resolve, (_input).table_geo_collumn_name, (_input).table_srid, (_input).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input).table_pk_column_name, _clean_info, cell_job_type);
     EXECUTE command_string;

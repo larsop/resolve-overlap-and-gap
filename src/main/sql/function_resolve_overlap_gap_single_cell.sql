@@ -299,7 +299,7 @@ BEGIN
         e1.left_face != e1.right_face and
         e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face
       ) e',
-      border_topo_info.topology_name, inner_cell_geom, _utm, _clean_info,_topology_snap_tolerance/3);
+      border_topo_info.topology_name, inner_cell_geom, _utm, _clean_info,_topology_snap_tolerance/2);
       EXECUTE command_string;
     END IF;
      
@@ -555,7 +555,7 @@ BEGIN
         (e1fl.face_id = e1.left_face or e1.left_face=0) and 
         (e1fr.face_id = e1.right_face or e1.right_face=0)
       ) e',
-      _topology_name, _bb, _utm, _clean_info, _topology_snap_tolerance/3);
+      _topology_name, _bb, _utm, _clean_info, _topology_snap_tolerance/2);
       EXECUTE command_string;
     END IF;
     

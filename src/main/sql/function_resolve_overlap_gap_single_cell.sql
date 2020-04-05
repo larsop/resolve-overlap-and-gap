@@ -136,8 +136,8 @@ BEGIN
         -- SELECT relation::regclass, * FROM pg_locks WHERE NOT GRANTED;
         --relation           | test_topo_ar5.edge_data
     LOOP
-      EXECUTE Format('SELECT count(*) from pg_stat_activity where wait_event in (%L,%L)',
-      'SubtransControlLock','relation') into subtransControlLock;
+      EXECUTE Format('SELECT count(*) from pg_stat_activity where query like %L and wait_event in (%L,%L)',
+      'CALL resolve_overlap_gap_single_cell%','SubtransControlLock','relation') into subtransControlLock;
       EXIT WHEN subtransControlLock = 0 OR subtransControlLock_count > 40;
       
       subtransControlLock_count := subtransControlLock_count + 1;
@@ -403,7 +403,41 @@ BEGIN
 
     command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
     input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
+    -- to much to block
+
+--    command_string := Format('SELECT ST_Union(geom) from (select ST_collect(%1$s) as geom from %3$s where ST_intersects(%1$s,%4$L)) as r', 
+--    input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
+--    does noe seems to help on permance
+
     EXECUTE command_string INTO area_to_block;
+    
+    --causes 
+--    area_to_block = ST_Expand(_bb,_topology_snap_tolerance*2);
+--CALL resolve_overlap_gap_single_cell(+| 26675 | active | transactionid
+--                                      |       |        | 
+--CALL resolve_overlap_gap_single_cell(+| 26685 | active | transactionid
+--                                      |       |        | 
+--CALL resolve_overlap_gap_single_cell(+| 26733 | active | tuple
+--                                      |       |        | 
+--CALL resolve_overlap_gap_single_cell(+| 26693 | active | transactionid
+--                                      |       |        | 
+--CALL resolve_overlap_gap_single_cell(+| 26696 | active | transactionid
+--                                      |       |        | 
+--CALL resolve_overlap_gap_single_cell(+| 26744 | active | tuple
+--                                      |       |        | 
+--CALL resolve_overlap_gap_single_cell(+| 26747 | active | [NULL]
+--                                      |       |        | 
+--CALL resolve_overlap_gap_single_cell(+| 26711 | active | tuple
+--                                      |       |        | 
+--CALL resolve_overlap_gap_single_cell(+| 26751 | active | tuple
+--                                      |       |        | 
+--CALL resolve_overlap_gap_single_cell(+| 26715 | active | tuple
+--                                      |       |        | 
+--CALL resolve_overlap_gap_single_cell(+| 26754 | active | tuple
+--                                      |       |        | 
+--CALL resolve_overlap_gap_single_cell(+| 26719 | active | transactionid
+--                                      |       |        | 
+--CALL resolve_overlap_gap_single_cell(+| 26756 | active | transactionid
     
     IF area_to_block is NULL or ST_Area(area_to_block) = 0.0 THEN
       area_to_block := _bb;

@@ -24,6 +24,7 @@ DECLARE
   -- holds dynamic sql to be able to use the same code for different
   command_string text;
   added_rows int = 0;
+  updated_rows int;
   start_time timestamp WITH time zone;
   done_time timestamp WITH time zone;
   used_time real;
@@ -138,7 +139,7 @@ BEGIN
     LOOP
       EXECUTE Format('SELECT count(*) from pg_stat_activity where query like %L and wait_event in (%L,%L)',
       'CALL resolve_overlap_gap_single_cell%','SubtransControlLock','relation') into subtransControlLock;
-      EXIT WHEN subtransControlLock = 0 OR subtransControlLock_count > 40;
+      EXIT WHEN subtransControlLock = 0 OR subtransControlLock_count > 100;
       
       subtransControlLock_count := subtransControlLock_count + 1;
       PERFORM pg_sleep(subtransControlLock*subtransControlLock_count*0.1);
@@ -409,10 +410,21 @@ BEGIN
 --    input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
 --    does noe seems to help on permance
 
+    
+--    command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
+--    'geo', _topology_snap_tolerance, _table_name_result_prefix||'_border_line_segments', _bb);
+-- causes dead lock    
+  
+    
     EXECUTE command_string INTO area_to_block;
     
-    --causes 
+    --causes
+    
 --    area_to_block = ST_Expand(_bb,_topology_snap_tolerance*2);
+    
+    
+  
+  
 --CALL resolve_overlap_gap_single_cell(+| 26675 | active | transactionid
 --                                      |       |        | 
 --CALL resolve_overlap_gap_single_cell(+| 26685 | active | transactionid
@@ -443,16 +455,50 @@ BEGIN
       area_to_block := _bb;
     END IF;
 
-    command_string := Format('select count(*) from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
-    EXECUTE command_string INTO num_boxes_intersect;
     command_string := Format('select count(*) from (select * from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L) for update SKIP LOCKED) as r;', _job_list_name, area_to_block);
     EXECUTE command_string INTO num_boxes_free;
+    
+    command_string := Format('select count(*) from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
+    EXECUTE command_string INTO num_boxes_intersect;
+    
     IF num_boxes_intersect != num_boxes_free THEN
       RAISE NOTICE 'Wait to handle add cell border edges for _cell_job_type %, num_boxes_intersect %, num_boxes_free %, for area_to_block % ',  
       _cell_job_type, num_boxes_intersect, num_boxes_free, area_to_block;
       RETURN;
     END IF;
 
+
+--  A test avoid un commented data updatinf and rollback if it fails
+--    command_string := Format('select count(*) from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
+--    EXECUTE command_string INTO num_boxes_intersect;
+--    
+--    command_string := Format('select count(*) from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L) AND blocked_by_id is null;', _job_list_name, area_to_block);
+--    EXECUTE command_string INTO num_boxes_free;
+--
+--    IF num_boxes_intersect != num_boxes_free THEN
+--      RAISE NOTICE 'Wait to handle add cell border edges for stage 1 _cell_job_type %, num_boxes_intersect %, num_boxes_free %, for area_to_block % ',  
+--      _cell_job_type, num_boxes_intersect, num_boxes_free, area_to_block;
+--      RETURN;
+--    END IF;
+--
+--    command_string := Format('update %1$s set blocked_by_id = %3$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L) AND blocked_by_id is null;', 
+--    _job_list_name, area_to_block, box_id);
+--    EXECUTE command_string;
+--    
+--    GET DIAGNOSTICS updated_rows = ROW_COUNT;
+--    
+--    IF num_boxes_intersect != updated_rows THEN
+--      RAISE NOTICE 'Wait to handle add cell border edges for stage 2 _cell_job_type %, num_boxes_intersect %, num_boxes_free %, for area_to_block % ',  
+--      _cell_job_type, num_boxes_intersect, num_boxes_free, area_to_block;
+--      ROLLBACK;
+--      RETURN;
+--    END IF;
+--    
+--    
+--    COMMIT;
+
+    
+    
     border_topo_info.topology_name := _topology_name;
 
     command_string := Format('CREATE TEMP table temp_left_over_borders as select geo FROM
@@ -501,22 +547,36 @@ BEGIN
 
     drop table temp_left_over_borders;
     
-    
+
+    command_string := Format('update %1$s set blocked_by_id = null where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', 
+    _job_list_name, area_to_block);
+    EXECUTE command_string;
+
      
   ELSIF _cell_job_type = 4 THEN
 
-    command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
-    input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
+--    command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
+--    input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
+    
+--    command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
+--    'geom', _topology_snap_tolerance, _topology_name||'.edge_data', _bb);
+    
+    command_string := Format('SELECT ST_Union(geom) from (select ST_collect(%1$s) as geom from %3$s where ST_intersects(%1$s,%4$L)) as r', 
+    'mbr', _topology_snap_tolerance, _topology_name||'.face', _bb);
+
     EXECUTE command_string INTO area_to_block;
+
 
     IF area_to_block is NULL or ST_Area(area_to_block) = 0.0 THEN
       area_to_block := _bb;
     END IF;
 
-    command_string := Format('select count(*) from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
-    EXECUTE command_string INTO num_boxes_intersect;
     command_string := Format('select count(*) from (select * from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L) for update SKIP LOCKED) as r;', _job_list_name, area_to_block);
     EXECUTE command_string INTO num_boxes_free;
+
+    command_string := Format('select count(*) from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
+    EXECUTE command_string INTO num_boxes_intersect;
+    
     IF num_boxes_intersect != num_boxes_free THEN
       RAISE NOTICE 'Wait to handle add cell border edges for _cell_job_type %, num_boxes_intersect %, num_boxes_free %, for area_to_block % ',  
       _cell_job_type, num_boxes_intersect, num_boxes_free, area_to_block;

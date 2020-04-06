@@ -24,7 +24,7 @@ DECLARE
   done_ok boolean;
   num_done_ok int;
   num_not_done_ok int = 0;
-  max_num_not_done_ok int = 3;
+  max_num_not_done_ok int = 4;
   lost_data boolean;
   -- returns a set of edge identifiers forming it up
   edges_added integer[];
@@ -32,6 +32,9 @@ DECLARE
   tolerance_retry_num int;
   tolerance_retry_diff real;
   tolerance_retry_value real;
+  
+  deadlock_detected int;
+  
 
 BEGIN
   no_cutline_filename = _table_name_result_prefix || '_no_cut_line_failed';
@@ -47,6 +50,13 @@ BEGIN
     v_context = PG_EXCEPTION_CONTEXT;
     RAISE NOTICE 'failed with in default case  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
     
+    SELECT Position('deadlock detected' IN v_state) INTO deadlock_detected;
+    IF (deadlock_detected > 0) THEN
+      RAISE NOTICE 'failed: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
+      EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, TRUE, 'Failed3, topo_update.add_border_lines ', v_state, v_msg, v_detail, v_hint, v_context, _new_line);
+      RETURN NULL;
+    END IF;
+     
     tolerance_retry_num := 1;
     tolerance_retry_diff := 0.75;
     tolerance_retry_value := _snap_tolerance*tolerance_retry_num*tolerance_retry_diff;
@@ -208,7 +218,7 @@ BEGIN
                 EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, TRUE, 'Failed2, topo_update.add_border_lines', v_state, v_msg, v_detail, v_hint, v_context, tmp_egde_geom);
                 -- 2
                 END;
-                EXIT WHEN max_num_not_done_ok = num_not_done_ok or done_ok = true;
+                EXIT WHEN num_not_done_ok < max_num_not_done_ok or done_ok = true;
 
               END LOOP;
               -- done loop throug each

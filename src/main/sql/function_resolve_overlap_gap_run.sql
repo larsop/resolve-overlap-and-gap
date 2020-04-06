@@ -59,6 +59,7 @@ DECLARE
   i_stmts int;
   analyze_stmts int;
   
+  last_run_stmts int;
 
 BEGIN
   table_name_result_prefix := (_topology_info).topology_name || Substring((_input).table_to_resolve FROM (Position('.' IN (_input).table_to_resolve)));
@@ -80,6 +81,7 @@ BEGIN
   EXECUTE command_string INTO num_cells;
   
   
+  
   FOR cell_job_type IN 1..6 LOOP
 
     -- try fixed failed lines before make simple feature in single thread
@@ -95,24 +97,24 @@ BEGIN
     COMMIT;
 
     loop_number := 1;
+    last_run_stmts := 0;
     LOOP
 
       command_string := Format('SELECT ARRAY(SELECT sql_to_run||%L as func_call FROM %s WHERE block_bb is null 
-        ORDER BY inside_cell desc, row_number, num_polygons desc )',  
+        ORDER BY inside_cell desc, num_polygons desc )',  
       loop_number||');',job_list_name);
       RAISE NOTICE 'command_string %', command_string;
       EXECUTE command_string INTO stmts;
       EXIT
-      WHEN Array_length(stmts, 1) IS NULL
-        OR stmts IS NULL;
-      
+      WHEN Array_length(stmts, 1) IS NULL OR
+        stmts IS NULL;
+        
       stmts_final := '{}';
       analyze_stmts  := 0;
       FOR i_stmts IN 1 .. Array_length(stmts, 1)
       LOOP
          stmts_final[i_stmts+analyze_stmts] = stmts[i_stmts];
-         IF (MOD(i_stmts,200) = 0 AND cell_job_type > 1 AND cell_job_type < 5) or
-            i_stmts = Array_length(stmts, 1)
+         IF (MOD(i_stmts,200) = 0 AND cell_job_type = 2)
             THEN
            analyze_stmts := analyze_stmts + 1;
            stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.edge_data;', (_topology_info).topology_name);
@@ -133,13 +135,13 @@ BEGIN
       Array_length(stmts_final, 1), (_input).table_to_resolve, cell_job_type, loop_number;
 
       SELECT execute_parallel (stmts_final, _max_parallel_jobs,true) INTO call_result;
-      IF (call_result = FALSE AND loop_number > 1) THEN
+      IF (call_result = FALSE AND last_run_stmts = Array_length(stmts, 1)) THEN
         RAISE EXCEPTION 'FFailed to run overlap and gap for % at loop_number % for the following statement list %', 
         (_input).table_to_resolve, loop_number, stmts_final;
       END IF;
-      
-      loop_number := loop_number + 1;
 
+      last_run_stmts := Array_length(stmts, 1); 
+      loop_number := loop_number + 1;
 
     END LOOP;
   END LOOP;

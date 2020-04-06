@@ -33,7 +33,7 @@ BEGIN
   command_string := Format('DROP table if exists %s', job_list_name_);
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
-  command_string := Format('CREATE unlogged table %s(id serial, start_time timestamp with time zone, inside_cell boolean, grid_thread_cell int, num_polygons int, row_number int, sql_to_block varchar, sql_to_run varchar, cell_geo geometry(geometry,%s),block_bb Geometry(geometry,%s))',
+  command_string := Format('CREATE unlogged table %s(id serial, start_time timestamp with time zone, inside_cell boolean, grid_thread_cell int, num_polygons int, row_number int, sql_to_block varchar, sql_to_run varchar, cell_geo geometry(geometry,%s),block_bb Geometry(geometry,%s), blocked_by_id int)',
   job_list_name_,_srid,_srid);
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
@@ -170,6 +170,43 @@ BEGIN
   command_string := Format('CREATE INDEX ON %s USING GIST (block_bb);', job_list_name_);
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
+  
+  -- num_polygin
+  
+  IF _cell_job_type = 3 THEN
+    command_string := Format('UPDATE %1$s u
+    SET num_polygons = r1.num_polygons
+    FROM 
+    (
+    SELECT count(*) num_polygons, a1.id 
+    FROM 
+    %1$s a1,
+    %2$s a2
+    WHERE a1.cell_geo && a2.%3$s
+    GROUP BY a1.id
+    ) r1
+    WHERE r1.id = u.id', 
+    job_list_name_, _table_name_result_prefix||'_border_line_segments', 'geo');
+    RAISE NOTICE 'command_string %', command_string;
+    EXECUTE command_string;
+  ELSIF _cell_job_type = 4 THEN
+    command_string := Format('UPDATE %1$s u
+    SET num_polygons = r1.num_polygons
+    FROM 
+    (
+    SELECT count(*) num_polygons, a1.id 
+    FROM 
+    %1$s a1,
+    %2$s a2
+    WHERE a1.cell_geo && a2.%3$s
+    GROUP BY a1.id
+    ) r1
+    WHERE r1.id = u.id', 
+    job_list_name_, topology_name_||'.edge_data', 'geom');
+    RAISE NOTICE 'command_string %', command_string;
+    EXECUTE command_string;
+  END IF;
+ 
   command_string := Format('CREATE INDEX ON %s (id);', job_list_name_);
   RAISE NOTICE 'command_string %', command_string;
   command_string := Format('CREATE INDEX ON %s (id);', job_list_name_);

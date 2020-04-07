@@ -107,12 +107,13 @@ BEGIN
   inner_cell_geom := ST_MakePolygon ((
       SELECT ST_ExteriorRing (ST_Expand (_bb, ((_topology_snap_tolerance) * -inner_cell_distance))) AS outer_ring));
 
---  outer_cell_boundary_geom := ST_MakePolygon ((
---      SELECT ST_ExteriorRing (ST_Expand (_bb, _topology_snap_tolerance)) AS outer_ring), ARRAY (
---        SELECT ST_ExteriorRing (inner_cell_geom) AS inner_rings));
   outer_cell_boundary_geom := ST_MakePolygon ((
-      SELECT ST_ExteriorRing (_bb) AS outer_ring), ARRAY (
+      SELECT ST_ExteriorRing (ST_Expand (_bb, _topology_snap_tolerance/2)) AS outer_ring), ARRAY (
         SELECT ST_ExteriorRing (inner_cell_geom) AS inner_rings));
+  -- this cause missing faces so we expand the boubdery     
+  -- outer_cell_boundary_geom := ST_MakePolygon ((
+  --    SELECT ST_ExteriorRing (_bb) AS outer_ring), ARRAY (
+  --      SELECT ST_ExteriorRing (inner_cell_geom) AS inner_rings));
 
   inner_cell_boundary_geom := ST_MakePolygon ((
       SELECT ST_ExteriorRing (ST_Expand (_bb, ((_topology_snap_tolerance) * -(inner_cell_distance/2)))) AS outer_ring), ARRAY (

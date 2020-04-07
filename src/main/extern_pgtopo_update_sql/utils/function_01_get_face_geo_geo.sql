@@ -1,7 +1,7 @@
 /**
  * Get face area in meter, exception return 0
  */
-CREATE OR REPLACE FUNCTION topo_update.get_face_geo(_atopology varchar, _face_id int)
+CREATE OR REPLACE FUNCTION topo_update.get_face_geo(_atopology varchar, _face_id int, tolerance real)
   RETURNS Geometry
   AS $$
 DECLARE
@@ -19,8 +19,9 @@ BEGIN
 	face_geo := st_getFaceGeometry (_atopology, _face_id);
 
 	IF face_geo is NULL THEN
-	  command_string = FORMAT('select ST_BuildArea(ST_Union(e.geom)) from %1$s.face f, %1$s.edge_data e  where ST_Intersects(f.mbr,e.geom) and face_id = %2$s',
-	  _atopology, _face_id);
+	  command_string = FORMAT('select ST_BuildArea(ST_Union(e.geom)) from %1$s.face f, %1$s.edge_data e  
+      where ST_Covers(ST_Expand(f.mbr,%2$s),e.geom) and face_id = %2$s',
+	  _atopology, _face_id,tolerance);
 	  execute command_string into face_geo;
 	  RAISE NOTICE 'Face % for toplogy % not found , try build manualy by using the edges, got %',
 	  _atopology, _face_id, ST_AsText(face_geo);
@@ -47,6 +48,7 @@ LANGUAGE plpgsql
 STABLE;
 
 
-SELECT ST_AsText(topo_update.get_face_geo('topo_sr16_trl_06',1518387));
-SELECT ST_AsText(topo_update.get_face_geo('topo_sr16_trl_06',1518292));
+--SELECT ST_AsText(topo_update.get_face_geo('topo_sr16_trl_06',1518387,1));
+--SELECT ST_AsText(topo_update.get_face_geo('topo_sr16_trl_06',1518292,1));
+--SELECT ST_AsText(topo_update.get_face_geo('topo_sr16_trl_06',1518294,1));
 

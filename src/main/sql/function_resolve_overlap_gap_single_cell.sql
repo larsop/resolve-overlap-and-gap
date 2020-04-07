@@ -738,14 +738,15 @@ BEGIN
  
     -- Insert new geos based on all face id do not check on input table
     command_string := Format('insert into %3$s(%5$s)
- 	select * from (select topo_update.get_face_geo(%1$L,face_id) as %5$s from (
+ 	select * from (select topo_update.get_face_geo(%1$L,face_id,%7$s) as %5$s from (
  	SELECT f.face_id, min(jl.id) as cell_id  FROM
  	%1$s.face f, 
  	%4$s jl 
  	WHERE f.mbr && %2$L and jl.cell_geo && f.mbr
  	GROUP BY f.face_id
  	) as r where cell_id = %6$s 
-    ) as r where ST_IsValid(r.%5$s)', _topology_name, _bb, temp_table_name, _table_name_result_prefix || '_job_list', input_table_geo_column_name, box_id);
+    ) as r where ST_IsValid(r.%5$s)', 
+    _topology_name, _bb, temp_table_name, _table_name_result_prefix || '_job_list', input_table_geo_column_name, box_id,snap_tolerance_fixed);
     RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
     -- update/add primary key and _other_intersect_id_list based on geo

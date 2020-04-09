@@ -15,9 +15,11 @@ CREATE TYPE resolve_overlap_data_topology_type AS (
 
 
 CREATE TYPE resolve_overlap_data_clean_type AS (
+  -- TODO move own type
   min_area_to_keep float, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
-  simplify_tolerance float, -- is this is more than zero simply will called with
-  
+  simplify_tolerance float, -- is this is more than zero ST_simplifyPreserveTopology will called with this tolerance
+  simplify_max_average_vertex_length int, -- in meter both for utm and deegrees, this used to avoid running ST_simplifyPreserveTopology for long lines lines with few points
+
   -- here we will use chaikins togehter with simply to smooth lines
   -- The basic idea idea is to use smooth out sharp edges in another way than  
   chaikins_nIterations int, -- -- IF 0 NO CHAKINS WILL BE DONE,  A big value here make no sense because the number of points will increaes exponential )
@@ -35,6 +37,7 @@ CREATE TYPE resolve_overlap_data_clean_type AS (
 CREATE OR REPLACE FUNCTION resolve_overlap_data_clean_type_func(
 _min_area_to_keep float default 0, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
 _simplify_tolerance float default 0, -- is this is more than zero simply will called with
+_simplify_max_average_vertex_length int default 0, -- in meter both for utm and deegrees, this used to avoid running ST_simplifyPreserveTopology for long lines lines with few points
 _chaikins_nIterations int default 0, -- IF 0 NO CHAKINS WILL BE DONE,  A big value here make no sense because the number of points will increaes exponential )
 _chaikins_max_length int default 0, --edge that are longer than this value will not be touched by _chaikins_min_degrees and _chaikins_max_degrees  
 _chaikins_min_degrees int default 0, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
@@ -50,6 +53,7 @@ BEGIN
   ct = (
     _min_area_to_keep,
     _simplify_tolerance,
+    _simplify_max_average_vertex_length,
     _chaikins_nIterations,
     _chaikins_max_length,
     _chaikins_min_degrees,

@@ -1,6 +1,6 @@
 
 CREATE OR REPLACE FUNCTION 
-topo_update.try_ST_ChangeEdgeGeom(_org_geom Geometry, _atopology varchar, _edge int, _geom Geometry)
+topo_update.try_ST_ChangeEdgeGeom(_org_geom Geometry, _atopology varchar, _max_average_vertex_length real, _utm boolean, _edge int, _geom Geometry)
 RETURNS int AS $$
 DECLARE
   result int = 0;
@@ -17,7 +17,17 @@ DECLARE
 	IF ST_Equals(ST_AsBinary(_org_geom), ST_AsBinary(_geom)) THEN
 	  RETURN 0;
 	END IF;
-
+	
+	
+    -- we may not want change lines that have very long lines.
+	IF (_max_average_vertex_length is not null and _max_average_vertex_length > 0) THEN
+	  IF _utm and ST_Length(_org_geom)/ST_NumPoints(_org_geom) > _max_average_vertex_length THEN
+	    RETURN 0;
+	  ELSIF _utm = false and ST_Length(_org_geom,true)/ST_NumPoints(_org_geom) > _max_average_vertex_length THEN 
+	    RETURN 0;
+	  END IF;
+	END IF;
+	
     BEGIN                                                                                                                       
 
 	command_string := Format('select topology.ST_ChangeEdgeGeom(%1$L,%2$s,%3$L)', _atopology, _edge, _geom);    

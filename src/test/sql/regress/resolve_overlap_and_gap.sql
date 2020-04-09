@@ -13,6 +13,7 @@ CALL resolve_overlap_gap_run(
 resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
 49,  -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
 0, -- is this is more than zero simply will called with
+null, -- _max_average_vertex_length, in meter both for utm and deegrees, this used to avoid running ST_simplifyPreserveTopology for long lines lines with few points
 0, -- IF 0 NO CHAKINS WILL BE DONE A big value here make no sense because the number of points will increaes exponential )
 10000, --edge that are longer than this value will not be touched by _chaikins_min_degrees and _chaikins_max_degrees  
 120, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
@@ -48,6 +49,7 @@ CALL resolve_overlap_gap_run(
 resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
 49,  -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
 30, -- is this is more than zero simply will called with
+10000, -- _max_average_vertex_length, in meter both for utm and deegrees, this used to avoid running ST_simplifyPreserveTopology for long lines lines with few points
 1, -- IF 0 NO CHAKINS WILL BE DONE A big value here make no sense because the number of points will increaes exponential )
 10000, --edge that are longer than this value will not be touched by _chaikins_min_degrees and _chaikins_max_degrees  
 120, -- The angle has to be less this given value, This is used to avoid to touch all angles. 

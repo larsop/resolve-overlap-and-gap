@@ -271,9 +271,9 @@ BEGIN
           LOOP
             heal_edge_retry_num := 1;
             LOOP
-              command_string := FORMAT('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,e.edge_id,ST_simplifyPreserveTopology(e.geom,%2$s)) 
+              command_string := FORMAT('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,%4$L,%5$L,e.edge_id,ST_simplifyPreserveTopology(e.geom,%2$s)) 
               from %1$s.edge_data e where e.edge_id = %3$s',
-              border_topo_info.topology_name, (_clean_info).simplify_tolerance/heal_edge_retry_num, edge_id_heal);
+              border_topo_info.topology_name, (_clean_info).simplify_tolerance/heal_edge_retry_num, edge_id_heal, (_clean_info).simplify_max_average_vertex_length, _utm);
               EXECUTE command_string into heal_edge_status;
               EXIT WHEN heal_edge_status in (0,1) or heal_edge_retry_num > 5;
               heal_edge_retry_num := heal_edge_retry_num  + 1;
@@ -287,7 +287,7 @@ BEGIN
     END IF;
     
     IF (_clean_info).chaikins_nIterations > 0 THEN
-      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,e.edge_id, 
+      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,%6$L,%3$L,e.edge_id, 
       ST_simplifyPreserveTopology(topo_update.chaikinsAcuteAngle(e.geom,%3$L,%4$L), %5$s)) 
       FROM (
       SELECT distinct e1.edge_id, e1.geom 
@@ -301,7 +301,7 @@ BEGIN
         e1.left_face != e1.right_face and
         e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face
       ) e',
-      border_topo_info.topology_name, inner_cell_geom, _utm, _clean_info,_topology_snap_tolerance/2);
+      border_topo_info.topology_name, inner_cell_geom, _utm, _clean_info,_topology_snap_tolerance/2, (_clean_info).simplify_max_average_vertex_length);
       EXECUTE command_string;
     END IF;
      
@@ -617,9 +617,9 @@ BEGIN
           LOOP
             heal_edge_retry_num := 1;
             LOOP
-              command_string := FORMAT('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,e.edge_id,ST_simplifyPreserveTopology(e.geom,%2$s)) 
+              command_string := FORMAT('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,%4$L,%5$L,e.edge_id,ST_simplifyPreserveTopology(e.geom,%2$s)) 
               from %1$s.edge_data e where e.edge_id = %3$s',
-              _topology_name, (_clean_info).simplify_tolerance/heal_edge_retry_num, edge_id_heal);
+              _topology_name, (_clean_info).simplify_tolerance/heal_edge_retry_num, edge_id_heal, (_clean_info).simplify_max_average_vertex_length, _utm);
               EXECUTE command_string into heal_edge_status;
               EXIT WHEN heal_edge_status in (0,1) or heal_edge_retry_num > 5;
               heal_edge_retry_num := heal_edge_retry_num  + 1;
@@ -635,7 +635,7 @@ BEGIN
 
     
     IF (_clean_info).chaikins_nIterations > 0 THEN
-      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,e.edge_id, 
+      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,%6$L,%3$L,e.edge_id, 
       ST_simplifyPreserveTopology(topo_update.chaikinsAcuteAngle(e.geom,%3$L,%4$L), %5$s )) 
       FROM (
       SELECT distinct e1.edge_id, e1.geom 
@@ -650,7 +650,7 @@ BEGIN
         (e1fl.face_id = e1.left_face or e1.left_face=0) and 
         (e1fr.face_id = e1.right_face or e1.right_face=0)
       ) e',
-      _topology_name, _bb, _utm, _clean_info, _topology_snap_tolerance/2);
+      _topology_name, _bb, _utm, _clean_info, _topology_snap_tolerance/2,(_clean_info).simplify_max_average_vertex_length);
       EXECUTE command_string;
     END IF;
     

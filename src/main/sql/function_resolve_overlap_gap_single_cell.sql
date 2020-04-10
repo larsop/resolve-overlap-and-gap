@@ -739,7 +739,7 @@ BEGIN
  
     -- Insert new geos based on all face id do not check on input table
     command_string := Format('insert into %3$s(%5$s)
- 	select * from (select topo_update.get_face_geo(%1$L,face_id,%7$s) as %5$s from (
+ 	select * from (select (ST_Dump(topo_update.get_face_geo(%1$L,face_id,%7$s))).geom as %5$s from (
  	SELECT f.face_id, min(jl.id) as cell_id  FROM
  	%1$s.face f, 
  	%4$s jl 

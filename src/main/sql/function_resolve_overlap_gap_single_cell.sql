@@ -773,7 +773,7 @@ BEGIN
                 WHERE i.%3$s = ii.%3$s
               ) as r1
   			  order by r1.area_coverarge desc
- 			) as r where area_coverarge > 0.1
+ 			) as r where area_coverarge > 0.5
  			order by %5$s, area_coverarge desc
  		) as r
  	) as r

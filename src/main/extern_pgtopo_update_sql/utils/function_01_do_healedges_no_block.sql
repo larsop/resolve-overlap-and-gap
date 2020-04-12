@@ -15,10 +15,14 @@ DECLARE
   edges_fixed int; 
   edges_mising int; 
 
+  start_time_delta_job timestamp WITH time zone;
+
   
 BEGIN
 	
   LOOP
+    start_time_delta_job := Clock_timestamp();
+
     loop_nr := loop_nr + 1;
     
     command_string := Format('SELECT ARRAY( SELECT ARRAY[r.edge_to_live, r.edge_to_eat] 
@@ -67,6 +71,9 @@ BEGIN
     where r.edge_to_live != r.edge_to_eat)', _atopology, _bb);
     EXECUTE command_string into edges_to_fix;
 
+    RAISE NOTICE 'In heal loop nr % , did find % edes to heal lines for topo % and bb % at % used_time %', 
+    loop_nr, (Array_length(edges_to_fix, 1)), _atopology, _bb, Clock_timestamp(), (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
+
     -- if I heal more than one each time I get a lot this  NOTICE:  00000: FAILED select ST_ModEdgeHeal('test_topo_ar50_t3', 852, 11601) state  : XX000  message: SQL/MM Spatial exception - non-existent edge 852 detail :  hint   :  context: SQL statement "SELECT topology.ST_ModEdgeHeal (_atopology, _edge_to_live, _edge_to_eat)"
     --	RAISE NOTICE 'execute command_string; %', command_string;
     
@@ -77,6 +84,8 @@ BEGIN
       EXIT;
    END IF;
  
+   start_time_delta_job := Clock_timestamp();
+
    FOREACH edges SLICE 1 IN ARRAY edges_to_fix
    LOOP
       command_string := FORMAT('SELECT count(*) from %1$s.edge_data where edge_id in (%2$s, %3$s)',
@@ -99,7 +108,8 @@ BEGIN
       END IF;
    END LOOP;
 
-   RAISE NOTICE 'Healed % of edges found % for _atopology % for bb % ' , edges_fixed, Array_length(edges_to_fix,1), _atopology, _bb; 
+   RAISE NOTICE 'In heal loop nr % , did heal % of % edes to heal lines for topo % and bb % at % used_time %', 
+   loop_nr, edges_fixed, (Array_length(edges_to_fix, 1)), _atopology, _bb, Clock_timestamp(), (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
 
    IF edges_fixed = 0 OR loop_nr > max_loops THEN
       EXIT;
@@ -110,4 +120,4 @@ END
 $function$;
 
 
---select topo_update.do_healedges_no_block('test_topo_ar50_t3','0103000020E9640000010000000500000000000000804F0241000000005ACC5A4100000000804F024100000000C4E45A4100000000C05C054100000000C4E45A4100000000C05C0541000000005ACC5A4100000000804F0241000000005ACC5A41');
+--select topo_update.do_healedges_no_block('topo_sr16_trl_07','0103000020E96400000100000005000000000000007223174100000058364C5B410000000072231741000000583C4C5B41000000C031841741000000583C4C5B41000000C03184174100000058364C5B41000000007223174100000058364C5B41');

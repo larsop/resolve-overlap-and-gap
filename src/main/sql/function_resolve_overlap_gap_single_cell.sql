@@ -28,7 +28,7 @@ DECLARE
   start_time timestamp WITH time zone;
   done_time timestamp WITH time zone;
   used_time real;
-  start_remove_small timestamp WITH time zone;
+  start_time_delta_job timestamp WITH time zone;
   is_done integer = 0;
   area_to_block geometry;
   num_boxes_intersect integer;
@@ -108,7 +108,7 @@ BEGIN
       SELECT ST_ExteriorRing (ST_Expand (_bb, ((_topology_snap_tolerance) * -inner_cell_distance))) AS outer_ring));
 
   outer_cell_boundary_geom := ST_MakePolygon ((
-      SELECT ST_ExteriorRing (ST_Expand (_bb, _topology_snap_tolerance/2)) AS outer_ring), ARRAY (
+      SELECT ST_ExteriorRing (ST_Expand (_bb, _topology_snap_tolerance/1.5)) AS outer_ring), ARRAY (
         SELECT ST_ExteriorRing (inner_cell_geom) AS inner_rings));
   -- this cause missing faces so we expand the boubdery     
   -- outer_cell_boundary_geom := ST_MakePolygon ((
@@ -199,7 +199,7 @@ BEGIN
 --       face_table_name = _topology_name || '.face';
 --       num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, (_clean_info).min_area_to_keep, face_table_name, ST_Expand(_bb,_topology_snap_tolerance * -6),
 --       _utm);
---       used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
+--       used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
 --       RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
 --    ELSE 
     
@@ -308,13 +308,13 @@ BEGIN
 
     IF (_clean_info).chaikins_nIterations > 0 OR (_clean_info).simplify_tolerance > 0 THEN
       face_table_name = border_topo_info.topology_name || '.face';
-      start_remove_small := Clock_timestamp();
+      start_time_delta_job := Clock_timestamp();
       RAISE NOTICE 'Start clean small polygons for face_table_name % at %', face_table_name, Clock_timestamp();
       -- remove small polygons in temp
       num_rows_removed := topo_update.do_remove_small_areas_no_block (
       border_topo_info.topology_name, (_clean_info).min_area_to_keep, face_table_name, _bb,_utm);
     
-      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
+      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
       RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
     
       --heal border edges remove small polygins
@@ -586,13 +586,20 @@ BEGIN
 
       -- select ARRAY(select unnest(line_edges_added)) into line_edges_tmp;
       --RAISE NOTICE 'Added edges for border lines for box % into line_edges_tmp %',  box_id, line_edges_tmp;
-      
-     command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
+
+    start_time_delta_job := Clock_timestamp();
+
+    command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
       _topology_name, _bb);
-      EXECUTE command_string;
+    EXECUTE command_string;
+
+    RAISE NOTICE 'Did Heal lines for topo % and bb % at % used_time %', 
+    _topology_name, _bb, Clock_timestamp(), (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
 
      IF (_clean_info).simplify_tolerance > 0  THEN
-      
+
+      start_time_delta_job := Clock_timestamp();
+
       command_string := Format('SELECT ARRAY(SELECT e.edge_id   
         FROM (
         SELECT distinct e1.edge_id 
@@ -631,10 +638,15 @@ BEGIN
           END LOOP;
         END IF;
 
+        RAISE NOTICE 'Did ST_simplifyPreserveTopology for topo % and bb % at % used_time %', 
+       _topology_name, _bb, Clock_timestamp(), (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
+
     END IF;
 
     
     IF (_clean_info).chaikins_nIterations > 0 THEN
+      start_time_delta_job := Clock_timestamp();
+
       command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,%6$L,%3$L,e.edge_id, 
       ST_simplifyPreserveTopology(topo_update.chaikinsAcuteAngle(e.geom,%3$L,%4$L), %5$s )) 
       FROM (
@@ -652,17 +664,20 @@ BEGIN
       ) e',
       _topology_name, _bb, _utm, _clean_info, _topology_snap_tolerance/2,(_clean_info).simplify_max_average_vertex_length);
       EXECUTE command_string;
+      RAISE NOTICE 'Did chaikinsAcuteAngle for topo % and bb % at % used_time %', 
+      _topology_name, _bb, Clock_timestamp(), (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
+
     END IF;
     
        -- remove 
     face_table_name = _topology_name || '.face';
-    start_remove_small := Clock_timestamp();
+    start_time_delta_job := Clock_timestamp();
     RAISE NOTICE 'Start clean small polygons for border plygons face_table_name % at %', face_table_name, Clock_timestamp();
     -- remove small polygons in temp
     -- TODO 6 sould be based on other values
     num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, (_clean_info).min_area_to_keep, face_table_name, ST_Expand(_bb,(_topology_snap_tolerance * -6)),
       _utm);
-    used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
+    used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
     RAISE NOTICE 'Removed % clean small polygons for after adding to main face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
 
   ELSIF _cell_job_type = 5 THEN
@@ -687,13 +702,13 @@ BEGIN
 
     -- remove 
     face_table_name = _topology_name || '.face';
-    start_remove_small := Clock_timestamp();
+    start_time_delta_job := Clock_timestamp();
     RAISE NOTICE 'Start clean small polygons for cell plygons face_table_name % at %', face_table_name, Clock_timestamp();
     -- remove small polygons in temp
     -- TODO 6 sould be based on other values
     num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, (_clean_info).min_area_to_keep, face_table_name, ST_Expand(_bb,(_topology_snap_tolerance * -6)),
       _utm);
-    used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_remove_small)));
+    used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
     RAISE NOTICE 'Removed % clean small polygons for after adding to main face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
 
 

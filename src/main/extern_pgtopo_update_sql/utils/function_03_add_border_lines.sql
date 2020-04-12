@@ -1,8 +1,8 @@
-CREATE OR REPLACE FUNCTION topo_update.add_border_lines (_topology_name character varying, _new_line geometry, _snap_tolerance float, _table_name_result_prefix varchar)
+CREATE OR REPLACE FUNCTION topo_update.add_border_lines (_topology_name character varying, _new_line_raw geometry, _snap_tolerance float, _table_name_result_prefix varchar)
   RETURNS integer[]
   AS $$
 DECLARE
-  old_egde_geom geometry;
+  new_line geometry;
   new_egde_geom geometry;
   tmp_egde_geom geometry;
   tmp_edge_geom2 geometry;
@@ -39,9 +39,10 @@ DECLARE
 BEGIN
   no_cutline_filename = _table_name_result_prefix || '_no_cut_line_failed';
   BEGIN
-	
+	new_line := ST_RemoveRepeatedPoints (_new_line_raw, _snap_tolerance);
+
 	  
-    command_string := Format('SELECT ARRAY(SELECT topology.TopoGeo_addLinestring(%L,%L,%s))', _topology_name, _new_line, _snap_tolerance);
+    command_string := Format('SELECT ARRAY(SELECT topology.TopoGeo_addLinestring(%L,%L,%s))', _topology_name, new_line, _snap_tolerance);
     EXECUTE command_string into edges_added;
  
     EXCEPTION
@@ -53,7 +54,7 @@ BEGIN
     SELECT Position('deadlock detected' IN v_state) INTO deadlock_detected;
     IF (deadlock_detected > 0) THEN
       RAISE NOTICE 'failed: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
-      EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, TRUE, 'Failed3, topo_update.add_border_lines ', v_state, v_msg, v_detail, v_hint, v_context, _new_line);
+      EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, TRUE, 'Failed3, topo_update.add_border_lines ', v_state, v_msg, v_detail, v_hint, v_context, new_line);
       RETURN NULL;
     END IF;
      
@@ -63,7 +64,7 @@ BEGIN
     
     EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, FALSE, 
     'Warn2, will do retry, topo_update.add_border_lines with tolerance :'||tolerance_retry_value||' and tolerance_retry_num '|| tolerance_retry_num ||'for topology '||_topology_name, 
-    v_state, v_msg, v_detail, v_hint, v_context, _new_line);
+    v_state, v_msg, v_detail, v_hint, v_context, new_line);
     
 	-- Try with different snap to
 	
@@ -72,7 +73,7 @@ BEGIN
       tolerance_retry_value := _snap_tolerance*tolerance_retry_num*tolerance_retry_diff;
       BEGIN
 	    command_string := Format('SELECT ARRAY(SELECT topology.TopoGeo_addLinestring(%L,%L,%s))', 
-	    _topology_name, _new_line, tolerance_retry_value);
+	    _topology_name, new_line, tolerance_retry_value);
         EXECUTE command_string into edges_added;
         RETURN edges_added;
 
@@ -91,7 +92,7 @@ BEGIN
       
       EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, FALSE, 
       'Warn2, will do retry, topo_update.add_border_lines with tolerance :'||tolerance_retry_value||' and tolerance_retry_num '|| tolerance_retry_num ||'for topology '||_topology_name, 
-       v_state, v_msg, v_detail, v_hint, v_context, _new_line);
+       v_state, v_msg, v_detail, v_hint, v_context, new_line);
 
     END LOOP;
 
@@ -100,7 +101,7 @@ BEGIN
       -- Try with break up in smaller parts
     
     BEGIN
-      single_line_geo = ST_Multi (topo_update.get_single_lineparts (_new_line));
+      single_line_geo = ST_Multi (topo_update.get_single_lineparts (new_line));
       SELECT ST_NumGeometries (single_line_geo) INTO dim;
       -- Add eache single line
       WHILE i < dim LOOP
@@ -234,7 +235,7 @@ BEGIN
         GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
         v_context = PG_EXCEPTION_CONTEXT;
       RAISE NOTICE 'failed: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
-      EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, TRUE, 'Failed3, topo_update.add_border_lines ', v_state, v_msg, v_detail, v_hint, v_context, _new_line);
+      EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, TRUE, 'Failed3, topo_update.add_border_lines ', v_state, v_msg, v_detail, v_hint, v_context, new_line);
       END;
     END;
   RETURN edges_added;

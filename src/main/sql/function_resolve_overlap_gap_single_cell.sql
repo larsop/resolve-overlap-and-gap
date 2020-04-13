@@ -403,10 +403,13 @@ BEGIN
     -- area_to_block := _bb;
     -- count the number of rows that intersects
 
+--    command_string := Format('SELECT ST_Union(geom) from (SELECT ST_Expand(ST_Envelope(%1$s),%2$s) as geom from %3$s where ST_intersects(%1$s,%4$L) ) as r', 
+ --   'geom', _topology_snap_tolerance, _topology_name||'.edge_data', _bb);
+
     command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
     input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
+    
     -- to much to block
-
 --    command_string := Format('SELECT ST_Union(geom) from (select ST_collect(%1$s) as geom from %3$s where ST_intersects(%1$s,%4$L)) as r', 
 --    input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
 --    does noe seems to help on permance
@@ -562,8 +565,11 @@ BEGIN
 --    command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
 --    'geom', _topology_snap_tolerance, _topology_name||'.edge_data', _bb);
     
-    command_string := Format('SELECT ST_Union(geom) from (select ST_collect(%1$s) as geom from %3$s where ST_intersects(%1$s,%4$L)) as r', 
-    'mbr', _topology_snap_tolerance, _topology_name||'.face', _bb);
+--    command_string := Format('SELECT ST_Union(geom) from (select ST_collect(%1$s) as geom from %3$s where ST_intersects(%1$s,%4$L)) as r', 
+ --   'mbr', _topology_snap_tolerance, _topology_name||'.face', _bb);
+
+    command_string := Format('SELECT ST_Union(geom) from (select ST_Expand(ST_Envelope(%1$s),%2$s) as geom from %3$s where ST_intersects(%1$s,%4$L) ) as r', 
+    'geom', _topology_snap_tolerance, _topology_name||'.edge_data', _bb);
 
     EXECUTE command_string INTO area_to_block;
 
@@ -584,7 +590,7 @@ BEGIN
       RETURN;
     END IF;
 
-      -- select ARRAY(select unnest(line_edges_added)) into line_edges_tmp;
+      -- select ARRAY(select unnest(line_edges_added)) intqo line_edges_tmp;
       --RAISE NOTICE 'Added edges for border lines for box % into line_edges_tmp %',  box_id, line_edges_tmp;
 
     start_time_delta_job := Clock_timestamp();

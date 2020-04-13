@@ -216,7 +216,7 @@ BEGIN
                 GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
                 v_context = PG_EXCEPTION_CONTEXT;
                 RAISE NOTICE 'failed2: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
-                EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, TRUE, 'Failed2, topo_update.add_border_lines', v_state, v_msg, v_detail, v_hint, v_context, tmp_egde_geom);
+                EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, TRUE, 'Failed2, topo_update.add_border_lines', v_state, v_msg, v_detail, v_hint, v_context, new_egde_geom);
                 -- 2
                 END;
                 EXIT WHEN num_not_done_ok < max_num_not_done_ok or done_ok = true;

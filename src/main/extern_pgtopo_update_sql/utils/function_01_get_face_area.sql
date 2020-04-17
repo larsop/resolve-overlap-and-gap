@@ -26,7 +26,7 @@ BEGIN
                     v_context = PG_EXCEPTION_CONTEXT;
         RAISE NOTICE 'Failed failed to area for face_id % in topo % state  : %  message: % detail : % hint   : % context: %', 
         _face_id, _atopology, v_state, v_msg, v_detail, v_hint, v_context;
-  face_area := 0;
+  face_area := null;
     END;
   RETURN face_area;
 END;

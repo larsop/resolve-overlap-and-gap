@@ -215,10 +215,21 @@ BEGIN
 END
 $function$;
 
-drop table test_tmp_simplified_border_lines_1;
-
-create table test_tmp_simplified_border_lines_1 as 
-(select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
-FROM topo_update.get_simplified_border_lines('sl_esh.ar50_utvikling_flate','geo',
-'0103000020E9640000010000000500000000000000B0A6074100000000F9F05A4100000000B0A607410000008013F75A4100000000006A08410000008013F75A4100000000006A084100000000F9F05A4100000000B0A6074100000000F9F05A41','1','test_topo_ar50_t11.ar50_utvikling_flate') g);
-alter table test_tmp_simplified_border_lines_1 add column id serial;
+--drop table if exists test_tmp_simplified_border_lines_1;
+--
+--create table test_tmp_simplified_border_lines_1 as 
+--(select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
+--FROM topo_update.get_simplified_border_lines('sl_esh.ar50_utvikling_flate','geo',
+--'0103000020E9640000010000000500000000000000B0A6074100000000F9F05A4100000000B0A607410000008013F75A4100000000006A08410000008013F75A4100000000006A084100000000F9F05A4100000000B0A6074100000000F9F05A41'
+--,'1','test_topo_ar50_t11.ar50_utvikling_flate') g);
+--alter table test_tmp_simplified_border_lines_1 add column id serial;
+--
+--drop if exists table test_tmp_simplified_border_lines_2;
+--
+--create table test_tmp_simplified_border_lines_2 as 
+--(select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
+--FROM topo_update.get_simplified_border_lines('sl_esh.ar50_utvikling_flate','geo',
+--'0103000020E9640000010000000500000000000000B0A60741000000C0EBED5A4100000000B0A6074100000000F9F05A41000000005808084100000000F9F05A410000000058080841000000C0EBED5A4100000000B0A60741000000C0EBED5A41'
+--,'1','test_topo_ar50_t11.ar50_utvikling_flate') g);
+--
+--alter table test_tmp_simplified_border_lines_2 add column id serial;

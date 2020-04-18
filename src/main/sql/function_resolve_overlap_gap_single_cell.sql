@@ -159,9 +159,9 @@ BEGIN
    
     
   IF _cell_job_type = 1 THEN
-  
     -- get the siple feature data both the line_types and the inner lines.
     -- the boundery linnes are saved in a table for later usage
+    
     command_string := Format('create temp table tmp_simplified_border_lines as 
     (select g.geo , line_type FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L) g)', 
     input_table_name, input_table_geo_column_name, _bb, _topology_snap_tolerance, _table_name_result_prefix);
@@ -342,7 +342,9 @@ BEGIN
     DROP TABLE IF EXISTS tmp_simplified_border_lines;
  
   ELSIF _cell_job_type = 2 THEN
-
+   -- add lines from each cell to final Topology layer
+   -- this lines will not connect to any line outside each cell
+ 
     has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;
     command_string := Format('SELECT EXISTS(SELECT 1 from to_regclass(%L) where to_regclass is not null)',has_edges_temp_table_name);
     
@@ -379,6 +381,8 @@ BEGIN
     
 
   ELSIF _cell_job_type = 3 THEN
+    -- add lines that connects each cell to each other
+    
     -- on cell border
     -- test with  area to block like _bb
     -- area_to_block := _bb;
@@ -519,16 +523,15 @@ BEGIN
       EXECUTE command_string into line_edges_added;
       RAISE NOTICE 'Added edges for border lines for box % into line_edges_added %',  box_id, line_edges_added;
      
-      -- add very long lines
-      -- TODO find what to with lines related to heal, and smooting if we keep it this way
-      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%3$s,%5$L) from %7$s r where ST_StartPoint(r.geo) && %2$L' , 
-      _topology_name, _bb, snap_tolerance_fixed, overlapgap_grid, 
-      _table_name_result_prefix, input_table_geo_column_name,
-      _table_name_result_prefix||'_border_line_many_points');
-      EXECUTE command_string;
---    END IF;
+    start_time_delta_job := Clock_timestamp();
 
-   
+    command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
+      _topology_name, _bb);
+    EXECUTE command_string;
+
+    RAISE NOTICE 'Did Heal lines for topo % and bb % at % used_time %', 
+    _topology_name, _bb, Clock_timestamp(), (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
+
 
     drop table temp_left_over_borders;
     
@@ -573,15 +576,6 @@ BEGIN
 
       -- select ARRAY(select unnest(line_edges_added)) intqo line_edges_tmp;
       --RAISE NOTICE 'Added edges for border lines for box % into line_edges_tmp %',  box_id, line_edges_tmp;
-
-    start_time_delta_job := Clock_timestamp();
-
-    command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
-      _topology_name, _bb);
-    EXECUTE command_string;
-
-    RAISE NOTICE 'Did Heal lines for topo % and bb % at % used_time %', 
-    _topology_name, _bb, Clock_timestamp(), (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
 
      IF (_clean_info).simplify_tolerance > 0  THEN
 
@@ -820,3 +814,53 @@ BEGIN
 END
 $$;
 
+
+--truncate table test_topo_ar50_t11.ar50_utvikling_flate_job_list_donejobs;
+--
+--CALL resolve_overlap_gap_single_cell(
+--  'sl_esh.ar50_utvikling_flate','geo','sl_sdeid','test_topo_ar50_t11.ar50_utvikling_flate',
+--  'test_topo_ar50_t11',1,25833,'true',
+--  '(300,9,500,3,140,120,240,3,35)',
+--  'test_topo_ar50_t11.ar50_utvikling_flate_job_list','test_topo_ar50_t11.ar50_utvikling_flate_grid',
+--  '0103000020E9640000010000000500000000000000B0A6074100000000F9F05A4100000000B0A607410000008013F75A4100000000006A08410000008013F75A4100000000006A084100000000F9F05A4100000000B0A6074100000000F9F05A41'
+--  ,1,1);
+--  
+--CALL resolve_overlap_gap_single_cell(
+--  'sl_esh.ar50_utvikling_flate','geo','sl_sdeid','test_topo_ar50_t11.ar50_utvikling_flate',
+--  'test_topo_ar50_t11',1,25833,'true',
+--  '(300,9,500,3,140,120,240,3,35)',
+--  'test_topo_ar50_t11.ar50_utvikling_flate_job_list','test_topo_ar50_t11.ar50_utvikling_flate_grid',
+--  '0103000020E9640000010000000500000000000000B0A60741000000C0EBED5A4100000000B0A6074100000000F9F05A41000000005808084100000000F9F05A410000000058080841000000C0EBED5A4100000000B0A60741000000C0EBED5A41'
+--  ,1,1);
+
+
+--truncate table test_topo_ar50_t11.ar50_utvikling_flate_job_list_donejobs;
+--
+--CALL resolve_overlap_gap_single_cell(
+--  'sl_esh.ar50_utvikling_flate','geo','sl_sdeid','test_topo_ar50_t11.ar50_utvikling_flate',
+--  'test_topo_ar50_t11',1,25833,'true',
+--  '(300,9,500,3,140,120,240,3,35)',
+--  'test_topo_ar50_t11.ar50_utvikling_flate_job_list','test_topo_ar50_t11.ar50_utvikling_flate_grid',
+--  '0103000020E9640000010000000500000000000000B0A6074100000000F9F05A4100000000B0A607410000008013F75A4100000000006A08410000008013F75A4100000000006A084100000000F9F05A4100000000B0A6074100000000F9F05A41'
+--  ,2,1);
+--  
+--CALL resolve_overlap_gap_single_cell(
+--  'sl_esh.ar50_utvikling_flate','geo','sl_sdeid','test_topo_ar50_t11.ar50_utvikling_flate',
+--  'test_topo_ar50_t11',1,25833,'true',
+--  '(300,9,500,3,140,120,240,3,35)',
+--  'test_topo_ar50_t11.ar50_utvikling_flate_job_list','test_topo_ar50_t11.ar50_utvikling_flate_grid',
+--  '0103000020E9640000010000000500000000000000B0A60741000000C0EBED5A4100000000B0A6074100000000F9F05A41000000005808084100000000F9F05A410000000058080841000000C0EBED5A4100000000B0A60741000000C0EBED5A41'
+--  ,2,1);
+--
+--truncate table test_topo_ar50_t11.ar50_utvikling_flate_job_list_donejobs;
+--
+--CALL resolve_overlap_gap_single_cell(
+--  'sl_esh.ar50_utvikling_flate','geo','sl_sdeid','test_topo_ar50_t11.ar50_utvikling_flate',
+--  'test_topo_ar50_t11',1,25833,'true',
+--  '(300,9,500,3,140,120,240,3,35)',
+--  'test_topo_ar50_t11.ar50_utvikling_flate_job_list','test_topo_ar50_t11.ar50_utvikling_flate_grid',
+--  '0103000020E964000001000000050000000000000050A6074100000000F6F05A410000000050A6074100000000FCF05A4100000000B808084100000000FCF05A4100000000B808084100000000F6F05A410000000050A6074100000000F6F05A41'
+--  ,3,1);
+--  
+--SELECT topo_update.do_healedges_no_block('test_topo_ar50_t11','0103000020E964000001000000050000000000000050A6074100000000F6F05A410000000050A6074100000000FCF05A4100000000B808084100000000FCF05A4100000000B808084100000000F6F05A410000000050A6074100000000F6F05A41');
+  

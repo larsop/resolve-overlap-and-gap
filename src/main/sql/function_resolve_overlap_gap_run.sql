@@ -82,11 +82,20 @@ BEGIN
   
   FOR cell_job_type IN 1..6 LOOP
 
-    -- try fixed failed lines before make simple feature in single thread
     IF cell_job_type = 4 THEN
+      -- try fixed failed lines before make simple feature in single thread
       command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L) from %4$s r where line_geo_lost = true' , 
       (_topology_info).topology_name, (_topology_info).topology_snap_tolerance, table_name_result_prefix, table_name_result_prefix||'_no_cut_line_failed');
       EXECUTE command_string;
+      
+      -- add very long lines feature in single thread
+      -- Most parts of this will not be healed and smooting if we keep it this way
+      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L) from %4$s r', 
+      (_topology_info).topology_name, (_topology_info).topology_snap_tolerance, 
+      table_name_result_prefix,
+      table_name_result_prefix||'_border_line_many_points');
+      EXECUTE command_string;
+      
     END IF;
     
     command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%L,%s)', 
@@ -94,6 +103,8 @@ BEGIN
     EXECUTE command_string;
     COMMIT;
 
+    --EXIT WHEN cell_job_type = 3;
+    
     loop_number := 1;
     last_run_stmts := 0;
     LOOP

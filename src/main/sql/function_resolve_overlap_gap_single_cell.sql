@@ -536,9 +536,8 @@ BEGIN
     drop table temp_left_over_borders;
     
 
-    command_string := Format('update %1$s set blocked_by_id = null where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', 
-    _job_list_name, area_to_block);
-    EXECUTE command_string;
+--    command_string := Format('update %1$s set blocked_by_id = null where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
+--    EXECUTE command_string;
 
      
   ELSIF _cell_job_type = 4 THEN

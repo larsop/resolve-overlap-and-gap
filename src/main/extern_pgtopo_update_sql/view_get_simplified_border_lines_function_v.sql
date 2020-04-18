@@ -82,7 +82,8 @@ BEGIN
   --#############################
   DROP TABLE IF EXISTS tmp_inner_lines_final_result;
   CREATE temp TABLE tmp_inner_lines_final_result AS (
-    SELECT (ST_Dump (ST_Intersection (rings.geom, bb_inner_glue_geom ) ) ).geom AS geo,
+    SELECT (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_Intersection (rings.geom, bb_inner_glue_geom)))))).geom as geo,
+ --   SELECT (ST_Dump (ST_Intersection (rings.geom, bb_inner_glue_geom ) ) ).geom AS geo,
     0 AS line_type
     FROM tmp_data_all_lines AS rings
   );
@@ -114,9 +115,11 @@ BEGIN
     SELECT (ST_Dump (ST_Intersection (rings.geom, boundary_glue_geom ) ) ).geom AS geo
     FROM tmp_data_all_lines AS rings
     );
+    
+    
   DROP TABLE IF EXISTS tmp_boundary_line_types_merged;
   CREATE temp TABLE tmp_boundary_line_types_merged AS (
-    SELECT r.geo, 1 AS line_type
+    SELECT distinct r.geo, 1 AS line_type
     FROM (
     SELECT (ST_Dump (ST_LineMerge (ST_Union (lg.geo ) ) ) ).geom AS geo
     FROM tmp_boundary_line_type_parts AS lg ) r
@@ -157,6 +160,7 @@ BEGIN
   CREATE temp TABLE tmp_boundary_line_parts AS (
     SELECT (ST_Dump (ST_Intersection (rings.geom, boundary_geom ) ) ).geom AS geo
     FROM tmp_data_all_lines AS rings );
+    
   DROP TABLE IF EXISTS tmp_boundary_lines_merged;
   CREATE temp TABLE tmp_boundary_lines_merged AS (
     SELECT (ST_Dump (ST_LineMerge (ST_Union (lg.geo ) ) ) ).geom AS geo
@@ -211,3 +215,10 @@ BEGIN
 END
 $function$;
 
+drop table test_tmp_simplified_border_lines_1;
+
+create table test_tmp_simplified_border_lines_1 as 
+(select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
+FROM topo_update.get_simplified_border_lines('sl_esh.ar50_utvikling_flate','geo',
+'0103000020E9640000010000000500000000000000B0A6074100000000F9F05A4100000000B0A607410000008013F75A4100000000006A08410000008013F75A4100000000006A084100000000F9F05A4100000000B0A6074100000000F9F05A41','1','test_topo_ar50_t11.ar50_utvikling_flate') g);
+alter table test_tmp_simplified_border_lines_1 add column id serial;

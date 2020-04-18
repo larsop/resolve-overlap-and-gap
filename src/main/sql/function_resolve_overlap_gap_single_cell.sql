@@ -162,30 +162,11 @@ BEGIN
   
     -- get the siple feature data both the line_types and the inner lines.
     -- the boundery linnes are saved in a table for later usage
-    command_string := Format('create temp table tmp_simplified_border_lines_1 as 
-    (select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
-     FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L) g)', 
+    command_string := Format('create temp table tmp_simplified_border_lines as 
+    (select g.geo , line_type FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L) g)', 
     input_table_name, input_table_geo_column_name, _bb, _topology_snap_tolerance, _table_name_result_prefix);
     EXECUTE command_string ;
     
-    EXECUTE Format('CREATE INDEX ON tmp_simplified_border_lines_1(is_closed)');
-    
-    IF (_utm = false) THEN
-      create temp table tmp_simplified_border_lines as 
-      (select * from tmp_simplified_border_lines_1 where 
-      is_closed = false or 
-      (ST_Area(ST_Envelope(geo),true) > (_clean_info).min_area_to_keep and ST_Area(ST_MakePolygon(geo),true) > (_clean_info).min_area_to_keep)); 
-    ELSE
-      create temp table tmp_simplified_border_lines as 
-      (select * from tmp_simplified_border_lines_1 where 
-      is_closed = false or 
-      (ST_Area(ST_Envelope(geo)) > (_clean_info).min_area_to_keep and ST_Area(ST_MakePolygon(geo)) > (_clean_info).min_area_to_keep)); 
-    END IF;
-
-    DROP TABLE tmp_simplified_border_lines_1;
-
-    EXECUTE Format('CREATE INDEX ON tmp_simplified_border_lines(is_closed,num_points)');
-
 --    IF _loop_number = 1 THEN 
 --       RAISE NOTICE 'use _topology_name %', _topology_name;
 --       command_string := Format('SELECT topology.TopoGeo_addLinestring(%2$L,r.geo,%1$s) FROM 

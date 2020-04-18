@@ -388,11 +388,18 @@ BEGIN
     -- area_to_block := _bb;
     -- count the number of rows that intersects
 
---    command_string := Format('SELECT ST_Union(geom) from (SELECT ST_Expand(ST_Envelope(%1$s),%2$s) as geom from %3$s where ST_intersects(%1$s,%4$L) ) as r', 
- --   'geom', _topology_snap_tolerance, _topology_name||'.edge_data', _bb);
+     IF _loop_number = 1 THEN 
+       -- In first loop only block by egdes
+       command_string := Format('SELECT ST_Union(geom) from (SELECT ST_Expand(ST_Envelope(%1$s),%2$s) as geom from %3$s where ST_intersects(%1$s,%4$L) ) as r', 
+       'geom', _topology_snap_tolerance, _topology_name||'.edge_data', _bb);
+     ELSE
+       -- In second loop block by input geo size
+       command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
+       input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
+       
+     END IF;
 
-    command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
-    input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
+
     
     -- to much to block
 --    command_string := Format('SELECT ST_Union(geom) from (select ST_collect(%1$s) as geom from %3$s where ST_intersects(%1$s,%4$L)) as r', 
@@ -529,7 +536,7 @@ BEGIN
       _topology_name, _bb);
     EXECUTE command_string;
 
-    RAISE NOTICE 'Did Heal lines for topo % and bb % at % used_time %', 
+    RAISE NOTICE 'Did Heal lines for topo % and bb % at % after added edges for border lines used_time %', 
     _topology_name, _bb, Clock_timestamp(), (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
 
 

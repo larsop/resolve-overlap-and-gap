@@ -100,7 +100,7 @@ BEGIN
  
   -- add inside cell polygons
   -- TODO solve how to find r.geom
-  IF _cell_job_type = 3 or _cell_job_type = 4 THEN 
+  IF _cell_job_type = 3 or _cell_job_type = 4 or _cell_job_type = 5 THEN 
     command_string := Format('
  	INSERT INTO %s(inside_cell,grid_thread_cell,num_polygons,row_number,sql_to_run,cell_geo,sql_to_block) 
  	SELECT
@@ -173,7 +173,7 @@ BEGIN
   
   -- num_polygin
   
-  IF _cell_job_type = 3 THEN
+  IF _cell_job_type = 3 or _cell_job_type = 4 THEN
     command_string := Format('UPDATE %1$s u
     SET num_polygons = r1.num_polygons
     FROM 

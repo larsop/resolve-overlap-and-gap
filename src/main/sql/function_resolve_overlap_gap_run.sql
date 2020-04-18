@@ -80,7 +80,7 @@ BEGIN
   -- execute the string
   EXECUTE command_string INTO num_cells;
   
-  FOR cell_job_type IN 1..6 LOOP
+  FOR cell_job_type IN 1..7 LOOP
 
     IF cell_job_type = 4 THEN
       -- try fixed failed lines before make simple feature in single thread

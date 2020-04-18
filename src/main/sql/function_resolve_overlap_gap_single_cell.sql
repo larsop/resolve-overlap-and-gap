@@ -529,7 +529,49 @@ BEGIN
 
       EXECUTE command_string into line_edges_added;
       RAISE NOTICE 'Added edges for border lines for box % into line_edges_added %',  box_id, line_edges_added;
+
+    drop table temp_left_over_borders;
+    
+
+--    command_string := Format('update %1$s set blocked_by_id = null where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
+--    EXECUTE command_string;
+
      
+   ELSIF _cell_job_type = 4 THEN
+    -- heal border edges
+    
+     IF _loop_number = 1 THEN 
+       -- In first loop only block by egdes
+       command_string := Format('SELECT ST_Union(geom) from (SELECT ST_Expand(ST_Envelope(%1$s),%2$s) as geom from %3$s where ST_intersects(%1$s,%4$L) ) as r', 
+       'geom', _topology_snap_tolerance, _topology_name||'.edge_data', _bb);
+     ELSE
+       -- In second loop block by input geo size
+       command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
+       input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
+       
+     END IF;
+
+    
+    EXECUTE command_string INTO area_to_block;
+    
+    IF area_to_block is NULL or ST_Area(area_to_block) = 0.0 THEN
+      area_to_block := _bb;
+    END IF;
+
+    command_string := Format('select count(*) from (select * from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L) for update SKIP LOCKED) as r;', _job_list_name, area_to_block);
+    EXECUTE command_string INTO num_boxes_free;
+    
+    command_string := Format('select count(*) from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
+    EXECUTE command_string INTO num_boxes_intersect;
+    
+    IF num_boxes_intersect != num_boxes_free THEN
+      RAISE NOTICE 'Wait to handle add cell border edges for _cell_job_type %, num_boxes_intersect %, num_boxes_free %, for area_to_block % ',  
+      _cell_job_type, num_boxes_intersect, num_boxes_free, area_to_block;
+      RETURN;
+    END IF;
+
+
+
     start_time_delta_job := Clock_timestamp();
 
     command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
@@ -540,14 +582,7 @@ BEGIN
     _topology_name, _bb, Clock_timestamp(), (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
 
 
-    drop table temp_left_over_borders;
-    
-
---    command_string := Format('update %1$s set blocked_by_id = null where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
---    EXECUTE command_string;
-
-     
-  ELSIF _cell_job_type = 4 THEN
+  ELSIF _cell_job_type = 5 THEN
 
 --    command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
 --    input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
@@ -667,7 +702,7 @@ BEGIN
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
     RAISE NOTICE 'Removed % clean small polygons for after adding to main face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
 
-  ELSIF _cell_job_type = 5 THEN
+  ELSIF _cell_job_type = 6 THEN
   
     command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
     input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
@@ -699,7 +734,7 @@ BEGIN
     RAISE NOTICE 'Removed % clean small polygons for after adding to main face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
 
 
-  ELSIF _cell_job_type = 6 THEN
+  ELSIF _cell_job_type = 7 THEN
     -- Create a temp table name
     temp_table_name := '_result_temp_' || box_id;
     temp_table_id_column := '_id' || temp_table_name;

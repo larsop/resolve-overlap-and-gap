@@ -388,7 +388,7 @@ BEGIN
     -- area_to_block := _bb;
     -- count the number of rows that intersects
 
-     IF _loop_number = 1 THEN 
+     IF _loop_number < 10 THEN 
        -- In first loop only block by egdes
        command_string := Format('SELECT ST_Union(geom) from (SELECT ST_Expand(ST_Envelope(%1$s),%2$s) as geom from %3$s where ST_intersects(%1$s,%4$L) ) as r', 
        'geom', _topology_snap_tolerance, _topology_name||'.edge_data', _bb);
@@ -540,7 +540,7 @@ BEGIN
    ELSIF _cell_job_type = 4 THEN
     -- heal border edges
     
-     IF _loop_number = 1 THEN 
+     IF _loop_number < 10 THEN 
        -- In first loop only block by egdes
        command_string := Format('SELECT ST_Union(geom) from (SELECT ST_Expand(ST_Envelope(%1$s),%2$s) as geom from %3$s where ST_intersects(%1$s,%4$L) ) as r', 
        'geom', _topology_snap_tolerance, _topology_name||'.edge_data', _bb);

@@ -14,19 +14,24 @@ _table_name_result_prefix varchar -- The topology schema name where we store sto
   AS $function$
 DECLARE
   command_string text;
+  
+  -- This is used to sure that no lines can snap to each other between two cells
+  -- The size wil the this value multiplied by _topology_snap_tolerance;
+  -- TODO make this as parameter
+  cell_boundary_tolerance_with_multi real = 5;
+  
   -- This is the boundary geom that contains lines pieces that will added after each single cell is done
   boundary_geom geometry;
   bb_boundary_inner geometry;
   bb_boundary_outer geometry;
+  
   -- This is is a box used to make small glue lines. This lines is needed to make that we don't do any snap out side our own cell
   bb_inner_glue_geom geometry;
   boundary_glue_geom geometry;
-  -- TODO add as parameter
-  --boundary_with real = 1.5;
-  --glue_boundary_with real = 0.5;
-  --overlap_width_inner real = 1;
-  boundary_with float = _topology_snap_tolerance * 1.5;
-  glue_boundary_with float = _topology_snap_tolerance * 0.5;
+
+  -- The inpux
+  boundary_with float = _topology_snap_tolerance;
+  glue_boundary_with float = _topology_snap_tolerance * cell_boundary_tolerance_with_multi;
   overlap_width_inner float = 0;
   try_update_invalid_rows int;
   
@@ -41,6 +46,7 @@ BEGIN
   boundary_geom := ST_MakePolygon ((
       SELECT ST_ExteriorRing (ST_Expand (_bb, boundary_with)) AS outer_ring), ARRAY (
         SELECT ST_ExteriorRing (ST_Expand (_bb, ((boundary_with + overlap_width_inner) * - 1))) AS inner_rings));
+        
   -- make the the polygon that contains lines is used a glue lines
   bb_inner_glue_geom := ST_Expand (_bb, ((boundary_with + glue_boundary_with) * - 1));
   boundary_glue_geom := ST_MakePolygon ((

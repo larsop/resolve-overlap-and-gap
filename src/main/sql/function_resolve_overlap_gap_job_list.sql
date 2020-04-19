@@ -28,6 +28,12 @@ DECLARE
   sql_to_block_cmd varchar;
   -- the sql resilve simple feature data
   sql_to_run_grid varchar;
+  
+  -- This is used to sure that no lines can snap to each other between two cells
+  -- The size wil the this value multiplied by _topology_snap_tolerance;
+  -- TODO make this as parameter
+  cell_boundary_tolerance_with_multi real = 12;
+  
 BEGIN
   -- ############################# START # create jobList tables
   command_string := Format('DROP table if exists %s', job_list_name_);
@@ -137,7 +143,7 @@ BEGIN
  	Quote_literal(');'),
  	
     geo_collumn_name_,
-    _topology_snap_tolerance*12,
+    _topology_snap_tolerance * cell_boundary_tolerance_with_multi,
     geo_collumn_name_,
     overlapgap_grid_,
  	overlapgap_grid_,

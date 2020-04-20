@@ -38,7 +38,7 @@ DECLARE
   face_table_name varchar;
   -- This is used when adding lines hte tolrannce is different when adding lines inside and box and the border;
   snap_tolerance_fixed float = _topology_snap_tolerance;
-  glue_snap_tolerance_fixed float = _topology_snap_tolerance/10000;
+  glue_snap_tolerance_fixed float = 0;
   min_length_line float = (_clean_info).min_area_to_keep/1000;
   temp_table_name varchar;
   temp_table_id_column varchar;
@@ -211,7 +211,8 @@ BEGIN
     -- add the glue line with no/small tolerance
     border_topo_info.snap_tolerance := glue_snap_tolerance_fixed;
     --command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::Text, %L) from tmp_simplified_border_lines g where line_type = 1', border_topo_info);
-    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geom,%2$s,%3$L) FROM (select geo as geom from tmp_simplified_border_lines g where line_type = 1) as r',
+    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geom,%2$s,%3$L) 
+                              FROM (select geo as geom from tmp_simplified_border_lines g where line_type = 1) as r',
     border_topo_info.topology_name, glue_snap_tolerance_fixed, _table_name_result_prefix);
     EXECUTE command_string;
 

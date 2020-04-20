@@ -38,7 +38,37 @@ DECLARE
   face_table_name varchar;
   -- This is used when adding lines hte tolrannce is different when adding lines inside and box and the border;
   snap_tolerance_fixed float = _topology_snap_tolerance;
+  
   glue_snap_tolerance_fixed float = 0;
+-- when bigger than 0
+-- Corrupted topology: adjacent edges 136899 and -137071 bind different face (0 and 40580)
+-- Corrupted topology: adjacent edges 136899 and -137071 bind different face (0 and 40580)
+-- Corrupted topology: adjacent edges 136899 and -137071 bind different face (0 and 40580)
+-- Corrupted topology: adjacent edges 136899 and -137071 bind different face (0 and 40580)
+-- Corrupted topology: adjacent edges 136899 and -137071 bind different face (0 and 40580)
+-- Corrupted topology: adjacent edges 137121 and -137144 bind different face (0 and 40558)
+-- Corrupted topology: adjacent edges 137122 and -137121 bind different face (40558 and 0)
+-- Corrupted topology: adjacent edges 137121 and -137144 bind different face (0 and 40558)
+-- Corrupted topology: adjacent edges 137121 and -137144 bind different face (0 and 40558)
+-- Corrupted topology: adjacent edges 137121 and -137144 bind different face (0 and 40558)
+-- Corrupted topology: adjacent edges 137121 and -137144 bind different face (0 and 40558)
+-- Corrupted topology: adjacent edges 137121 and -137144 bind different face (0 and 40558)
+-- Corrupted topology: adjacent edges 137121 and -137144 bind different face (0 and 40558)
+-- Corrupted topology: adjacent edges 137121 and -137144 bind different face (0 and 40558)
+-- Corrupted topology: adjacent edges -136899 and 136902 bind different face (0 and 40269)
+-- Corrupted topology: adjacent edges -136899 and 136902 bind different face (0 and 40269)
+-- Corrupted topology: adjacent edges -137071 and 136899 bind different face (40269 and 0)
+-- Corrupted topology: adjacent edges -137071 and 136899 bind different face (40269 and 0)
+-- Corrupted topology: adjacent edges -137071 and 136899 bind different face (40269 and 0)
+-- Corrupted topology: adjacent edges -137071 and 136899 bind different face (40269 and 0)
+-- Corrupted topology: adjacent edges -137071 and 136899 bind different face (40269 and 0)
+-- Corrupted topology: adjacent edges -137071 and 136899 bind different face (40269 and 0)
+-- Corrupted topology: adjacent edges -137071 and 136899 bind different face (40269 and 0)
+-- .
+-- .
+-- Corrupted topology: adjacent edges -137071 and 136899 bind different face (40269 and 0)
+-- (84 rows)
+  
   min_length_line float = (_clean_info).min_area_to_keep/1000;
   temp_table_name varchar;
   temp_table_id_column varchar;

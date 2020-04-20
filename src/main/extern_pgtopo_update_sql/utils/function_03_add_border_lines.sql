@@ -239,6 +239,12 @@ BEGIN
                 EXIT WHEN num_not_done_ok < max_num_not_done_ok or done_ok = true;
 
               END LOOP;
+              
+              if (done_ok = false) THEN
+                RAISE NOTICE 'failed2, done_ok = false state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
+                EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, TRUE, 'Failed2, topo_update.add_border_lines', v_state, v_msg, v_detail, v_hint, v_context, new_egde_geom);
+              END IF;
+
               -- done loop throug each
               DROP TABLE temp_table_fix_topo;
               --1

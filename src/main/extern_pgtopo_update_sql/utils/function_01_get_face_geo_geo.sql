@@ -63,9 +63,9 @@ BEGIN
 	  END IF;
 
 	END IF;  
+
 	
-	
-	IF ST_NumGeometries(face_geo) > 1 THEN
+	IF ST_NumGeometries(face_geo) > 1 and ST_NumGeometries(face_geo) < 10 THEN
  	  RAISE NOTICE 'Face % for toplogy % is a multipolygon, we will check it, has % sub geos',_atopology, _face_id, ST_NumGeometries(face_geo);
  	  -- maybe we need to checkit
  	  --command_string = FORMAT('select f.mr from %1$s.face f where face_id = %2$s', _atopology, _face_id);
@@ -102,7 +102,11 @@ BEGIN
       face_geo := ST_Collect(glist);
 	END IF;
 	  
-	
+
+	IF face_geo is NULL THEN
+	  RAISE NOTICE 'Face for toplogy % with id % not used', _atopology, _face_id;
+	END IF;
+
     EXCEPTION WHEN OTHERS THEN
 	    GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
                     v_context = PG_EXCEPTION_CONTEXT;

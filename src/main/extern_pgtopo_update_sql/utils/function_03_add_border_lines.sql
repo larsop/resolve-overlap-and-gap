@@ -52,11 +52,11 @@ BEGIN
     v_context = PG_EXCEPTION_CONTEXT;
     RAISE NOTICE 'failed with in default case  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
     
-    SELECT Position('deadlock detected' IN v_state) INTO deadlock_detected;
+    SELECT Position('deadlock detected' IN v_msg) INTO deadlock_detected;
     IF (deadlock_detected > 0 or
        _snap_tolerance = 0)
     THEN
-      RAISE NOTICE 'failed: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
+      RAISE NOTICE 'failed: state deadlock detected or _snap_tolerance = 0  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
       EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) 
                       VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', 
                       no_cutline_filename, TRUE, 'Failed3, topo_update.add_border_lines ', v_state, v_msg, v_detail, v_hint, v_context, new_line);
@@ -90,7 +90,7 @@ BEGIN
         RAISE NOTICE 'failed after trying with tolerance % : % message: % detail : % hint   : % context: %', 
         tolerance_retry_value, v_state, v_msg, v_detail, v_hint, v_context;
         
-        SELECT Position('deadlock detected' IN v_state) INTO deadlock_detected;
+        SELECT Position('deadlock detected' IN v_msg) INTO deadlock_detected;
         IF (deadlock_detected > 0 )
         THEN
          RAISE NOTICE 'failed after trying with tolerance, got dead lock: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;

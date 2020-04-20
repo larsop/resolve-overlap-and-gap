@@ -37,6 +37,7 @@ DECLARE
   
 
 BEGIN
+	
   no_cutline_filename = _table_name_result_prefix || '_no_cut_line_failed';
   BEGIN
 	new_line := ST_RemoveRepeatedPoints (_new_line_raw, _snap_tolerance);
@@ -52,9 +53,13 @@ BEGIN
     RAISE NOTICE 'failed with in default case  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
     
     SELECT Position('deadlock detected' IN v_state) INTO deadlock_detected;
-    IF (deadlock_detected > 0) THEN
+    IF (deadlock_detected > 0 or
+       _snap_tolerance = 0)
+    THEN
       RAISE NOTICE 'failed: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
-      EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, TRUE, 'Failed3, topo_update.add_border_lines ', v_state, v_msg, v_detail, v_hint, v_context, new_line);
+      EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) 
+                      VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', 
+                      no_cutline_filename, TRUE, 'Failed3, topo_update.add_border_lines ', v_state, v_msg, v_detail, v_hint, v_context, new_line);
       RETURN NULL;
     END IF;
      
@@ -65,6 +70,7 @@ BEGIN
     EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, FALSE, 
     'Warn2, will do retry, topo_update.add_border_lines with tolerance :'||tolerance_retry_value||' and tolerance_retry_num '|| tolerance_retry_num ||'for topology '||_topology_name, 
     v_state, v_msg, v_detail, v_hint, v_context, new_line);
+    
     
 	-- Try with different snap to
 	
@@ -83,6 +89,17 @@ BEGIN
         v_context = PG_EXCEPTION_CONTEXT;
         RAISE NOTICE 'failed after trying with tolerance % : % message: % detail : % hint   : % context: %', 
         tolerance_retry_value, v_state, v_msg, v_detail, v_hint, v_context;
+        
+        SELECT Position('deadlock detected' IN v_state) INTO deadlock_detected;
+        IF (deadlock_detected > 0 )
+        THEN
+         RAISE NOTICE 'failed after trying with tolerance, got dead lock: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
+         EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) 
+                      VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', 
+                      no_cutline_filename, TRUE, 'Failed3, topo_update.add_border_lines ', v_state, v_msg, v_detail, v_hint, v_context, new_line);
+         RETURN NULL;
+        END IF;
+  
 
       END;	    
 
@@ -244,4 +261,3 @@ END;
 $$
 LANGUAGE plpgsql;
 
--- 3 timer 19 minitter

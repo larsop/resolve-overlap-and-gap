@@ -82,6 +82,21 @@ BEGIN
   
   FOR cell_job_type IN 1..7 LOOP
 
+
+  -- This is not working it uses a very long time  both add this data and glu lnes together later
+  --  IF cell_job_type = 3 THEN
+  --      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geom,%2$s,%3$L) from  (
+  --       SELECT (ST_dump(ST_LineMerge(ST_Intersection(g.geo,b.geo)))).geom as geom
+  --       from 
+  --       (select ST_union(ST_ExteriorRing(%7$s)) as geo from %4$s g ) as g,
+  --       (select ST_union(geo) as geo from %5$s b ) as b
+  --      ) r where ST_GeometryType(geom) = %6$L', 
+  --    (_topology_info).topology_name, (_topology_info).topology_snap_tolerance, table_name_result_prefix,
+  --    table_name_result_prefix||'_grid', table_name_result_prefix||'_border_line_segments','ST_LineString',
+  --    (_input).table_geo_collumn_name);
+  --    EXECUTE command_string;
+  --  END IF;
+
     IF cell_job_type = 4 THEN
       -- try fixed failed lines before make simple feature in single thread
       command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L) from %4$s r where line_geo_lost = true' , 

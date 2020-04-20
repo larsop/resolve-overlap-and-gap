@@ -18,7 +18,7 @@ DECLARE
   -- This is used to sure that no lines can snap to each other between two cells
   -- The size wil the this value multiplied by _topology_snap_tolerance;
   -- TODO make this as parameter
-  cell_boundary_tolerance_with_multi real = 5;
+  cell_boundary_tolerance_with_multi real = 6;
   
   -- This is the boundary geom that contains lines pieces that will added after each single cell is done
   boundary_geom geometry;

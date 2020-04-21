@@ -190,6 +190,9 @@ EXECUTE Format('ALTER TABLE %s ADD column _other_intersect_id_list int[]',_table
 -- Add an extra column to hold a list of other intersections surfaces
 EXECUTE Format('GRANT select ON TABLE %s TO PUBLIC',_table_name_result_prefix||'_result');
 
+-- TODO should have been done after data are created
+EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', _table_name_result_prefix||'_result',_geo_collumn_name);
+
 
   RETURN num_cells;
 END;

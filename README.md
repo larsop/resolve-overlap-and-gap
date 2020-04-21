@@ -10,5 +10,5 @@ The following is planed to implement
 - Collapse small/tiny surfaces if requested
 - Collapse small/tiny gaps if requested
 - Create new a new simple Feature layer 
-- Add attributtes and assign values 
+- Add attributes and assign values 
 

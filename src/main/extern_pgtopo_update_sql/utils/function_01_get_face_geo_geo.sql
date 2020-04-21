@@ -13,6 +13,8 @@ DECLARE
   v_hint text;
   v_context text;
   face_geo Geometry;
+  face_geo_ok Geometry;
+
   i int;
   i2 int;
   g Geometry;
@@ -24,9 +26,10 @@ DECLARE
   face_id_mbr Geometry;
 BEGIN
   BEGIN
-	face_geo := st_getFaceGeometry (_atopology, _face_id);
+	face_geo_ok := st_getFaceGeometry (_atopology, _face_id);
 
-	IF face_geo is NULL THEN
+	IF face_geo_ok is NULL THEN
+	  -- Try to make face geo for logging
 	  command_string = FORMAT('select ST_BuildArea(ST_Collect(e.geom)) from %1$s.face f, %1$s.edge_data e  
       where ST_Covers(ST_Expand(f.mbr,%3$s),e.geom) and face_id = %2$s',
 	  _atopology, _face_id,tolerance);
@@ -62,16 +65,14 @@ BEGIN
 	
 	  END IF;
 
-	END IF;  
-
 	
-	IF ST_NumGeometries(face_geo) > 1 and ST_NumGeometries(face_geo) < 10 THEN
+	  IF ST_NumGeometries(face_geo) > 1 and ST_NumGeometries(face_geo) < 10 THEN
  	  RAISE NOTICE 'Face % for toplogy % is a multipolygon, we will check it, has % sub geos',_atopology, _face_id, ST_NumGeometries(face_geo);
  	  -- maybe we need to checkit
  	  --command_string = FORMAT('select f.mr from %1$s.face f where face_id = %2$s', _atopology, _face_id);
 	  --execute command_string into face_id_mbr;
  	  
-	  FOR i IN 1..ST_NumGeometries(face_geo) LOOP
+	    FOR i IN 1..ST_NumGeometries(face_geo) LOOP
 	     g2 := ST_GeometryN(face_geo, i);
 	     
 	       FOR i2 IN 1..ST_NumGeometries(g2) LOOP
@@ -100,21 +101,24 @@ BEGIN
       
 	   
       face_geo := ST_Collect(glist);
-	END IF;
+	  END IF;
 	  
 
-	IF face_geo is NULL THEN
-	  RAISE NOTICE 'Face for toplogy % with id % not used', _atopology, _face_id;
-	END IF;
+	  IF face_geo is NULL THEN
+	    RAISE NOTICE 'Face for toplogy % with id % not used', _atopology, _face_id;
+	  END IF;
 
+
+	END IF;  
+	
     EXCEPTION WHEN OTHERS THEN
 	    GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
                     v_context = PG_EXCEPTION_CONTEXT;
         RAISE NOTICE 'Failed failed to area for face_id % in topo % state  : %  message: % detail : % hint   : % context: %', 
         _face_id, _atopology, v_state, v_msg, v_detail, v_hint, v_context;
-      face_geo := null;
+      face_geo_ok := null;
     END;
-  RETURN face_geo;
+  RETURN face_geo_ok;
 END;
 
 $$

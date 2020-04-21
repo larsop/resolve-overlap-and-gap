@@ -1,56 +1,74 @@
--- Test 1 -------------
--- This is test that does a obverlap and gap test on overlap_gap_input_t1.sql
+CREATE EXTENSION dblink; -- needed by  execute_parallel
 
--- Test that input data are ok
-SELECT '1 spheroid-true', count(*), ROUND(sum(st_area(geom,true))::numeric,0) from test_data.overlap_gap_input_t1;
-SELECT '1 transform 3035', count(*), ROUND(sum(st_area(ST_Transform(geom,3035)))::numeric,0) from test_data.overlap_gap_input_t1;
+-- Create data test case degrees
+CREATE table test_data.overlap_gap_input_t2 AS (SELECT * from test_data.overlap_gap_input_t1 WHERE c1 in (633,1233,1231,834));
 
--- Pipe output sql to a file to execute later - \o /tmp/run_cmd.sql does not work in Travis
-SELECT find_overlap_gap_make_run_cmd('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',50);
+-- Create data test case meter and new column names
+CREATE table test_data.overlap_gap_input_t3 AS (SELECT distinct c1 as c1t3, c2 as c2t3, c3, ST_transform(geom,25833)::Geometry(Polygon,25833) as geo from test_data.overlap_gap_input_t1 WHERE c1 in (633,1233,1231,834));
 
--- Run with GNU parallel (Does not work on travis. Have to install paralell)
--- \! parallel -j 4  psql nibio_reg  -c :::: /tmp/run_cmd.sql > /tmp/run_cmd_result.log
+-- Call function to resolve overlap and gap in the function in test_data.overlap_gap_input_t1 which we just testet for overlap
+CALL resolve_overlap_gap_run(
+('test_data.overlap_gap_input_t2','c1','geom',4258,false), -- TYPE resolve_overlap_data_input
+('test_topo_t2',0.00001), -- TYPE resolve_overlap_data_topology
+resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
+49,  -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
+0, -- is this is more than zero simply will called with
+null, -- _max_average_vertex_length, in meter both for utm and deegrees, this used to avoid running ST_simplifyPreserveTopology for long lines lines with few points
+0, -- IF 0 NO CHAKINS WILL BE DONE A big value here make no sense because the number of points will increaes exponential )
+10000, --edge that are longer than this value will not be touched by _chaikins_min_degrees and _chaikins_max_degrees  
+120, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
+240, -- OR the angle has to be greather than this given value, This is used to avoid to touch all angles 
+40, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
+320 -- OR The angle has to be greather than this given value, This is used to avoid to touch all angles 
+)
+,5,4);
 
--- So we use single calls instead
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',1,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',2,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',3,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',4,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',5,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',6,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',7,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',8,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',9,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',10,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',11,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',12,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',13,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',14,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',15,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',16,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',17,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',18,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',19,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',20,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',21,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',22,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',23,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',24,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',25,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',26,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',27,28);
-SELECT find_overlap_gap_single_cell('test_data.overlap_gap_input_t1','geom',4258,'test_data.overlap_gap_input_t1_res',28,28);
+SELECT 'degrees_check_failed_lines', count(geo) from test_topo_t2.overlap_gap_input_t2_no_cut_line_failed;
 
--- Check the result
-SELECT 'check overlap table', count(*) num_overlap, ROUND(sum(st_area(ST_Transform(geom,3035)))::numeric,0) from (SELECT  (ST_dump(geom)).geom as geom, cell_id 
-from test_data.overlap_gap_input_t1_res_overlap) as r where ST_Area(geom) >0;                  
+SELECT 'degrees_check_border_lines', count(geo) from test_topo_t2.overlap_gap_input_t2_border_line_segments;
 
-SELECT 'check gap table',  count(*) num_gap, ROUND(sum(st_area(ST_Transform(geom,3035)))::numeric,0) 
-from (SELECT  (ST_dump(geom)).geom as geom, cell_id from test_data.overlap_gap_input_t1_res_gap) as r;                  
+--SELECT 'degrees_check_added_lines', count(geom) from test_topo_t2.edge;
 
-SELECT 'check grid table',  count(*) num_grid, ROUND(sum(st_area(ST_Transform(geom,3035)))::numeric,0) from (SELECT  (ST_dump(geom)).geom as geom, id 
-from test_data.overlap_gap_input_t1_res_grid) as r;                  
+SELECT 'degrees_check_added_faces', count(mbr) from test_topo_t2.face;
 
-SELECT 'check boundery table',  count(*) num_boudery, ROUND(sum(st_area(ST_Transform(geom,3035)))::numeric,0) from (SELECT  (ST_dump(geom)).geom as geom, id 
-from test_data.overlap_gap_input_t1_res_boundery) as r;                  
+SELECT 'degrees_check_added_simple_feature_geom', count(*) from test_topo_t2.overlap_gap_input_t2_result where geom is not null;
+
+SELECT 'degrees_check_added_simple_feature_c1', count(*) from test_topo_t2.overlap_gap_input_t2_result where c1 is not null;
+
+SELECT 'degrees_check_added_simple_feature_c2', count(*) from test_topo_t2.overlap_gap_input_t2_result where c2 is not null;
+
+SELECT 'degrees_check_added_simple_feature_c3', count(*) from test_topo_t2.overlap_gap_input_t2_result where c3 is not null;
+
+SELECT 'degrees', topology.droptopology('test_topo_t2');
+
+
+-- Call function to resolve overlap and gap in the function in test_data.overlap_gap_input_t1 which we just testet for overlap
+CALL resolve_overlap_gap_run(
+('test_data.overlap_gap_input_t3','c1t3','geo',25833,true), -- TYPE resolve_overlap_data_input
+('test_topo_t3',1.0), -- TYPE resolve_overlap_data_topology
+resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
+49,  -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
+30, -- is this is more than zero simply will called with
+10000, -- _max_average_vertex_length, in meter both for utm and deegrees, this used to avoid running ST_simplifyPreserveTopology for long lines lines with few points
+1, -- IF 0 NO CHAKINS WILL BE DONE A big value here make no sense because the number of points will increaes exponential )
+10000, --edge that are longer than this value will not be touched by _chaikins_min_degrees and _chaikins_max_degrees  
+120, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
+240, -- OR the angle has to be greather than this given value, This is used to avoid to touch all angles 
+40, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
+320 -- OR The angle has to be greather than this given value, This is used to avoid to touch all angles 
+),
+5,4);
+
+SELECT 'utm_check_failed_lines', count(geo) from test_topo_t3.overlap_gap_input_t3_no_cut_line_failed;
+
+SELECT 'utm_check_border_lines', count(geo) from test_topo_t3.overlap_gap_input_t3_border_line_segments;
+
+--SELECT 'utm_check_added_lines', count(geom) from test_topo_t3.edge;
+
+SELECT 'utm_check_added_faces', count(mbr) from test_topo_t3.face;
+
+SELECT 'utm_check_added_simple_feature_polygons', count(*) from test_topo_t3.overlap_gap_input_t3_result;
+
+SELECT 'utm', topology.droptopology('test_topo_t3');
+
 

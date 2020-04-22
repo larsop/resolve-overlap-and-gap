@@ -60,8 +60,12 @@ BEGIN
             e1.start_node != e1.end_node and
             e2.start_node != e2.end_node and --to avoid a closed surface ending in a line 
 
-            e2.left_face = e1.left_face and
-            e2.right_face = e1.right_face and
+            -- we have to add this because we have big face that covers very man polygons
+            -- and then an edge should be healded even if two face on the sane are not equal
+            (
+              (e2.left_face = e1.left_face and e2.right_face = e1.right_face ) or 
+              (e2.left_face = e2.right_face or e1.left_face = e1.right_face)
+            ) and
 
             ST_CoveredBy(n1.geom,%2$L) 
         ) as r
@@ -120,4 +124,3 @@ END
 $function$;
 
 
---select topo_update.do_healedges_no_block('topo_sr16_trl_07','0103000020E96400000100000005000000000000007223174100000058364C5B410000000072231741000000583C4C5B41000000C031841741000000583C4C5B41000000C03184174100000058364C5B41000000007223174100000058364C5B41');

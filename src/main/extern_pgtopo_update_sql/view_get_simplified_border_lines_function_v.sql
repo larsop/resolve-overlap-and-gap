@@ -30,7 +30,7 @@ DECLARE
   boundary_glue_geom geometry;
 
   -- The inpux
-  boundary_with float = _topology_snap_tolerance;
+  boundary_with float = _topology_snap_tolerance*1.1;
   glue_boundary_with float = _topology_snap_tolerance * cell_boundary_tolerance_with_multi;
   overlap_width_inner float = 0;
   try_update_invalid_rows int;
@@ -38,6 +38,8 @@ DECLARE
   _max_point_in_line int = 10000;
   
 BEGIN
+	
+	
   -- buffer in to work with geom that lines are only meter from the border
   -- will only work with polygons
   -- make the the polygon that contains lines	that will be added in the post process

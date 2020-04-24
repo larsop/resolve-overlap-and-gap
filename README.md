@@ -8,6 +8,8 @@ This function now depend on
 - https://github.com/larsop/postgres_execute_parallel
 - https://github.com/larsop/content_balanced_grid
 
+To test checkout code
+git clone --recursive https://github.com/larsop/resolve-overlap-and-gap.git
 
 [![Build Status](https://travis-ci.org/larsop/resolve-overlap-and-gap.svg?branch=master)](https://travis-ci.org/larsop/resolve-overlap-and-gap)
 

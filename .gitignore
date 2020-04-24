@@ -1,0 +1,4 @@
+src/test/sql/loader/
+src/test/sql/raster/
+src/test/sql/regress/resolve_overlap_and_gap-pre-def.sql
+src/test/sql/regress/resolve_overlap_and_gap-pre.sql

@@ -556,7 +556,7 @@ BEGIN
       -- add border smale border lines
       command_string := Format('SELECT topo_update.add_border_lines(%1$L,geo,%2$s,%3$L) from temp_left_over_borders group by geo order by ST_Length(geo) asc', 
       _topology_name, snap_tolerance_fixed, _table_name_result_prefix);
-      EXECUTE command_string;
+--      EXECUTE command_string;
 
       EXECUTE command_string into line_edges_added;
       RAISE NOTICE 'Added edges for border lines for box % into line_edges_added %',  box_id, line_edges_added;

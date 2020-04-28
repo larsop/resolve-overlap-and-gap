@@ -63,121 +63,67 @@ BEGIN
  	FROM %1$s v
  	where ST_Intersects(v.%3$s,%2$L)
  	),
- 	lines as (select distinct (ST_Dump(geom)).geom as geom from rings)
+ 	lines as 
+    (
+    select distinct (ST_Dump(geom)).geom as geom 
+    from rings
+    ),
+    my_lines as 
+    (
+    select min(g.id) as min_id, l.geom 
+    from lines l,
+    %5$s g
+    where ST_Intersects(l.geom,g.%3$s)
+    group by l.geom 
+    )
+
  	select 
-     ST_Multi(ST_RemoveRepeatedPoints (geom,%4$s)) as geom, 
-     ST_NPoints(geom) as npoints,
-     ST_Intersects(geom,%5$L) as touch_outside 
-    from lines where  ST_IsEmpty(geom) is false', 
- 	_input_table_name, bb_boundary_outer, _input_table_geo_column_name, _topology_snap_tolerance, _bb);
+     ST_Multi(ST_RemoveRepeatedPoints (l.geom,%4$s)) as geom, 
+     ST_NPoints(l.geom) as npoints,
+     (ST_CoveredBy(l.geom,%6$L) = false) as touch_outside
+    from 
+    my_lines l,
+    %5$s g
+    where g.%3$s = %2$L and ST_IsEmpty(l.geom) is false and l.min_id = g.id
+    ', 
+ 	_input_table_name, _bb, _input_table_geo_column_name, _topology_snap_tolerance,
+ 	_table_name_result_prefix||'_grid', bb_boundary_inner
+ 	);
   EXECUTE command_string;
   command_string := Format('create index %1$s on tmp_data_all_lines using gist(geom)', 'idx1' || Md5(ST_AsBinary (_bb)));
   EXECUTE command_string;
+
   
+
   -- insert lines with more than max point
-  EXECUTE Format('INSERT INTO %s (geo)
-    SELECT r.geom as geo
-    FROM tmp_data_all_lines r
-    WHERE npoints > %s and touch_outside = true and ST_StartPoint(r.geom) && %L'
-  ,_table_name_result_prefix||'_border_line_many_points', _max_point_in_line, _bb);
-  
-  DELETE FROM tmp_data_all_lines r
-  where npoints > _max_point_in_line and touch_outside = true and ST_StartPoint(r.geom) && _bb;
-      
-  
+  EXECUTE Format('WITH long_lines AS 
+    (DELETE FROM tmp_data_all_lines r where npoints >  %2$s and touch_outside = true RETURNING geom) 
+    INSERT INTO %1$s (geo) SELECT distinct (ST_dump(geom)).geom as geo from long_lines'
+  ,_table_name_result_prefix||'_border_line_many_points', _max_point_in_line);
+
+    
   -- 1 make line parts for inner box
   -- holds the lines inside bb_boundary_inner
   --#############################
   DROP TABLE IF EXISTS tmp_inner_lines_final_result;
   CREATE temp TABLE tmp_inner_lines_final_result AS (
-    SELECT (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_Intersection (rings.geom, bb_inner_glue_geom)))))).geom as geo,
+    SELECT (ST_Dump(ST_Multi(ST_LineMerge(ST_union(rings.geom))))).geom as geo,
  --   SELECT (ST_Dump (ST_Intersection (rings.geom, bb_inner_glue_geom ) ) ).geom AS geo,
     0 AS line_type
-    FROM tmp_data_all_lines AS rings
+    FROM tmp_data_all_lines as rings where touch_outside = false 
   );
     
---  IF (_topology_snap_tolerance > 0 AND _do_chaikins IS TRUE) THEN
---    UPDATE
---      tmp_inner_lines_final_result  lg
---    SET geo = ST_simplifyPreserveTopology (topo_update.chaikinsAcuteAngle (lg.geo, 120, 240), _topology_snap_tolerance);
---    RAISE NOTICE ' do snap_tolerance % and do do_chaikins %', _topology_snap_tolerance, _do_chaikins;
---    -- TODO send paratmeter if this org data or not. _do_chaikins
---    -- insert into tmp_inner_lines_final_result (geo,line_type)
---    -- SELECT e1.geom as geo , 2 as line_type from  topo_ar5_forest_sysdata.edge e1
---    -- where e1.geom && bb_inner_glue_geom;
---  ELSE
---    IF (_topology_snap_tolerance > 0) THEN
---      UPDATE
---        tmp_inner_lines_final_result  lg
---     SET geo = ST_simplifyPreserveTopology (lg.geo, _topology_snap_tolerance);
---      RAISE NOTICE ' do snap_tolerance % and not do do_chaikins %', _topology_snap_tolerance, _do_chaikins;
---    END IF;
---    --update tmp_inner_lines_final_result  lg
---    --set geo = ST_Segmentize(geo, 1);
---  END IF;
-
-  -- make linns for glue parts.
-  --#############################
-  DROP TABLE IF EXISTS tmp_boundary_line_type_parts;
-  CREATE temp TABLE tmp_boundary_line_type_parts AS (
-    SELECT (ST_Dump (ST_Intersection (rings.geom, boundary_glue_geom ) ) ).geom AS geo
-    FROM tmp_data_all_lines AS rings
-    );
-    
-    
-  DROP TABLE IF EXISTS tmp_boundary_line_types_merged;
-  CREATE temp TABLE tmp_boundary_line_types_merged AS (
-    SELECT distinct r.geo, 1 AS line_type
-    FROM (
-    SELECT (ST_Dump (ST_LineMerge (ST_Union (lg.geo ) ) ) ).geom AS geo
-    FROM tmp_boundary_line_type_parts AS lg ) r
-  );
-  
-  
- -- Try to fix invalid lines
-  UPDATE tmp_inner_lines_final_result  r 
-  SET geo = ST_MakeValid(r.geo)
-  WHERE ST_IsValid (r.geo) = FALSE; 
-  GET DIAGNOSTICS try_update_invalid_rows = ROW_COUNT;
-  IF  try_update_invalid_rows > 0 THEN
-    -- log error lines
-    EXECUTE Format('INSERT INTO %s (error_info, geo)
-    SELECT %L AS error_info, r.geo
-    FROM tmp_inner_lines_final_result  r
-    WHERE ST_IsValid (r.geo) = FALSE',_table_name_result_prefix||'_no_cut_line_failed','Failed to make valid input border line in tmp_inner_lines_final_result ');
-    
-    INSERT INTO tmp_inner_lines_final_result  (geo, line_type)
-    SELECT r.geo, 1 AS line_type
-    FROM tmp_boundary_line_types_merged r
-    WHERE ST_ISvalid (r.geo);
-
-  ELSE
-  
-    INSERT INTO tmp_inner_lines_final_result  (geo, line_type)
-    SELECT r.geo, 1 AS line_type
-    FROM tmp_boundary_line_types_merged r;
-    
-  END IF; 
-  
-
-  
   
   -- make line part for outer box, that contains the line parts will be added add the final stage when all the cell are done.
   --#############################
   DROP TABLE IF EXISTS tmp_boundary_line_parts;
   CREATE temp TABLE tmp_boundary_line_parts AS (
-    SELECT (ST_Dump (ST_Intersection (rings.geom, boundary_geom ) ) ).geom AS geo
-    FROM tmp_data_all_lines AS rings );
-    
-  DROP TABLE IF EXISTS tmp_boundary_lines_merged;
-  CREATE temp TABLE tmp_boundary_lines_merged AS (
-    SELECT (ST_Dump (ST_LineMerge (ST_Union (lg.geo ) ) ) ).geom AS geo
-    FROM tmp_boundary_line_parts AS lg
-    );
-
+    SELECT (ST_Dump (rings.geom) ).geom AS geo
+    FROM tmp_data_all_lines AS rings where touch_outside = true );
+ 
 
      -- Try to fix invalid lines
-  UPDATE tmp_boundary_lines_merged r 
+  UPDATE tmp_boundary_line_parts r 
   SET geo = ST_MakeValid(r.geo)
   WHERE ST_IsValid (r.geo) = FALSE; 
   GET DIAGNOSTICS try_update_invalid_rows = ROW_COUNT;
@@ -185,14 +131,14 @@ BEGIN
     -- log error lines
     EXECUTE Format('INSERT INTO %s (error_info, geo)
     SELECT %L AS error_info, r.geo
-    FROM tmp_boundary_lines_merged r
+    FROM tmp_boundary_line_parts r
     WHERE ST_IsValid (r.geo) = FALSE',_table_name_result_prefix||'_no_cut_line_failed','Failed to make valid input border line for tmp_boundary_lines_merged' );
     
     EXECUTE Format('INSERT INTO %s (geo, point_geo)
     SELECT r.geo, NULL AS point_geo
     FROM (
     SELECT r.geo
-    FROM tmp_boundary_lines_merged r
+    FROM tmp_boundary_line_parts r
     WHERE ST_IsValid (r.geo) IS TRUE) AS r',_table_name_result_prefix||'_border_line_segments');
 
   ELSE
@@ -201,7 +147,7 @@ BEGIN
     SELECT r.geo, NULL AS point_geo
     FROM (
     SELECT r.geo
-    FROM tmp_boundary_lines_merged r) AS r',_table_name_result_prefix||'_border_line_segments');
+    FROM tmp_boundary_line_parts r) AS r',_table_name_result_prefix||'_border_line_segments');
 
   END IF; 
 

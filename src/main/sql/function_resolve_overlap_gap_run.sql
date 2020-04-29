@@ -110,7 +110,9 @@ BEGIN
       table_name_result_prefix,
       table_name_result_prefix||'_border_line_many_points');
       EXECUTE command_string;
-      
+
+      COMMIT;
+
     END IF;
     
     command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%L,%s)', 

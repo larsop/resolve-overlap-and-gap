@@ -79,8 +79,7 @@ BEGIN
 
  	select 
      ST_Multi(ST_RemoveRepeatedPoints (l.geom,%4$s)) as geom, 
-     ST_NPoints(l.geom) as npoints,
-     ST_Intersects(l.geom,%6$L) as touch_outside 
+     ST_NPoints(l.geom) as npoints 
     from 
     my_lines l,
     %5$s g
@@ -97,9 +96,9 @@ BEGIN
 
   -- insert lines with more than max point
   EXECUTE Format('WITH long_lines AS 
-    (DELETE FROM tmp_data_all_lines r where npoints >  %2$s and touch_outside = true RETURNING geom) 
+    (DELETE FROM tmp_data_all_lines r where npoints >  %2$s and ST_Intersects(geom,%3$L) RETURNING geom) 
     INSERT INTO %1$s (geo) SELECT distinct (ST_dump(geom)).geom as geo from long_lines'
-  ,_table_name_result_prefix||'_border_line_many_points', _max_point_in_line);
+  ,_table_name_result_prefix||'_border_line_many_points', _max_point_in_line, ST_ExteriorRing(_bb));
 
     
   -- 1 make line parts for inner box
@@ -107,21 +106,22 @@ BEGIN
   --#############################
   DROP TABLE IF EXISTS tmp_inner_lines_final_result;
   CREATE temp TABLE tmp_inner_lines_final_result AS (
-    SELECT (ST_Dump(ST_Multi(ST_LineMerge(ST_union(rings.geom))))).geom as geo,
- --   SELECT (ST_Dump (ST_Intersection (rings.geom, bb_inner_glue_geom ) ) ).geom AS geo,
-    0 AS line_type
-    FROM tmp_data_all_lines as rings where touch_outside = false 
+    SELECT r.geo, 0 AS line_type FROM (
+    SELECT(ST_Dump(ST_Multi(ST_LineMerge(ST_union(rings.geom))))).geom as geo
+    FROM tmp_data_all_lines AS rings 
+    ) as r WHERE ST_CoveredBy(r.geo,_bb)
   );
-    
   
   -- make line part for outer box, that contains the line parts will be added add the final stage when all the cell are done.
   --#############################
   DROP TABLE IF EXISTS tmp_boundary_line_parts;
   CREATE temp TABLE tmp_boundary_line_parts AS (
-    SELECT (ST_Dump (rings.geom) ).geom AS geo
-    FROM tmp_data_all_lines AS rings where touch_outside = true );
+    SELECT r.geo FROM (
+    SELECT(ST_Dump(ST_Multi(ST_LineMerge(ST_union(rings.geom))))).geom as geo
+    FROM tmp_data_all_lines AS rings 
+    ) as r WHERE ST_Intersects(r.geo,ST_ExteriorRing(_bb))
+  );
  
-
      -- Try to fix invalid lines
   UPDATE tmp_boundary_line_parts r 
   SET geo = ST_MakeValid(r.geo)
@@ -187,3 +187,15 @@ $function$;
 --,'1','test_topo_ar50_t11.ar50_utvikling_flate') g);
 --
 --alter table test_tmp_simplified_border_lines_2 add column id serial;
+
+drop table if exists test_tmp_simplified_border_lines_2 ;
+
+TRUNCATE topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata_border_line_segments ;
+
+create table test_tmp_simplified_border_lines_2 as 
+(select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
+FROM topo_update.get_simplified_border_lines('sl_kbj.trl_2019_test_segmenter_mindredata','geo',
+'0103000020E9640000010000000500000000000000C8520C4168C21B5B21B65A4100000000C8520C4148DFA49806BB5A4100000000DC060D4148DFA49806BB5A4100000000DC060D4168C21B5B21B65A4100000000C8520C4168C21B5B21B65A41'
+,'1','topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata') g);
+
+alter table test_tmp_simplified_border_lines_2 add column id serial;

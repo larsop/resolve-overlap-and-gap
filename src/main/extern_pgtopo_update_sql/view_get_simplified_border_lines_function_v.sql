@@ -80,7 +80,7 @@ BEGIN
  	select 
      ST_Multi(ST_RemoveRepeatedPoints (l.geom,%4$s)) as geom, 
      ST_NPoints(l.geom) as npoints,
-     (ST_CoveredBy(l.geom,%6$L) = false) as touch_outside
+     ST_Intersects(l.geom,%6$L) as touch_outside 
     from 
     my_lines l,
     %5$s g

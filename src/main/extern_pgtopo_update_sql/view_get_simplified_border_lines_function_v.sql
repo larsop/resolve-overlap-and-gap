@@ -87,7 +87,7 @@ BEGIN
     where g.%3$s = %2$L and ST_IsEmpty(l.geom) is false and l.min_id = g.id
     ', 
  	_input_table_name, _bb, _input_table_geo_column_name, _topology_snap_tolerance,
- 	_table_name_result_prefix||'_grid', bb_boundary_inner
+ 	_table_name_result_prefix||'_grid', ST_ExteriorRing(_bb)
  	);
   EXECUTE command_string;
   command_string := Format('create index %1$s on tmp_data_all_lines using gist(geom)', 'idx1' || Md5(ST_AsBinary (_bb)));

@@ -55,9 +55,9 @@ BEGIN
       SELECT ST_ExteriorRing (bb_boundary_inner) AS outer_ring), ARRAY (
         SELECT ST_ExteriorRing (bb_inner_glue_geom) AS inner_rings));
   -- holds the lines inside bb_boundary_inner
-  DROP TABLE IF EXISTS tmp_data_all_lines;
+  DROP TABLE IF EXISTS tmp_data_exterior_rings;
   -- get the all the line parts based the bb_boundary_outer
-  command_string := Format('CREATE temp table tmp_data_all_lines AS 
+  command_string := Format('CREATE temp table tmp_data_exterior_rings AS 
  	WITH rings AS (
  	SELECT ST_ExteriorRing((ST_DumpRings((st_dump(%3$s)).geom)).geom) as geom
  	FROM %1$s v
@@ -67,32 +67,47 @@ BEGIN
     (
     select distinct (ST_Dump(geom)).geom as geom 
     from rings
-    ),
-    my_lines as 
-    (
-    select min(g.id) as min_id, l.geom 
-    from lines l,
-    %5$s g
-    where ST_Intersects(l.geom,g.%3$s)
-    group by l.geom 
     )
-
  	select 
-     ST_Multi(ST_RemoveRepeatedPoints (l.geom,%4$s)) as geom, 
-     ST_NPoints(l.geom) as npoints 
+     ST_Multi(ST_RemoveRepeatedPoints (l.geom,%4$s)) as geom
     from 
-    my_lines l,
-    %5$s g
-    where g.%3$s = %2$L and ST_IsEmpty(l.geom) is false and l.min_id = g.id
-    ', 
+    rings l', 
  	_input_table_name, _bb, _input_table_geo_column_name, _topology_snap_tolerance,
  	_table_name_result_prefix||'_grid', ST_ExteriorRing(_bb)
  	);
   EXECUTE command_string;
+  
+ 
+  DROP TABLE IF EXISTS tmp_data_all_lines;
+  -- get the all the line parts based the bb_boundary_outer
+  command_string := Format('CREATE TEMP TABLE tmp_data_all_lines AS SELECT r.geom, ST_NPoints(r.geom) AS npoints 
+  FROM 
+  (
+  SELECT min(g.id) as min_id, l.geom FROM
+  ( SELECT(ST_Dump(ST_Multi(ST_LineMerge(ST_union(rings.geom))))).geom AS geom 
+    FROM tmp_data_exterior_rings rings
+  ) AS l,
+  %1$s g
+  where ST_Intersects(l.geom,g.%2$s)
+  group by l.geom
+  ) AS r,
+  %1$s g 
+  WHERE g.%2$s = %3$L and ST_IsEmpty(r.geom) is false and r.min_id = g.id', 
+  _table_name_result_prefix||'_grid', _input_table_geo_column_name, _bb);
+
+  EXECUTE command_string;
+
+  -- TODO user partion by
+  
+  UPDATE tmp_data_all_lines r 
+  SET geom = ST_MakeValid(r.geom)
+  WHERE ST_IsValid (r.geom) = FALSE; 
+
+  
+ 
   command_string := Format('create index %1$s on tmp_data_all_lines using gist(geom)', 'idx1' || Md5(ST_AsBinary (_bb)));
   EXECUTE command_string;
 
-  
 
   -- insert lines with more than max point
   EXECUTE Format('WITH long_lines AS 
@@ -105,51 +120,31 @@ BEGIN
   -- holds the lines inside bb_boundary_inner
   --#############################
   DROP TABLE IF EXISTS tmp_inner_lines_final_result;
-  CREATE temp TABLE tmp_inner_lines_final_result AS (
-    SELECT r.geo, 0 AS line_type FROM (
-    SELECT(ST_Dump(ST_Multi(ST_LineMerge(ST_union(rings.geom))))).geom as geo
-    FROM tmp_data_all_lines AS rings 
-    ) as r WHERE ST_CoveredBy(r.geo,_bb)
-  );
+  
+  CREATE temp TABLE tmp_inner_lines_final_result AS
+  WITH lr AS
+  (DELETE FROM tmp_data_all_lines l WHERE  ST_CoveredBy(l.geom,_bb) and ST_IsValid(l.geom) RETURNING geom)
+    SELECT lr.geom as geo, 0 AS line_type FROM lr;
   
   -- make line part for outer box, that contains the line parts will be added add the final stage when all the cell are done.
   --#############################
   DROP TABLE IF EXISTS tmp_boundary_line_parts;
-  CREATE temp TABLE tmp_boundary_line_parts AS (
-    SELECT r.geo FROM (
-    SELECT(ST_Dump(ST_Multi(ST_LineMerge(ST_union(rings.geom))))).geom as geo
-    FROM tmp_data_all_lines AS rings 
-    ) as r WHERE ST_Intersects(r.geo,ST_ExteriorRing(_bb))
-  );
+  CREATE temp TABLE tmp_boundary_line_parts AS
+  WITH lr AS
+  (DELETE FROM tmp_data_all_lines l WHERE  ST_Intersects(l.geom,ST_ExteriorRing(_bb)) and ST_IsValid(l.geom) RETURNING geom)
+    SELECT lr.geom as geom FROM lr;
  
-     -- Try to fix invalid lines
-  UPDATE tmp_boundary_line_parts r 
-  SET geo = ST_MakeValid(r.geo)
-  WHERE ST_IsValid (r.geo) = FALSE; 
-  GET DIAGNOSTICS try_update_invalid_rows = ROW_COUNT;
-  IF  try_update_invalid_rows > 0 THEN
     -- log error lines
-    EXECUTE Format('INSERT INTO %s (error_info, geo)
-    SELECT %L AS error_info, r.geo
-    FROM tmp_boundary_line_parts r
-    WHERE ST_IsValid (r.geo) = FALSE',_table_name_result_prefix||'_no_cut_line_failed','Failed to make valid input border line for tmp_boundary_lines_merged' );
+  EXECUTE Format('INSERT INTO %s (error_info, geo)
+  SELECT %L AS error_info, r.geom as geo
+  FROM tmp_data_all_lines r',
+  _table_name_result_prefix||'_no_cut_line_failed','Failed to make valid input border line for tmp_boundary_lines_merged' );
     
-    EXECUTE Format('INSERT INTO %s (geo, point_geo)
-    SELECT r.geo, NULL AS point_geo
-    FROM (
-    SELECT r.geo
-    FROM tmp_boundary_line_parts r
-    WHERE ST_IsValid (r.geo) IS TRUE) AS r',_table_name_result_prefix||'_border_line_segments');
 
-  ELSE
-
-    EXECUTE Format('INSERT INTO %s (geo, point_geo)
-    SELECT r.geo, NULL AS point_geo
-    FROM (
-    SELECT r.geo
-    FROM tmp_boundary_line_parts r) AS r',_table_name_result_prefix||'_border_line_segments');
-
-  END IF; 
+  EXECUTE Format('INSERT INTO %s (geo, point_geo)
+  SELECT r.geom as geo, NULL AS point_geo
+  FROM tmp_boundary_line_parts r'
+  ,_table_name_result_prefix||'_border_line_segments');
 
     
 
@@ -188,14 +183,14 @@ $function$;
 --
 --alter table test_tmp_simplified_border_lines_2 add column id serial;
 
-drop table if exists test_tmp_simplified_border_lines_2 ;
-
-TRUNCATE topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata_border_line_segments ;
-
-create table test_tmp_simplified_border_lines_2 as 
-(select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
-FROM topo_update.get_simplified_border_lines('sl_kbj.trl_2019_test_segmenter_mindredata','geo',
-'0103000020E9640000010000000500000000000000C8520C4168C21B5B21B65A4100000000C8520C4148DFA49806BB5A4100000000DC060D4148DFA49806BB5A4100000000DC060D4168C21B5B21B65A4100000000C8520C4168C21B5B21B65A41'
-,'1','topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata') g);
-
-alter table test_tmp_simplified_border_lines_2 add column id serial;
+--drop table if exists test_tmp_simplified_border_lines_2 ;
+--
+--TRUNCATE topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata_border_line_segments ;
+--
+--create table test_tmp_simplified_border_lines_2 as 
+--(select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
+--FROM topo_update.get_simplified_border_lines('sl_kbj.trl_2019_test_segmenter_mindredata','geo',
+--'0103000020E9640000010000000500000000000000F0BA0D4168C21B5B21B65A4100000000F0BA0D41D850E0F993B85A4100000000FA140E41D850E0F993B85A4100000000FA140E4168C21B5B21B65A4100000000F0BA0D4168C21B5B21B65A41'
+--,'1','topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata') g);
+--
+--alter table test_tmp_simplified_border_lines_2 add column id serial;

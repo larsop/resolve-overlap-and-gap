@@ -256,7 +256,7 @@ BEGIN
 
     command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
     border_topo_info.topology_name,_bb);
-    EXECUTE command_string;
+--    EXECUTE command_string;
     
     command_string = null;
     
@@ -332,7 +332,7 @@ BEGIN
       --heal border edges remove small polygins
       command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
       border_topo_info.topology_name,outer_cell_boundary_geom);
-      EXECUTE command_string;
+      --EXECUTE command_string;
     END IF;
 
     
@@ -399,7 +399,7 @@ BEGIN
 
      command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
      _topology_name, inner_cell_boundary_geom);
-     EXECUTE command_string;
+--     EXECUTE command_string;
 
 -- >WARNING:  terminating connection because of crash of another server process at character 29
 --< postgres, 2020-03-25 09:41:04 CET, resolve_cha, 2020-03-25 09:41:04.879 CET >DETAIL:  The postmaster has commanded this server process to roll back the current transaction and exit, because another server process exited abnormally and possibly corrupted shared memory.
@@ -529,7 +529,7 @@ BEGIN
     border_topo_info.topology_name := _topology_name;
 
     command_string := Format('CREATE TEMP table temp_left_over_borders as select geo FROM
-    (select (ST_Dump(ST_LineMerge(ST_Union(geo)))).geom as geo from topo_update.get_left_over_borders(%1$L,%2$L,%3$L,%4$L) as r) as r', 
+    (select geo from topo_update.get_left_over_borders(%1$L,%2$L,%3$L,%4$L) as r) as r', 
     overlapgap_grid, input_table_geo_column_name, _bb, _table_name_result_prefix,_topology_snap_tolerance*inner_cell_distance);
     EXECUTE command_string;
 

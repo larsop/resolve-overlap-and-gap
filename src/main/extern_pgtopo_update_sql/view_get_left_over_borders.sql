@@ -9,13 +9,25 @@ _table_name_result_prefix varchar
   LANGUAGE 'plpgsql'
   AS $function$
 DECLARE
+ command_string text;
 BEGIN
    	
-
-
-  RETURN QUERY EXECUTE ' DELETE FROM ' || _table_name_result_prefix||'_border_line_segments lg3
- 	WHERE ST_IsValid(lg3.geo) and ST_Intersects(lg3.geo,$1)
-    RETURNING lg3.geo '
-  USING _bb;
+  command_string := Format(' SELECT r.geo FROM
+    ( 
+    SELECT l.geo, min(g.id) as min_id 
+    FROM %1$s l,
+    %2$s g
+    where ST_Intersects(l.geo,g.cell_geo)
+    group by l.geo
+    ) AS r,
+    %2$s g 
+    WHERE ST_Intersects(g.cell_geo,  ST_PointOnSurface(%4$L)) and r.min_id = g.id',
+  _table_name_result_prefix||'_border_line_segments',
+  _table_name_result_prefix||'_job_list', 
+  _input_table_geo_column_name, 
+  _bb);
+  
+  RETURN QUERY EXECUTE command_string;
+  
 END
 $function$;

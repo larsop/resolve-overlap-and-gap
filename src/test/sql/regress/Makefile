@@ -1,6 +1,6 @@
 
 check: loader #00-regress
-	POSTGIS_REGRESS_DB=nibio_reg ./run_test.pl -v --spatial_ref_sys --extension --topology $(RUNTESTFLAGS) ./resolve_overlap_and_gap
+	POSTGIS_REGRESS_DB=nibio_reg ./run_test.pl -v --extension --topology $(RUNTESTFLAGS) ./resolve_overlap_and_gap
 
 loader:
 	mkdir -p ../loader; \

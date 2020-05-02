@@ -76,6 +76,19 @@ BEGIN
  	_table_name_result_prefix||'_grid', ST_ExteriorRing(_bb)
  	);
   EXECUTE command_string;
+
+   command_string := Format('INSERT INTO tmp_data_exterior_rings(geom)
+    SELECT geom FROM ( 
+    SELECT 
+ 	ST_ExteriorRing(v.%2$s) AS geom FROM
+    %1$s v,
+    tmp_data_exterior_rings r
+ 	where ST_Intersects(v.%2$s,r.geom)
+    ) AS r',
+ 	_input_table_name, _input_table_geo_column_name);
+  EXECUTE command_string;
+  
+  
   
  
   DROP TABLE IF EXISTS tmp_data_all_lines;
@@ -194,3 +207,27 @@ $function$;
 --,'1','topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata') g);
 --
 --alter table test_tmp_simplified_border_lines_2 add column id serial;
+
+--\timing
+--drop table if exists test_tmp_simplified_border_lines_1 ;
+--
+--TRUNCATE topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata_border_line_segments ;
+--
+--create table test_tmp_simplified_border_lines_1 as 
+--(select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
+--FROM topo_update.get_simplified_border_lines('sl_kbj.trl_2019_test_segmenter_mindredata','geo',
+--'0103000020E9640000010000000500000000000000FA140E4154C404F028CC5A4100000000FA140E41C452C98E9BCE5A4100000000046F0E41C452C98E9BCE5A4100000000046F0E4154C404F028CC5A4100000000FA140E4154C404F028CC5A41'
+--,'1','topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata') g);
+--
+--alter table test_tmp_simplified_border_lines_1 add column id serial;
+--
+--drop table if exists test_tmp_simplified_border_lines_2 ;
+--
+--create table test_tmp_simplified_border_lines_2 as 
+--(select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
+--FROM topo_update.get_simplified_border_lines('sl_kbj.trl_2019_test_segmenter_mindredata','geo',
+--'0103000020E9640000010000000500000000000000F0BA0D4154C404F028CC5A4100000000F0BA0D41C452C98E9BCE5A4100000000FA140E41C452C98E9BCE5A4100000000FA140E4154C404F028CC5A4100000000F0BA0D4154C404F028CC5A41'
+--,'1','topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata') g);
+--
+--alter table test_tmp_simplified_border_lines_2 add column id serial;
+	

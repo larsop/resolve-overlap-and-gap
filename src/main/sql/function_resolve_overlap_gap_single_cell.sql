@@ -267,16 +267,20 @@ BEGIN
         FROM 
           %1$s.edge_data e1,
           %1$s.face e1fl,
-          %1$s.face e1fr
+          %1$s.face e1fr,
+          %3$s b
         WHERE
 	      (e1fl.mbr && %2$L OR e1fr.mbr && %2$L) and 
    		  (ST_CoveredBy(e1fl.mbr,%2$L) OR ST_CoveredBy(e1fr.mbr,%2$L)) and 
           e1.left_face != e1.right_face and
           e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face and
-          e1.left_face != 0 AND e1.right_face != 0
+          ST_Intersects(b.%4$s,%5$L) AND NOT ST_Touches(b.%4$s,e1.geom)
         ) e)',
         border_topo_info.topology_name, 
-        inner_cell_geom);
+        inner_cell_geom,
+        input_table_name,
+        input_table_geo_column_name,
+        ST_ExteriorRing(_bb));
         EXECUTE command_string into edgelist_to_change;
 
         
@@ -308,15 +312,20 @@ BEGIN
       FROM 
         %1$s.edge_data e1,
         %1$s.face e1fl,
-        %1$s.face e1fr
+        %1$s.face e1fr,
+        %7$s b
       WHERE
 	    (e1fl.mbr && %2$L OR e1fr.mbr && %2$L) and 
    		(ST_CoveredBy(e1fl.mbr,%2$L) OR ST_CoveredBy(e1fr.mbr,%2$L)) and 
         e1.left_face != e1.right_face and
         e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face and
-        e1.left_face != 0 AND e1.right_face != 0
+        ST_Intersects(b.%8$s,%9$L) AND NOT ST_Touches(b.%8$s,e1.geom)
       ) e',
-      border_topo_info.topology_name, inner_cell_geom, _utm, _clean_info,_topology_snap_tolerance/2, (_clean_info).simplify_max_average_vertex_length);
+      border_topo_info.topology_name, inner_cell_geom, _utm, _clean_info,_topology_snap_tolerance/2, 
+      (_clean_info).simplify_max_average_vertex_length,
+      input_table_name,
+      input_table_geo_column_name,
+      ST_ExteriorRing(_bb));
       EXECUTE command_string;
     END IF;
      

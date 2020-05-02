@@ -272,9 +272,11 @@ BEGIN
 	      (e1fl.mbr && %2$L OR e1fr.mbr && %2$L) and 
    		  (ST_CoveredBy(e1fl.mbr,%2$L) OR ST_CoveredBy(e1fr.mbr,%2$L)) and 
           e1.left_face != e1.right_face and
-          e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face
+          e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face and
+          e1.left_face != 0 AND e1.right_face != 0
         ) e)',
-        border_topo_info.topology_name, inner_cell_geom);
+        border_topo_info.topology_name, 
+        inner_cell_geom);
         EXECUTE command_string into edgelist_to_change;
 
         
@@ -311,7 +313,8 @@ BEGIN
 	    (e1fl.mbr && %2$L OR e1fr.mbr && %2$L) and 
    		(ST_CoveredBy(e1fl.mbr,%2$L) OR ST_CoveredBy(e1fr.mbr,%2$L)) and 
         e1.left_face != e1.right_face and
-        e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face
+        e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face and
+        e1.left_face != 0 AND e1.right_face != 0
       ) e',
       border_topo_info.topology_name, inner_cell_geom, _utm, _clean_info,_topology_snap_tolerance/2, (_clean_info).simplify_max_average_vertex_length);
       EXECUTE command_string;

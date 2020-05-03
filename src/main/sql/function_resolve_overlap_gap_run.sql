@@ -97,7 +97,7 @@ BEGIN
   --    EXECUTE command_string;
   --  END IF;
 
-    IF cell_job_type = 4 THEN
+    IF cell_job_type = 3 THEN
       -- try fixed failed lines before make simple feature in single thread
       command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L) from %4$s r where line_geo_lost = true' , 
       (_topology_info).topology_name, (_topology_info).topology_snap_tolerance, table_name_result_prefix, table_name_result_prefix||'_no_cut_line_failed');
@@ -120,7 +120,7 @@ BEGIN
     EXECUTE command_string;
     COMMIT;
 
-    --EXIT WHEN cell_job_type = 3;
+    --EXIT WHEN cell_job_type = 4;
     
     loop_number := 1;
     last_run_stmts := 0;
@@ -159,8 +159,12 @@ BEGIN
       
       RAISE NOTICE 'Start to run overlap for % stmts_final and gap for table % cell_job_type % at loop_number %', 
       Array_length(stmts_final, 1), (_input).table_to_resolve, cell_job_type, loop_number;
-
-      SELECT execute_parallel (stmts_final, _max_parallel_jobs,true) INTO call_result;
+      
+      IF cell_job_type = 3 THEN
+        SELECT execute_parallel (stmts_final, 1,true) INTO call_result;
+      ELSE 
+        SELECT execute_parallel (stmts_final, _max_parallel_jobs,true) INTO call_result;
+      END IF;
       IF (call_result = FALSE AND last_run_stmts = Array_length(stmts, 1)) THEN
         RAISE EXCEPTION 'FFailed to run overlap and gap for % at loop_number % for the following statement list %', 
         (_input).table_to_resolve, loop_number, stmts_final;

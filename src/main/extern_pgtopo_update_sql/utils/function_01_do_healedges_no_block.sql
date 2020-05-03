@@ -62,11 +62,11 @@ BEGIN
 
             -- we have to add this because we have big face that covers very man polygons
             -- and then an edge should be healded even if two face on the sane are not equal
-            (
-              (e2.left_face = e1.left_face and e2.right_face = e1.right_face ) or 
-              (e2.left_face = e2.right_face or e1.left_face = e1.right_face)
-            ) and
-
+            --(
+            --  (e2.left_face = e1.left_face and e2.right_face = e1.right_face ) or 
+            --  (e2.left_face = e2.right_face or e1.left_face = e1.right_face)
+            --) and
+            e2.left_face = e1.left_face and e2.right_face = e1.right_face and
             ST_CoveredBy(n1.geom,%2$L) 
         ) as r
         ) as r

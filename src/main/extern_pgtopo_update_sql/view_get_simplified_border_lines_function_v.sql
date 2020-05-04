@@ -55,7 +55,6 @@ BEGIN
       SELECT ST_ExteriorRing (bb_boundary_inner) AS outer_ring), ARRAY (
         SELECT ST_ExteriorRing (bb_inner_glue_geom) AS inner_rings));
   -- holds the lines inside bb_boundary_inner
-  DROP TABLE IF EXISTS tmp_data_exterior_rings;
   -- get the all the line parts based the bb_boundary_outer
   command_string := Format('CREATE temp table tmp_data_exterior_rings AS 
  	WITH rings AS (
@@ -78,20 +77,19 @@ BEGIN
   EXECUTE command_string;
 
    command_string := Format('INSERT INTO tmp_data_exterior_rings(geom)
-    SELECT geom FROM ( 
+    SELECT distinct geom FROM ( 
     SELECT 
  	ST_ExteriorRing(v.%2$s) AS geom FROM
     %1$s v,
-    tmp_data_exterior_rings r
+    (select geom from tmp_data_exterior_rings r where ST_Intersects(r.geom,%3$L)) as r
  	where ST_Intersects(v.%2$s,r.geom)
     ) AS r',
- 	_input_table_name, _input_table_geo_column_name);
+ 	_input_table_name, _input_table_geo_column_name,ST_ExteriorRing(_bb) );
   EXECUTE command_string;
   
   
   
  
-  DROP TABLE IF EXISTS tmp_data_all_lines;
   -- get the all the line parts based the bb_boundary_outer
   command_string := Format('CREATE TEMP TABLE tmp_data_all_lines AS SELECT r.geom, ST_NPoints(r.geom) AS npoints 
   FROM 
@@ -126,13 +124,12 @@ BEGIN
   EXECUTE Format('WITH long_lines AS 
     (DELETE FROM tmp_data_all_lines r where npoints >  %2$s and ST_Intersects(geom,%3$L) RETURNING geom) 
     INSERT INTO %1$s (geo) SELECT distinct (ST_dump(geom)).geom as geo from long_lines'
-  ,_table_name_result_prefix||'_border_line_many_points', _max_point_in_line, ST_ExteriorRing(_bb));
+  ,_table_name_result_prefix||'_border_line_many_points', _max_point_in_line, ST_ExteriorRing(_bb) );
 
     
   -- 1 make line parts for inner box
   -- holds the lines inside bb_boundary_inner
   --#############################
-  DROP TABLE IF EXISTS tmp_inner_lines_final_result;
   
   CREATE temp TABLE tmp_inner_lines_final_result AS
   WITH lr AS
@@ -141,7 +138,7 @@ BEGIN
   
   -- make line part for outer box, that contains the line parts will be added add the final stage when all the cell are done.
   --#############################
-  DROP TABLE IF EXISTS tmp_boundary_line_parts;
+ 
   CREATE temp TABLE tmp_boundary_line_parts AS
   WITH lr AS
   (DELETE FROM tmp_data_all_lines l WHERE  ST_Intersects(l.geom,ST_ExteriorRing(_bb)) and ST_IsValid(l.geom) RETURNING geom)

@@ -364,7 +364,13 @@ foreach $TEST (@ARGV)
 	start_test($TEST);
 
 	# Check for a "-pre.pl" file in case there are setup commands 
-    eval_file("${TEST}-pre.pl");
+  eval_file("${TEST}-pre.pl");
+  unless ( eval_file("${TEST}-pre.pl") )
+  {
+    chop($@);
+    fail("Failed evaluating ${TEST}-pre.pl: $@");
+    next;
+  }
 
 	# Check for a "-pre.sql" file in case there is setup SQL needed before
 	# the test can be run.
@@ -610,12 +616,10 @@ sub eval_file
     my $pl;
     if ( -r $file )
     {
-        #open(PL, $file);
-        #$pl = <PL>;
-        #close(PL);
-        #eval($pl);
-				do $file;
+        #system($^X, $file) == 0 or return 0;
+				do $file or return 0;
     }
+    return 1;
 }
 
 ##################################################################

@@ -36,6 +36,8 @@ DECLARE
   
   _max_point_in_line int = 10000;
   
+  cell_id int;
+  
 BEGIN
 	
 	
@@ -55,116 +57,91 @@ BEGIN
         SELECT ST_ExteriorRing (bb_inner_glue_geom) AS inner_rings));
   -- holds the lines inside bb_boundary_inner
   -- get the all the line parts based the bb_boundary_outer
-  command_string := Format('CREATE temp table tmp_data_exterior_rings AS 
- 	WITH rings AS (
- 	SELECT ST_ExteriorRing((ST_DumpRings((st_dump(%3$s)).geom)).geom) as geom
- 	FROM %1$s v
- 	where ST_Intersects(v.%3$s,%2$L)
+  command_string := Format('CREATE TEMP TABLE tmp_data_all_lines AS WITH 
+    rings AS (
+ 	  SELECT ST_ExteriorRing((ST_DumpRings((st_dump(%3$s)).geom)).geom) as geom
+ 	  FROM %1$s v
+ 	  where ST_Intersects(v.%3$s,%2$L)
  	),
- 	lines as 
-    (
-    select distinct (ST_Dump(geom)).geom as geom 
-    from rings
-    )
- 	select 
-     ST_Multi(ST_RemoveRepeatedPoints (l.geom,%4$s)) as geom
-    from 
-    rings l', 
- 	_input_table_name, _bb, _input_table_geo_column_name, _topology_snap_tolerance,
- 	_table_name_result_prefix||'_grid', ST_ExteriorRing(_bb)
+ 	lines as (
+      SELECT( ST_Dump(ST_Multi(ST_LineMerge(ST_union(rings.geom))))).geom 
+      from rings
+    ),
+    tmp_data_this_cell_lines AS (
+      SELECT 
+      case WHEN ST_IsValid (r.geom) = FALSE THEN ST_MakeValid(r.geom)
+      ELSE r.geom
+      END as geom,
+      min_cell_id
+      FROM 
+      (
+      SELECT min(g.id) as min_cell_id, l.geom FROM
+      lines l,
+      %5$s g
+      where ST_Intersects(l.geom,g.%3$s)
+      group by l.geom
+      ) AS r 
+      WHERE ST_IsEmpty(r.geom) is false      
+ 	)
+    select geom, ST_NPoints(geom) AS npoints, min_cell_id from tmp_data_this_cell_lines
+    ', 
+ 	_input_table_name, 
+ 	_bb, 
+ 	_input_table_geo_column_name, 
+ 	_topology_snap_tolerance,
+ 	_table_name_result_prefix||'_grid', 
+ 	ST_ExteriorRing(_bb)
  	);
   EXECUTE command_string;
 
-   command_string := Format('INSERT INTO tmp_data_exterior_rings(geom)
-    SELECT distinct geom FROM ( 
-    SELECT 
- 	ST_ExteriorRing(v.%2$s) AS geom FROM
-    %1$s v,
-    (select geom from tmp_data_exterior_rings r where ST_Intersects(r.geom,%3$L)) as r
- 	where ST_Intersects(v.%2$s,r.geom)
-    ) AS r',
- 	_input_table_name, _input_table_geo_column_name,ST_ExteriorRing(_bb) );
+  
+  command_string := Format('select id from %1$s g WHERE g.%2$s = %3$L ',
+  _table_name_result_prefix||'_grid', 
+  _input_table_geo_column_name, 
+  _bb
+ 	);
+  EXECUTE command_string into cell_id;
+
+  command_string := Format('create index on tmp_data_all_lines using gist(geom)', 'idxtmp_data_all_lines_geom' || Md5(ST_AsBinary (_bb)));
   EXECUTE command_string;
   
-  
-  command_string := Format('CREATE TEMP TABLE tmp_data_all_lines AS SELECT( ST_Dump(ST_Multi(ST_LineMerge(ST_union(rings.geom))))).geom AS geom 
-    FROM tmp_data_exterior_rings rings');
+  command_string := Format('create index on tmp_data_all_lines(min_cell_id)', 'idxtmp_data_all_lines_min_cell_id' || Md5(ST_AsBinary (_bb)));
   EXECUTE command_string;
 
-  command_string := Format('create index %1$s on tmp_data_all_lines using gist(geom)', 'idxtmp_data_all_lines' || Md5(ST_AsBinary (_bb)));
-  EXECUTE command_string;
-
- 
-  -- get the all the line parts based the bb_boundary_outer
-  command_string := Format('CREATE TEMP TABLE tmp_data_this_cell_lines AS SELECT r.geom, ST_NPoints(r.geom) AS npoints 
-  FROM 
-  (
-  SELECT min(g.id) as min_id, l.geom FROM
-  tmp_data_all_lines l,
-  %1$s g
-  where ST_Intersects(l.geom,g.%2$s)
-  group by l.geom
-  ) AS r,
-  %1$s g 
-  WHERE g.%2$s = %3$L and ST_IsEmpty(r.geom) is false and r.min_id = g.id', 
-  _table_name_result_prefix||'_grid', _input_table_geo_column_name, _bb);
-
-  EXECUTE command_string;
-
-  -- TODO user partion by
-  
-  UPDATE tmp_data_this_cell_lines r 
-  SET geom = ST_MakeValid(r.geom)
-  WHERE ST_IsValid (r.geom) = FALSE; 
-
+   
+  -- log error lines
+  EXECUTE Format('WITH error_lines AS 
+    (DELETE FROM tmp_data_all_lines r where r.min_cell_id = %1$s and ST_IsValid(r.geom) = false RETURNING geom) 
+    INSERT INTO %2$s (error_info, geo)
+    SELECT %3$L AS error_info, r.geom as geo
+    FROM error_lines r',
+    cell_id,
+   _table_name_result_prefix||'_no_cut_line_failed',
+   'Failed to make valid input border line for tmp_boundary_lines_merged' );
   
  
-  command_string := Format('create index %1$s on tmp_data_this_cell_lines using gist(geom)', 'idx1' || Md5(ST_AsBinary (_bb)));
-  EXECUTE command_string;
-
 
   -- insert lines with more than max point
   EXECUTE Format('WITH long_lines AS 
-    (DELETE FROM tmp_data_this_cell_lines r where npoints >  %2$s and ST_Intersects(geom,%3$L) RETURNING geom) 
+    (DELETE FROM tmp_data_all_lines r where npoints >  %2$s and ST_Intersects(geom,%3$L) and min_cell_id = %4$s RETURNING geom) 
     INSERT INTO %1$s (geo) SELECT distinct (ST_dump(geom)).geom as geo from long_lines'
-  ,_table_name_result_prefix||'_border_line_many_points', _max_point_in_line, ST_ExteriorRing(_bb) );
+  ,_table_name_result_prefix||'_border_line_many_points', _max_point_in_line, ST_ExteriorRing(_bb), cell_id);
 
     
-  -- 1 make line parts for inner box
-  -- holds the lines inside bb_boundary_inner
-  --#############################
-  
-  CREATE temp TABLE tmp_inner_lines_final_result AS
-  WITH lr AS
-  (DELETE FROM tmp_data_this_cell_lines l WHERE  ST_CoveredBy(l.geom,_bb) and ST_IsValid(l.geom) RETURNING geom)
-    SELECT lr.geom as geo FROM lr;
-  
+ 
   -- make line part for outer box, that contains the line parts will be added add the final stage when all the cell are done.
-  --#############################
  
-  CREATE temp TABLE tmp_boundary_line_parts AS
-  WITH lr AS
-  (DELETE FROM tmp_data_this_cell_lines l WHERE  ST_Intersects(l.geom,ST_ExteriorRing(_bb)) and ST_IsValid(l.geom) RETURNING geom)
-    SELECT lr.geom as geom FROM lr;
- 
-    -- log error lines
-  EXECUTE Format('INSERT INTO %s (error_info, geo)
-  SELECT %L AS error_info, r.geom as geo
-  FROM tmp_data_this_cell_lines r',
-  _table_name_result_prefix||'_no_cut_line_failed','Failed to make valid input border line for tmp_boundary_lines_merged' );
-    
-
   EXECUTE Format('INSERT INTO %s (geo, point_geo)
-  SELECT r.geom as geo, NULL AS point_geo
-  FROM tmp_boundary_line_parts r'
-  ,_table_name_result_prefix||'_border_line_segments');
+  SELECT l.geom as geo, NULL AS point_geo
+  FROM tmp_data_all_lines l where ST_Intersects(geom,%2$L) and min_cell_id = %3$s and ST_IsValid(l.geom) = true '
+  ,_table_name_result_prefix||'_border_line_segments', ST_ExteriorRing(_bb), cell_id );
 
       
   -- return the result of inner geos to handled imediatly
   RETURN QUERY
   SELECT * FROM (
-    SELECT inl.geo, false as outer_border_line FROM
-    tmp_inner_lines_final_result inl
+    SELECT l.geom as geo, false as outer_border_line FROM
+    tmp_data_all_lines l WHERE  ST_CoveredBy(l.geom,_bb)
     union 
     SELECT ST_Union(out.geom) as geo, true as outer_border_line FROM
     tmp_data_all_lines out where ST_Intersects(out.geom,ST_ExteriorRing(_bb))
@@ -226,4 +203,4 @@ $function$;
 --,'1','topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata') g);
 --
 --alter table test_tmp_simplified_border_lines_2 add column id serial;
-	
+--

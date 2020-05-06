@@ -6,10 +6,7 @@ _topology_snap_tolerance float,
 _table_name_result_prefix varchar -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,
 )
   RETURNS TABLE (
-    json text,
-    geo geometry,
-    objectid integer,
-    line_type integer)
+    geo geometry)
   LANGUAGE 'plpgsql'
   AS $function$
 DECLARE
@@ -134,7 +131,7 @@ BEGIN
   CREATE temp TABLE tmp_inner_lines_final_result AS
   WITH lr AS
   (DELETE FROM tmp_data_all_lines l WHERE  ST_CoveredBy(l.geom,_bb) and ST_IsValid(l.geom) RETURNING geom)
-    SELECT lr.geom as geo, 0 AS line_type FROM lr;
+    SELECT lr.geom as geo FROM lr;
   
   -- make line part for outer box, that contains the line parts will be added add the final stage when all the cell are done.
   --#############################
@@ -164,11 +161,9 @@ BEGIN
   RETURN QUERY
   SELECT *
   FROM (
-    SELECT '{"type": "Feature",' || '"geometry":' || ST_AsGeoJSON (lg3.geo, 10, 2)::json || ',' || '"properties":' || Row_to_json((
-        SELECT l FROM (
-            SELECT NULL AS "oppdateringsdato") AS l)) || '}' AS json, lg3.geo, 1 AS objectid, lg3.line_type
+    SELECT lg3.geo
     FROM (
-      SELECT l1.geo, l1.line_type
+      SELECT l1.geo
       FROM tmp_inner_lines_final_result  l1
       WHERE ST_IsValid (l1.geo)) AS lg3) AS f;
 END

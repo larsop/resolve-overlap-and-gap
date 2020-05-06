@@ -193,7 +193,7 @@ BEGIN
     -- the boundery linnes are saved in a table for later usage
     
     command_string := Format('create temp table tmp_simplified_border_lines as 
-    (select g.geo , line_type FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L) g)', 
+    (select g.geo FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L) g)', 
     input_table_name, input_table_geo_column_name, _bb, _topology_snap_tolerance, _table_name_result_prefix);
     EXECUTE command_string ;
     
@@ -237,20 +237,11 @@ BEGIN
     EXECUTE Format('CREATE INDEX ON %s.relation(topogeo_id)', border_topo_info.topology_name);
 
     
-    
-    -- add the glue line with no/small tolerance
-    border_topo_info.snap_tolerance := glue_snap_tolerance_fixed;
-    --command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::Text, %L) from tmp_simplified_border_lines g where line_type = 1', border_topo_info);
-    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geom,%2$s,%3$L) 
-                              FROM (select geo as geom from tmp_simplified_border_lines g where line_type = 1) as r',
-    border_topo_info.topology_name, glue_snap_tolerance_fixed, _table_name_result_prefix);
-    EXECUTE command_string;
-
     -- using the input tolreance for adding
     border_topo_info.snap_tolerance := snap_tolerance_fixed;
     --command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::Text, %L) from tmp_simplified_border_lines g where line_type = 0 order by is_closed desc, num_points desc', border_topo_info);
     --RAISE NOTICE 'command_string %', command_string;
-    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geom,%2$s,%3$L) FROM (select geo as geom from tmp_simplified_border_lines g where line_type = 0) as r',
+    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geom,%2$s,%3$L) FROM (select geo as geom from tmp_simplified_border_lines g) as r',
     border_topo_info.topology_name, border_topo_info.snap_tolerance, _table_name_result_prefix);
     EXECUTE command_string;
 

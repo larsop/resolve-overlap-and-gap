@@ -373,7 +373,7 @@ BEGIN
     execute Format('SET CONSTRAINTS ALL IMMEDIATE');
     PERFORM topology.DropTopology (border_topo_info.topology_name);
     
-    DROP TABLE IF EXISTS tmp_simplified_border_lines;
+    -- DROP TABLE IF EXISTS tmp_simplified_border_lines;
  
   ELSIF _cell_job_type = 2 THEN
    -- add lines from each cell to final Topology layer
@@ -775,7 +775,7 @@ BEGIN
     final_result_table_name := _table_name_result_prefix || '_result';
 
     -- Drop/Create a temp to hold data temporay for job
-    EXECUTE Format('DROP TABLE IF EXISTS %s', temp_table_name);
+    -- EXECUTE Format('DROP TABLE IF EXISTS %s', temp_table_name);
     -- Create the temp for result simple feature result table  as copy of the input table
     EXECUTE Format('CREATE TEMP TABLE %s AS TABLE %s with NO DATA', temp_table_name, final_result_table_name);
     -- Add an extra column to hold a list of other intersections surfaces
@@ -866,7 +866,7 @@ BEGIN
     command_string := Format('insert into %1$s select * from %2$s', final_result_table_name, temp_table_name);
     EXECUTE command_string;
     -- Drop/Create a temp to hold data temporay for job
-    EXECUTE Format('DROP TABLE IF EXISTS %s', temp_table_name);
+    -- EXECUTE Format('DROP TABLE IF EXISTS %s', temp_table_name);
   ELSE
     RAISE EXCEPTION 'Invalid _cell_job_type % ', _cell_job_type;
   END IF;

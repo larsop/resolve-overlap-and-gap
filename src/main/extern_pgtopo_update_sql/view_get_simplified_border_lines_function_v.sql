@@ -6,7 +6,9 @@ _topology_snap_tolerance float,
 _table_name_result_prefix varchar -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,
 )
   RETURNS TABLE (
-    geo geometry)
+    geo geometry,
+    outer_border_line boolean
+  )
   LANGUAGE 'plpgsql'
   AS $function$
 DECLARE
@@ -85,16 +87,20 @@ BEGIN
   EXECUTE command_string;
   
   
-  
+  command_string := Format('CREATE TEMP TABLE tmp_data_all_lines AS SELECT( ST_Dump(ST_Multi(ST_LineMerge(ST_union(rings.geom))))).geom AS geom 
+    FROM tmp_data_exterior_rings rings');
+  EXECUTE command_string;
+
+  command_string := Format('create index %1$s on tmp_data_all_lines using gist(geom)', 'idxtmp_data_all_lines' || Md5(ST_AsBinary (_bb)));
+  EXECUTE command_string;
+
  
   -- get the all the line parts based the bb_boundary_outer
-  command_string := Format('CREATE TEMP TABLE tmp_data_all_lines AS SELECT r.geom, ST_NPoints(r.geom) AS npoints 
+  command_string := Format('CREATE TEMP TABLE tmp_data_this_cell_lines AS SELECT r.geom, ST_NPoints(r.geom) AS npoints 
   FROM 
   (
   SELECT min(g.id) as min_id, l.geom FROM
-  ( SELECT(ST_Dump(ST_Multi(ST_LineMerge(ST_union(rings.geom))))).geom AS geom 
-    FROM tmp_data_exterior_rings rings
-  ) AS l,
+  tmp_data_all_lines l,
   %1$s g
   where ST_Intersects(l.geom,g.%2$s)
   group by l.geom
@@ -107,19 +113,19 @@ BEGIN
 
   -- TODO user partion by
   
-  UPDATE tmp_data_all_lines r 
+  UPDATE tmp_data_this_cell_lines r 
   SET geom = ST_MakeValid(r.geom)
   WHERE ST_IsValid (r.geom) = FALSE; 
 
   
  
-  command_string := Format('create index %1$s on tmp_data_all_lines using gist(geom)', 'idx1' || Md5(ST_AsBinary (_bb)));
+  command_string := Format('create index %1$s on tmp_data_this_cell_lines using gist(geom)', 'idx1' || Md5(ST_AsBinary (_bb)));
   EXECUTE command_string;
 
 
   -- insert lines with more than max point
   EXECUTE Format('WITH long_lines AS 
-    (DELETE FROM tmp_data_all_lines r where npoints >  %2$s and ST_Intersects(geom,%3$L) RETURNING geom) 
+    (DELETE FROM tmp_data_this_cell_lines r where npoints >  %2$s and ST_Intersects(geom,%3$L) RETURNING geom) 
     INSERT INTO %1$s (geo) SELECT distinct (ST_dump(geom)).geom as geo from long_lines'
   ,_table_name_result_prefix||'_border_line_many_points', _max_point_in_line, ST_ExteriorRing(_bb) );
 
@@ -130,7 +136,7 @@ BEGIN
   
   CREATE temp TABLE tmp_inner_lines_final_result AS
   WITH lr AS
-  (DELETE FROM tmp_data_all_lines l WHERE  ST_CoveredBy(l.geom,_bb) and ST_IsValid(l.geom) RETURNING geom)
+  (DELETE FROM tmp_data_this_cell_lines l WHERE  ST_CoveredBy(l.geom,_bb) and ST_IsValid(l.geom) RETURNING geom)
     SELECT lr.geom as geo FROM lr;
   
   -- make line part for outer box, that contains the line parts will be added add the final stage when all the cell are done.
@@ -138,13 +144,13 @@ BEGIN
  
   CREATE temp TABLE tmp_boundary_line_parts AS
   WITH lr AS
-  (DELETE FROM tmp_data_all_lines l WHERE  ST_Intersects(l.geom,ST_ExteriorRing(_bb)) and ST_IsValid(l.geom) RETURNING geom)
+  (DELETE FROM tmp_data_this_cell_lines l WHERE  ST_Intersects(l.geom,ST_ExteriorRing(_bb)) and ST_IsValid(l.geom) RETURNING geom)
     SELECT lr.geom as geom FROM lr;
  
     -- log error lines
   EXECUTE Format('INSERT INTO %s (error_info, geo)
   SELECT %L AS error_info, r.geom as geo
-  FROM tmp_data_all_lines r',
+  FROM tmp_data_this_cell_lines r',
   _table_name_result_prefix||'_no_cut_line_failed','Failed to make valid input border line for tmp_boundary_lines_merged' );
     
 
@@ -153,19 +159,17 @@ BEGIN
   FROM tmp_boundary_line_parts r'
   ,_table_name_result_prefix||'_border_line_segments');
 
-    
-
-  -- log error lines
-  
+      
   -- return the result of inner geos to handled imediatly
   RETURN QUERY
-  SELECT *
-  FROM (
-    SELECT lg3.geo
-    FROM (
-      SELECT l1.geo
-      FROM tmp_inner_lines_final_result  l1
-      WHERE ST_IsValid (l1.geo)) AS lg3) AS f;
+  SELECT * FROM (
+    SELECT inl.geo, false as outer_border_line FROM
+    tmp_inner_lines_final_result inl
+    union 
+    SELECT ST_Union(out.geom) as geo, true as outer_border_line FROM
+    tmp_data_all_lines out where ST_Intersects(out.geom,ST_ExteriorRing(_bb))
+ 
+  ) AS f;
 END
 $function$;
 

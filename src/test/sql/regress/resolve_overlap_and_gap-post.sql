@@ -133,11 +133,12 @@ DROP TYPE IF EXISTS find_overlap_gap_single_cell_pameter cascade;
 
 DROP FUNCTION IF EXISTS execute_parallel(stmts text[], num_parallel_thread int,open_close_conn boolean,user_connstr text);
 
-drop extension dblink cascade;
-
 DROP FUNCTION IF EXISTS "vsr_get_data_type"(_t regclass, _c text);
 
 -- Drop function used by view_ar5_forest_split_distinct_func.sql
 drop schema topo_update cascade;
 
 drop schema topo_rein cascade;
+
+
+drop extension dblink cascade;

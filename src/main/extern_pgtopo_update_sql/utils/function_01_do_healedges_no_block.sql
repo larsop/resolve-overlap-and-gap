@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION topo_update.do_healedges_no_block (_atopology varchar, _bb geometry)
+CREATE OR REPLACE FUNCTION topo_update.do_healedges_no_block (_atopology varchar, _bb geometry, _outer_cell_boundary_lines geometry default null)
   RETURNS integer
   LANGUAGE 'plpgsql'
   AS $function$
@@ -48,7 +48,7 @@ BEGIN
                     %1$s.edge_data e1
                     where e1.geom &&  %2$L and
     				n1.geom &&  %2$L and
-    				ST_intersects(e1.geom,%2$L) and
+    				ST_intersects(e1.geom,%2$L) and NOT st_intersects(e1.geom,%3$L) and
                     (e1.start_node = n1.node_id or e1.end_node = n1.node_id)
                     group by n1.node_id
                 ) as r
@@ -67,12 +67,12 @@ BEGIN
             --  (e2.left_face = e2.right_face or e1.left_face = e1.right_face)
             --) and
             e2.left_face = e1.left_face and e2.right_face = e1.right_face and
-            ST_CoveredBy(n1.geom,%2$L) 
+            ST_CoveredBy(n1.geom,%2$L) and NOT st_intersects(e1.geom,%3$L) and NOT st_intersects(e2.geom,%3$L)
         ) as r
         ) as r
         order by edge_to_eat
     ) as r
-    where r.edge_to_live != r.edge_to_eat)', _atopology, _bb);
+    where r.edge_to_live != r.edge_to_eat)', _atopology, _bb, _outer_cell_boundary_lines);
     EXECUTE command_string into edges_to_fix;
 
     RAISE NOTICE 'In heal loop nr % , did find % edes to heal lines for topo % and bb % at % used_time %', 

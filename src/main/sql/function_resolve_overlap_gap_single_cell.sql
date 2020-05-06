@@ -96,6 +96,9 @@ DECLARE
   outer_cell_boundary_geom geometry;
   inner_cell_boundary_geom geometry;
 
+  -- This is lines that nay intersesct with outher boudary lines
+  outer_cell_boundary_lines geometry;
+
   -- This is the inner area tha we safly can fix
   inner_cell_geom geometry;
   
@@ -193,7 +196,7 @@ BEGIN
     -- the boundery linnes are saved in a table for later usage
     
     command_string := Format('create temp table tmp_simplified_border_lines as 
-    (select g.geo FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L) g)', 
+    (select g.geo, g.outer_border_line FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L) g)', 
     input_table_name, input_table_geo_column_name, _bb, _topology_snap_tolerance, _table_name_result_prefix);
     EXECUTE command_string ;
     
@@ -241,13 +244,20 @@ BEGIN
     border_topo_info.snap_tolerance := snap_tolerance_fixed;
     --command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::Text, %L) from tmp_simplified_border_lines g where line_type = 0 order by is_closed desc, num_points desc', border_topo_info);
     --RAISE NOTICE 'command_string %', command_string;
-    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geom,%2$s,%3$L) FROM (select geo as geom from tmp_simplified_border_lines g) as r',
+    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geom,%2$s,%3$L) FROM (select geo as geom from tmp_simplified_border_lines g where outer_border_line = false) as r',
     border_topo_info.topology_name, border_topo_info.snap_tolerance, _table_name_result_prefix);
     EXECUTE command_string;
 
+ 
+    command_string := Format('SELECT geo as geom from tmp_simplified_border_lines g where outer_border_line = true',
+    border_topo_info.topology_name, border_topo_info.snap_tolerance, _table_name_result_prefix);
+    EXECUTE command_string into outer_cell_boundary_lines ;
+
+
+     
     command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
     border_topo_info.topology_name,_bb);
---    EXECUTE command_string;
+    EXECUTE command_string;
     
     command_string = null;
     

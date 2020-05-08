@@ -255,8 +255,8 @@ BEGIN
 
 
      
-    command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
-    border_topo_info.topology_name,_bb);
+    command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L,%3$L)', 
+    border_topo_info.topology_name,_bb,outer_cell_boundary_lines);
     EXECUTE command_string;
     
     command_string = null;
@@ -343,8 +343,9 @@ BEGIN
       RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
     
       --heal border edges remove small polygins
-      command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
-      border_topo_info.topology_name,outer_cell_boundary_geom);
+     
+      command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L,%3$L)', 
+      border_topo_info.topology_name,_bb,outer_cell_boundary_lines);
       --EXECUTE command_string;
     END IF;
 

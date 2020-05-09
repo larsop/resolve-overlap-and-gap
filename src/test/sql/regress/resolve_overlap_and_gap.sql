@@ -39,6 +39,9 @@ SELECT 'degrees_check_added_simple_feature_c2', count(*) from test_topo_t2.overl
 
 SELECT 'degrees_check_added_simple_feature_c3', count(*) from test_topo_t2.overlap_gap_input_t2_result where c3 is not null;
 
+-- Records from this function would mean an invalid topology was created
+SELECT 'validation', * FROM topology.ValidateTopology('test_topo_t2');
+
 SELECT 'degrees', topology.droptopology('test_topo_t2');
 
 

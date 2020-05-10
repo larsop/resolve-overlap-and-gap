@@ -200,22 +200,30 @@ BEGIN
     input_table_name, input_table_geo_column_name, _bb, _topology_snap_tolerance, _table_name_result_prefix);
     EXECUTE command_string ;
     
---    IF _loop_number = 1 THEN 
---       RAISE NOTICE 'use _topology_name %', _topology_name;
---       command_string := Format('SELECT topology.TopoGeo_addLinestring(%2$L,r.geo,%1$s) FROM 
---         (SELECT geo from tmp_simplified_border_lines where line_type = 1) as r', glue_snap_tolerance_fixed, _topology_name);
---       EXECUTE command_string ; 
---       command_string := Format('SELECT topology.TopoGeo_addLinestring(%2$L,r.geo,%1$s) FROM 
---         (SELECT geo from tmp_simplified_border_lines where line_type = 0 order by is_closed desc, num_points desc) as r', snap_tolerance_fixed, _topology_name);
---       EXECUTE command_string ; 
---       RAISE NOTICE 'Start clean small polygons at _loop_number 1 for face_table_name % at %', face_table_name, Clock_timestamp();
---       -- remove small polygons in temp
---       face_table_name = _topology_name || '.face';
---       num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, (_clean_info).min_area_to_keep, face_table_name, ST_Expand(_bb,_topology_snap_tolerance * -6),
---       _utm);
---       used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
---       RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
---    ELSE 
+    command_string := Format('SELECT geo as geom from tmp_simplified_border_lines g where outer_border_line = true',
+    border_topo_info.topology_name, border_topo_info.snap_tolerance, _table_name_result_prefix);
+    EXECUTE command_string into outer_cell_boundary_lines ;
+
+    
+    IF (_clean_info).simplify_tolerance > 0  THEN
+        command_string := Format('UPDATE tmp_simplified_border_lines l
+        SET geo = ST_simplifyPreserveTopology(l.geo,%1$s)
+        WHERE NOT ST_Intersects(%2$L,l.geo)',
+        (_clean_info).simplify_tolerance , outer_cell_boundary_lines);
+        EXECUTE command_string;
+    END IF;
+    
+    IF (_clean_info).chaikins_nIterations > 0 THEN
+        command_string := Format('UPDATE tmp_simplified_border_lines l
+        SET geo = ST_simplifyPreserveTopology(topo_update.chaikinsAcuteAngle(l.geo,%1$L,%2$L), %3$s)
+        WHERE NOT ST_Intersects(%4$L,l.geo)',
+        _utm,
+        _clean_info,
+        _topology_snap_tolerance/2,
+        outer_cell_boundary_lines);
+        EXECUTE command_string;
+    END IF;
+
     
     border_topo_info.topology_name := _topology_name || '_' || box_id;
     RAISE NOTICE 'use border_topo_info.topology_name %', border_topo_info.topology_name;
@@ -249,89 +257,17 @@ BEGIN
     EXECUTE command_string;
 
  
-    command_string := Format('SELECT geo as geom from tmp_simplified_border_lines g where outer_border_line = true',
-    border_topo_info.topology_name, border_topo_info.snap_tolerance, _table_name_result_prefix);
-    EXECUTE command_string into outer_cell_boundary_lines ;
 
-
-     
+      
+    -- Heal egdes  
     command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L,%3$L)', 
     border_topo_info.topology_name,_bb,outer_cell_boundary_lines);
     EXECUTE command_string;
     
     command_string = null;
-    
-    IF (_clean_info).simplify_tolerance > 0  THEN
-        command_string := Format('SELECT ARRAY(SELECT e.edge_id   
-        FROM (
-        SELECT distinct e1.edge_id 
-        FROM 
-          %1$s.edge_data e1,
-          %1$s.face e1fl,
-          %1$s.face e1fr,
-          %3$s b
-        WHERE
-	      (e1fl.mbr && %2$L OR e1fr.mbr && %2$L) and 
-   		  (ST_CoveredBy(e1fl.mbr,%2$L) OR ST_CoveredBy(e1fr.mbr,%2$L)) and 
-          e1.left_face != e1.right_face and
-          e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face and
-          ST_Intersects(b.%4$s,%5$L) AND NOT ST_Touches(b.%4$s,e1.geom)
-        ) e)',
-        border_topo_info.topology_name, 
-        inner_cell_geom,
-        input_table_name,
-        input_table_geo_column_name,
-        ST_ExteriorRing(_bb));
-        EXECUTE command_string into edgelist_to_change;
-
-        
-        IF edgelist_to_change IS NOT NULL AND (Array_length(edgelist_to_change, 1)) IS NOT NULL THEN 
-          FOREACH edge_id_heal IN ARRAY edgelist_to_change 
-          LOOP
-            heal_edge_retry_num := 1;
-            LOOP
-              command_string := FORMAT('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,%4$L,%5$L,e.edge_id,ST_simplifyPreserveTopology(e.geom,%2$s)) 
-              from %1$s.edge_data e where e.edge_id = %3$s',
-              border_topo_info.topology_name, (_clean_info).simplify_tolerance/heal_edge_retry_num, edge_id_heal, (_clean_info).simplify_max_average_vertex_length, _utm);
-              EXECUTE command_string into heal_edge_status;
-              EXIT WHEN heal_edge_status in (0,1) or heal_edge_retry_num > 5;
-              heal_edge_retry_num := heal_edge_retry_num  + 1;
-            END LOOP;
-            IF heal_edge_status = -1 THEN
-              RAISE NOTICE 'Failed to run topo_update.try_ST_ChangeEdgeGeom using ST_simplifyPreserveTopologyfor edge_id % for topology % using tolerance % .' , 
-              edge_id_heal, border_topo_info.topology_name, (_clean_info).simplify_tolerance;
-            END IF;
-          END LOOP;
-        END IF;
-    END IF;
-    
-    IF (_clean_info).chaikins_nIterations > 0 THEN
-      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,%6$L,%3$L,e.edge_id, 
-      ST_simplifyPreserveTopology(topo_update.chaikinsAcuteAngle(e.geom,%3$L,%4$L), %5$s)) 
-      FROM (
-      SELECT distinct e1.edge_id, e1.geom 
-      FROM 
-        %1$s.edge_data e1,
-        %1$s.face e1fl,
-        %1$s.face e1fr,
-        %7$s b
-      WHERE
-	    (e1fl.mbr && %2$L OR e1fr.mbr && %2$L) and 
-   		(ST_CoveredBy(e1fl.mbr,%2$L) OR ST_CoveredBy(e1fr.mbr,%2$L)) and 
-        e1.left_face != e1.right_face and
-        e1fl.face_id = e1.left_face and e1fr.face_id = e1.right_face and
-        ST_Intersects(b.%8$s,%9$L) AND NOT ST_Touches(b.%8$s,e1.geom)
-      ) e',
-      border_topo_info.topology_name, inner_cell_geom, _utm, _clean_info,_topology_snap_tolerance/2, 
-      (_clean_info).simplify_max_average_vertex_length,
-      input_table_name,
-      input_table_geo_column_name,
-      ST_ExteriorRing(_bb));
-      EXECUTE command_string;
-    END IF;
-     
-
-    IF (_clean_info).chaikins_nIterations > 0 OR (_clean_info).simplify_tolerance > 0 THEN
+         
+    -- Remome small polygons
+    -- TODO make check that do not intersect any cell border lines
       face_table_name = border_topo_info.topology_name || '.face';
       start_time_delta_job := Clock_timestamp();
       RAISE NOTICE 'Start clean small polygons for face_table_name % at %', face_table_name, Clock_timestamp();
@@ -347,7 +283,6 @@ BEGIN
       command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L,%3$L)', 
       border_topo_info.topology_name,_bb,outer_cell_boundary_lines);
       --EXECUTE command_string;
-    END IF;
 
     
     
@@ -426,6 +361,25 @@ BEGIN
     
 
   ELSIF _cell_job_type = 3 THEN
+  
+  ---- test smooth border lines before adding them
+---- Todo find a way smooth the rest off the lines
+ 
+--  IF (_clean_info).simplify_tolerance > 0  THEN
+--       command_string := Format('UPDATE temp_left_over_borders l
+--       SET geo = ST_simplifyPreserveTopology(l.geo,%1$s)',
+--       (_clean_info).simplify_tolerance);
+--       EXECUTE command_string;
+--   END IF;
+    
+--  IF (_clean_info).chaikins_nIterations > 0 THEN
+--       command_string := Format('UPDATE temp_left_over_borders l
+--       SET geo = ST_simplifyPreserveTopology(topo_update.chaikinsAcuteAngle(l.geo,%1$L,%2$L), %3$s)',
+--       _utm,
+--       _clean_info,
+--       _topology_snap_tolerance/2);
+--        EXECUTE command_string;
+--    END IF;
     -- add lines that connects each cell to each other
     
     -- on cell border
@@ -582,6 +536,7 @@ BEGIN
 --    EXECUTE command_string;
 
      
+     
    ELSIF _cell_job_type = 4 THEN
     -- heal border edges
     
@@ -628,7 +583,7 @@ BEGIN
 
 
   ELSIF _cell_job_type = 5 THEN
-
+    -- Remove small polygons
 --    command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
 --    input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
     

@@ -7,7 +7,9 @@
 -- TODO add  _min_area float as parameter and use relative mbr area
 
 
-CREATE OR REPLACE FUNCTION topo_update.do_remove_small_areas_no_block (_atopology varchar, _min_area float, _table_name varchar, _bb geometry, _utm boolean)
+CREATE OR REPLACE FUNCTION topo_update.do_remove_small_areas_no_block (_atopology varchar, _min_area float, _table_name varchar, _bb geometry, 
+_utm boolean,
+_outer_cell_boundary_lines geometry default null)
   RETURNS integer
   LANGUAGE 'plpgsql'
   AS $function$
@@ -29,16 +31,16 @@ BEGIN
                 ELSE 
                   ST_Area(g.mbr)
                 END AS mbr_area,
-                g.face_id 
+                g.face_id
  				from ( 
  					select g.face_id , g.mbr from %3$s g 
- 					where g.mbr && %4$L and ST_Intersects(g.mbr,%4$L) 
- 				) as g
- 			) as g
+ 					where g.mbr && %4$L and ST_Intersects(g.mbr,%4$L)
+ 				) as g WHERE NOT st_intersects(g.mbr,%7$L)
+ 			) as g 
  			where  g.mbr_area < %5$s 
  		) as g
  	  ) as g
-  where g.topo_area < %2$s', Quote_literal(_atopology), _min_area, _table_name, _bb, min_mbr_area, _utm);
+  where g.topo_area < %2$s', Quote_literal(_atopology), _min_area, _table_name, _bb, min_mbr_area, _utm, _outer_cell_boundary_lines);
  	 
   LOOP
     -- RAISE NOTICE 'execute command_string; %', command_string;

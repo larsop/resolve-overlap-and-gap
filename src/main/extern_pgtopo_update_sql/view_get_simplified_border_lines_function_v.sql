@@ -57,16 +57,23 @@ BEGIN
         SELECT ST_ExteriorRing (bb_inner_glue_geom) AS inner_rings));
   -- holds the lines inside bb_boundary_inner
   -- get the all the line parts based the bb_boundary_outer
+  
   command_string := Format('CREATE TEMP TABLE tmp_data_all_lines AS WITH 
     rings AS (
  	  SELECT ST_ExteriorRing((ST_DumpRings((st_dump(%3$s)).geom)).geom) as geom
  	  FROM %1$s v
  	  where ST_Intersects(v.%3$s,%2$L)
  	),
- 	lines as (
+ 	lines_intersect_cell as (
       SELECT( ST_Dump(ST_Multi(ST_LineMerge(ST_union(rings.geom))))).geom 
       from rings
     ),
+    touch_lines_intersects AS (
+      SELECT distinct ST_ExteriorRing(v.%3$s) AS geom
+      FROM lines_intersect_cell l, 
+      %1$s v
+ 	  WHERE ST_Intersects(v.%3$s,l.geom) 
+ 	),
     tmp_data_this_cell_lines AS (
       SELECT 
       case WHEN ST_IsValid (r.geom) = FALSE THEN ST_MakeValid(r.geom)
@@ -75,15 +82,22 @@ BEGIN
       min_cell_id
       FROM 
       (
-      SELECT min(g.id) as min_cell_id, l.geom FROM
-      lines l,
+      SELECT min(g.id) as min_cell_id, l.geom 
+      FROM
+      ( SELECT (ST_Dump(ST_Multi(ST_LineMerge(ST_union(geom))))).geom FROM
+      ( 
+        SELECT distinct geom from 
+         (SELECT geom from lines_intersect_cell l1 union SELECT geom from touch_lines_intersects l2) as l
+      ) as l
+      ) as l,
       %5$s g
       where ST_Intersects(l.geom,g.%3$s)
       group by l.geom
       ) AS r 
       WHERE ST_IsEmpty(r.geom) is false      
+   
  	)
-    select geom, ST_NPoints(geom) AS npoints, min_cell_id from tmp_data_this_cell_lines
+    select geom, ST_NPoints(geom) AS npoints, min_cell_id from  tmp_data_this_cell_lines
     ', 
  	_input_table_name, 
  	_bb, 
@@ -143,64 +157,34 @@ BEGIN
     SELECT l.geom as geo, false as outer_border_line FROM
     tmp_data_all_lines l WHERE  ST_CoveredBy(l.geom,_bb)
     union 
-    SELECT ST_Union(out.geom) as geo, true as outer_border_line FROM
+    SELECT ST_Intersection(ST_Union(
+    ST_StartPoint(out.geom),
+    ST_EndPoint(out.geom)),_bb) as geo
+    , true as outer_border_line FROM
     tmp_data_all_lines out where ST_Intersects(out.geom,ST_ExteriorRing(_bb))
  
   ) AS f;
 END
 $function$;
 
---drop table if exists test_tmp_simplified_border_lines_1;
---
---create table test_tmp_simplified_border_lines_1 as 
---(select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
---FROM topo_update.get_simplified_border_lines('sl_esh.ar50_utvikling_flate','geo',
---'0103000020E9640000010000000500000000000000B0A6074100000000F9F05A4100000000B0A607410000008013F75A4100000000006A08410000008013F75A4100000000006A084100000000F9F05A4100000000B0A6074100000000F9F05A41'
---,'1','test_topo_ar50_t11.ar50_utvikling_flate') g);
---alter table test_tmp_simplified_border_lines_1 add column id serial;
---
---drop if exists table test_tmp_simplified_border_lines_2;
---
---create table test_tmp_simplified_border_lines_2 as 
---(select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
---FROM topo_update.get_simplified_border_lines('sl_esh.ar50_utvikling_flate','geo',
---'0103000020E9640000010000000500000000000000B0A60741000000C0EBED5A4100000000B0A6074100000000F9F05A41000000005808084100000000F9F05A410000000058080841000000C0EBED5A4100000000B0A60741000000C0EBED5A41'
---,'1','test_topo_ar50_t11.ar50_utvikling_flate') g);
---
---alter table test_tmp_simplified_border_lines_2 add column id serial;
 
---drop table if exists test_tmp_simplified_border_lines_2 ;
---
 --TRUNCATE topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata_border_line_segments ;
 --
---create table test_tmp_simplified_border_lines_2 as 
+--drop table if exists test_tmp_simplified_border_data ;
+--drop table if exists test_tmp_simplified_border_data_lines ;
+--drop table if exists test_tmp_simplified_border_data_point ;
+--
+--create table test_tmp_simplified_border_data as 
 --(select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
 --FROM topo_update.get_simplified_border_lines('sl_kbj.trl_2019_test_segmenter_mindredata','geo',
---'0103000020E9640000010000000500000000000000F0BA0D4168C21B5B21B65A4100000000F0BA0D41D850E0F993B85A4100000000FA140E41D850E0F993B85A4100000000FA140E4168C21B5B21B65A4100000000F0BA0D4168C21B5B21B65A41'
+--'0103000020E9640000010000000500000000000000F0BA0D410619B713D1C45A4100000000F0BA0D4176A77BB243C75A4100000000FA140E4176A77BB243C75A4100000000FA140E410619B713D1C45A4100000000F0BA0D410619B713D1C45A41'
 --,'1','topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata') g);
 --
---alter table test_tmp_simplified_border_lines_2 add column id serial;
+--create table test_tmp_simplified_border_data_lines as select geo from test_tmp_simplified_border_data where outer_border_line = false;
+--alter table test_tmp_simplified_border_data_lines add column id serial;
+--
+--create table test_tmp_simplified_border_data_point as select geo from test_tmp_simplified_border_data where outer_border_line = TRUE;
+--alter table test_tmp_simplified_border_data_point add column id serial;
 
---\timing
---drop table if exists test_tmp_simplified_border_lines_1 ;
---
---TRUNCATE topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata_border_line_segments ;
---
---create table test_tmp_simplified_border_lines_1 as 
---(select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
---FROM topo_update.get_simplified_border_lines('sl_kbj.trl_2019_test_segmenter_mindredata','geo',
---'0103000020E9640000010000000500000000000000FA140E4154C404F028CC5A4100000000FA140E41C452C98E9BCE5A4100000000046F0E41C452C98E9BCE5A4100000000046F0E4154C404F028CC5A4100000000FA140E4154C404F028CC5A41'
---,'1','topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata') g);
---
---alter table test_tmp_simplified_border_lines_1 add column id serial;
---
---drop table if exists test_tmp_simplified_border_lines_2 ;
---
---create table test_tmp_simplified_border_lines_2 as 
---(select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
---FROM topo_update.get_simplified_border_lines('sl_kbj.trl_2019_test_segmenter_mindredata','geo',
---'0103000020E9640000010000000500000000000000F0BA0D4154C404F028CC5A4100000000F0BA0D41C452C98E9BCE5A4100000000FA140E41C452C98E9BCE5A4100000000FA140E4154C404F028CC5A4100000000F0BA0D4154C404F028CC5A41'
---,'1','topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata') g);
---
---alter table test_tmp_simplified_border_lines_2 add column id serial;
---
+
+

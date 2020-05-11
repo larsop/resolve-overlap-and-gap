@@ -200,27 +200,33 @@ BEGIN
     input_table_name, input_table_geo_column_name, _bb, _topology_snap_tolerance, _table_name_result_prefix);
     EXECUTE command_string ;
     
-    command_string := Format('SELECT geo as geom from tmp_simplified_border_lines g where outer_border_line = true',
-    border_topo_info.topology_name, border_topo_info.snap_tolerance, _table_name_result_prefix);
+    command_string := Format('SELECT ST_SetSRID(ST_Multi(ST_Union(geo)),%1$s)::Geometry(MultiPoint, %1$s) from tmp_simplified_border_lines g where outer_border_line = true',
+    _srid);
     EXECUTE command_string into outer_cell_boundary_lines ;
+    
+    IF ST_NumGeometries(outer_cell_boundary_lines) = 0 THEN
+     outer_cell_boundary_lines  := null;
+    END IF; 
+    
 
     
     IF (_clean_info).simplify_tolerance > 0  THEN
         command_string := Format('UPDATE tmp_simplified_border_lines l
         SET geo = ST_simplifyPreserveTopology(l.geo,%1$s)
-        WHERE NOT ST_Intersects(%2$L,l.geo)',
-        (_clean_info).simplify_tolerance , outer_cell_boundary_lines);
+        WHERE NOT ST_DWithin(%2$L,l.geo,%3$s)',
+        (_clean_info).simplify_tolerance , outer_cell_boundary_lines,snap_tolerance_fixed);
         EXECUTE command_string;
     END IF;
     
     IF (_clean_info).chaikins_nIterations > 0 THEN
         command_string := Format('UPDATE tmp_simplified_border_lines l
         SET geo = ST_simplifyPreserveTopology(topo_update.chaikinsAcuteAngle(l.geo,%1$L,%2$L), %3$s)
-        WHERE NOT ST_Intersects(%4$L,l.geo)',
+        WHERE NOT ST_DWithin(%4$L,l.geo,%5$s)',
         _utm,
         _clean_info,
         _topology_snap_tolerance/2,
-        outer_cell_boundary_lines);
+        outer_cell_boundary_lines,
+        snap_tolerance_fixed);
         EXECUTE command_string;
     END IF;
 
@@ -273,7 +279,7 @@ BEGIN
       RAISE NOTICE 'Start clean small polygons for face_table_name % at %', face_table_name, Clock_timestamp();
       -- remove small polygons in temp
       num_rows_removed := topo_update.do_remove_small_areas_no_block (
-      border_topo_info.topology_name, (_clean_info).min_area_to_keep, face_table_name, _bb,_utm);
+      border_topo_info.topology_name, (_clean_info).min_area_to_keep, face_table_name, _bb,_utm,outer_cell_boundary_lines);
     
       used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
       RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;

@@ -62,6 +62,7 @@ DECLARE
   v_detail text;
   v_hint text;
   v_context text;
+  v_cnt_left_over_borders int;
  
   
   -- This is the area that will handle when glus cell together, this is very importan to avoid smooth lines to times
@@ -261,10 +262,10 @@ BEGIN
       used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
       RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
     
-      --heal border edges remove small polygins
-     
-      command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L,%3$L)', 
-      border_topo_info.topology_name,_bb,outer_cell_boundary_lines);
+      --heal border edges removing small small polygins
+      --Do we need to this??????, only if we do simplify later, no we do simplify before, if change the code to do simplify in the topplogy layer we may need to do this.
+      --command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L,%3$L)', 
+      --border_topo_info.topology_name,_bb,outer_cell_boundary_lines);
       --EXECUTE command_string;
     
     
@@ -494,7 +495,14 @@ BEGIN
     END IF;
 
 
-     IF (_clean_info).simplify_tolerance > 0  THEN
+    command_string := Format('CREATE TEMP table temp_left_over_borders as select geo FROM
+    (select geo from topo_update.get_left_over_borders(%1$L,%2$L,%3$L,%4$L) as r) as r', 
+    overlapgap_grid, input_table_geo_column_name, _bb, _table_name_result_prefix,_topology_snap_tolerance*inner_cell_distance);
+    EXECUTE command_string;
+    
+    GET DIAGNOSTICS v_cnt_left_over_borders = ROW_COUNT;
+
+     IF v_cnt_left_over_borders > 0 AND (_clean_info).simplify_tolerance > 0  THEN
 
       start_time_delta_job := Clock_timestamp();
 
@@ -503,17 +511,10 @@ BEGIN
         SELECT distinct e1.edge_id 
         FROM 
           %1$s.edge_data e1,
-          %1$s.face e1fl,
-          %1$s.face e1fr
+          temp_left_over_borders lb
         WHERE
-	    (e1fl.mbr && %2$L or e1fr.mbr && %2$L) and 
-   		ST_Intersects(e1fl.mbr,%2$L) and 
-        ST_Intersects(e1fr.mbr,%2$L) and 
-        e1.left_face != e1.right_face and
-        (e1fl.face_id = e1.left_face or e1.left_face=0) and 
-        (e1fr.face_id = e1.right_face or e1.right_face=0)
-        ) e)',
-        _topology_name,  _bb);
+   		ST_Intersects(lb.geo,e1.geom)) as e )',
+        _topology_name);
         EXECUTE command_string into edgelist_to_change;
 
         
@@ -542,24 +543,18 @@ BEGIN
     END IF;
 
     
-    IF (_clean_info).chaikins_nIterations > 0 THEN
+    IF v_cnt_left_over_borders > 0 AND (_clean_info).chaikins_nIterations > 0 THEN
       start_time_delta_job := Clock_timestamp();
 
       command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,%6$L,%3$L,e.edge_id, 
       ST_simplifyPreserveTopology(topo_update.chaikinsAcuteAngle(e.geom,%3$L,%4$L), %5$s )) 
       FROM (
       SELECT distinct e1.edge_id, e1.geom 
-      FROM 
-        %1$s.edge_data e1,
-        %1$s.face e1fl,
-        %1$s.face e1fr
-      WHERE
-	    (e1fl.mbr && %2$L AND e1fr.mbr && %2$L) and 
-   		(ST_Intersects(e1fl.mbr,%2$L) AND ST_Intersects(e1fr.mbr,%2$L)) and 
-        e1.left_face != e1.right_face and
-        (e1fl.face_id = e1.left_face or e1.left_face=0) and 
-        (e1fr.face_id = e1.right_face or e1.right_face=0)
-      ) e',
+        FROM 
+          %1$s.edge_data e1,
+          temp_left_over_borders lb
+        WHERE
+   		ST_Intersects(lb.geo,e1.geom)) e',
       _topology_name, _bb, _utm, _clean_info, _topology_snap_tolerance/2,(_clean_info).simplify_max_average_vertex_length);
       EXECUTE command_string;
       RAISE NOTICE 'Did chaikinsAcuteAngle for topo % and bb % at % used_time %', 

@@ -35,7 +35,7 @@ BEGIN
  				from ( 
  					select g.face_id , g.mbr from %3$s g 
  					where g.mbr && %4$L and ST_Intersects(g.mbr,%4$L)
- 				) as g WHERE NOT st_intersects(g.mbr,%7$L)
+ 				) as g WHERE (ST_Disjoint(g.mbr,%7$L) OR %7$L is null)
  			) as g 
  			where  g.mbr_area < %5$s 
  		) as g
@@ -55,3 +55,4 @@ BEGIN
   RETURN num_rows_total;
 END
 $function$;
+

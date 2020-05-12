@@ -40,34 +40,6 @@ DECLARE
   snap_tolerance_fixed float = _topology_snap_tolerance;
   
   glue_snap_tolerance_fixed float = 0;
--- when bigger than 0
--- Corrupted topology: adjacent edges 136899 and -137071 bind different face (0 and 40580)
--- Corrupted topology: adjacent edges 136899 and -137071 bind different face (0 and 40580)
--- Corrupted topology: adjacent edges 136899 and -137071 bind different face (0 and 40580)
--- Corrupted topology: adjacent edges 136899 and -137071 bind different face (0 and 40580)
--- Corrupted topology: adjacent edges 136899 and -137071 bind different face (0 and 40580)
--- Corrupted topology: adjacent edges 137121 and -137144 bind different face (0 and 40558)
--- Corrupted topology: adjacent edges 137122 and -137121 bind different face (40558 and 0)
--- Corrupted topology: adjacent edges 137121 and -137144 bind different face (0 and 40558)
--- Corrupted topology: adjacent edges 137121 and -137144 bind different face (0 and 40558)
--- Corrupted topology: adjacent edges 137121 and -137144 bind different face (0 and 40558)
--- Corrupted topology: adjacent edges 137121 and -137144 bind different face (0 and 40558)
--- Corrupted topology: adjacent edges 137121 and -137144 bind different face (0 and 40558)
--- Corrupted topology: adjacent edges 137121 and -137144 bind different face (0 and 40558)
--- Corrupted topology: adjacent edges 137121 and -137144 bind different face (0 and 40558)
--- Corrupted topology: adjacent edges -136899 and 136902 bind different face (0 and 40269)
--- Corrupted topology: adjacent edges -136899 and 136902 bind different face (0 and 40269)
--- Corrupted topology: adjacent edges -137071 and 136899 bind different face (40269 and 0)
--- Corrupted topology: adjacent edges -137071 and 136899 bind different face (40269 and 0)
--- Corrupted topology: adjacent edges -137071 and 136899 bind different face (40269 and 0)
--- Corrupted topology: adjacent edges -137071 and 136899 bind different face (40269 and 0)
--- Corrupted topology: adjacent edges -137071 and 136899 bind different face (40269 and 0)
--- Corrupted topology: adjacent edges -137071 and 136899 bind different face (40269 and 0)
--- Corrupted topology: adjacent edges -137071 and 136899 bind different face (40269 and 0)
--- .
--- .
--- Corrupted topology: adjacent edges -137071 and 136899 bind different face (40269 and 0)
--- (84 rows)
   
   min_length_line float = (_clean_info).min_area_to_keep/1000;
   temp_table_name varchar;
@@ -406,51 +378,8 @@ BEGIN
 
 
     
-    -- to much to block
---    command_string := Format('SELECT ST_Union(geom) from (select ST_collect(%1$s) as geom from %3$s where ST_intersects(%1$s,%4$L)) as r', 
---    input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
---    does noe seems to help on permance
-
-    
---    command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
---    'geo', _topology_snap_tolerance, _table_name_result_prefix||'_border_line_segments', _bb);
--- causes dead lock    
-  
-    
     EXECUTE command_string INTO area_to_block;
     
-    --causes
-    
---    area_to_block = ST_Expand(_bb,_topology_snap_tolerance*2);
-    
-    
-  
-  
---CALL resolve_overlap_gap_single_cell(+| 26675 | active | transactionid
---                                      |       |        | 
---CALL resolve_overlap_gap_single_cell(+| 26685 | active | transactionid
---                                      |       |        | 
---CALL resolve_overlap_gap_single_cell(+| 26733 | active | tuple
---                                      |       |        | 
---CALL resolve_overlap_gap_single_cell(+| 26693 | active | transactionid
---                                      |       |        | 
---CALL resolve_overlap_gap_single_cell(+| 26696 | active | transactionid
---                                      |       |        | 
---CALL resolve_overlap_gap_single_cell(+| 26744 | active | tuple
---                                      |       |        | 
---CALL resolve_overlap_gap_single_cell(+| 26747 | active | [NULL]
---                                      |       |        | 
---CALL resolve_overlap_gap_single_cell(+| 26711 | active | tuple
---                                      |       |        | 
---CALL resolve_overlap_gap_single_cell(+| 26751 | active | tuple
---                                      |       |        | 
---CALL resolve_overlap_gap_single_cell(+| 26715 | active | tuple
---                                      |       |        | 
---CALL resolve_overlap_gap_single_cell(+| 26754 | active | tuple
---                                      |       |        | 
---CALL resolve_overlap_gap_single_cell(+| 26719 | active | transactionid
---                                      |       |        | 
---CALL resolve_overlap_gap_single_cell(+| 26756 | active | transactionid
     
     IF area_to_block is NULL or ST_Area(area_to_block) = 0.0 THEN
       area_to_block := _bb;
@@ -469,34 +398,6 @@ BEGIN
     END IF;
 
 
---  A test avoid un commented data updatinf and rollback if it fails
---    command_string := Format('select count(*) from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
---    EXECUTE command_string INTO num_boxes_intersect;
---    
---    command_string := Format('select count(*) from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L) AND blocked_by_id is null;', _job_list_name, area_to_block);
---    EXECUTE command_string INTO num_boxes_free;
---
---    IF num_boxes_intersect != num_boxes_free THEN
---      RAISE NOTICE 'Wait to handle add cell border edges for stage 1 _cell_job_type %, num_boxes_intersect %, num_boxes_free %, for area_to_block % ',  
---      _cell_job_type, num_boxes_intersect, num_boxes_free, area_to_block;
---      RETURN;
---    END IF;
---
---    command_string := Format('update %1$s set blocked_by_id = %3$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L) AND blocked_by_id is null;', 
---    _job_list_name, area_to_block, box_id);
---    EXECUTE command_string;
---    
---    GET DIAGNOSTICS updated_rows = ROW_COUNT;
---    
---    IF num_boxes_intersect != updated_rows THEN
---      RAISE NOTICE 'Wait to handle add cell border edges for stage 2 _cell_job_type %, num_boxes_intersect %, num_boxes_free %, for area_to_block % ',  
---      _cell_job_type, num_boxes_intersect, num_boxes_free, area_to_block;
---      ROLLBACK;
---      RETURN;
---    END IF;
---    
---    
---    COMMIT;
 
     
     
@@ -507,41 +408,16 @@ BEGIN
     overlapgap_grid, input_table_geo_column_name, _bb, _table_name_result_prefix,_topology_snap_tolerance*inner_cell_distance);
     EXECUTE command_string;
 
-    
-    
-    
--- Try with out try catch     
---    IF _loop_number = 1 THEN 
---      command_string := Format('SELECT topology.TopoGeo_addLinestring(%1$L,geo,%2$s) from temp_left_over_borders order by ST_Length(geo) asc', 
---      _topology_name,snap_tolerance_fixed);
---      EXECUTE command_string;
---      
---      command_string := Format('SELECT topo_update.heal_cellborder_edges_no_block(%1$L,bb_geo) from temp_left_over_borders order by ST_Length(geo) asc', 
---      _topology_name);
---      EXECUTE command_string;
---      
---      command_string := Format('SELECT topology.TopoGeo_addLinestring(%1$L,r.geo,%3$s) from %7$s r where ST_StartPoint(r.geo) && %2$L', 
---      _topology_name, _bb, snap_tolerance_fixed, overlapgap_grid, 
---      _table_name_result_prefix, input_table_geo_column_name,
---      _table_name_result_prefix||'_border_line_many_points');
---      EXECUTE command_string;
---    ELSE
 
       -- add border smale border lines
       command_string := Format('SELECT topo_update.add_border_lines(%1$L,geo,%2$s,%3$L) from temp_left_over_borders group by geo order by ST_Length(geo) asc', 
       _topology_name, snap_tolerance_fixed, _table_name_result_prefix);
---      EXECUTE command_string;
 
       EXECUTE command_string into line_edges_added;
       RAISE NOTICE 'Added edges for border lines for box % into line_edges_added %',  box_id, line_edges_added;
 
     drop table temp_left_over_borders;
     
-
---    command_string := Format('update %1$s set blocked_by_id = null where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
---    EXECUTE command_string;
-
-     
      
    ELSIF _cell_job_type = 4 THEN
     -- heal border edges
@@ -589,15 +465,6 @@ BEGIN
 
 
   ELSIF _cell_job_type = 5 THEN
-    -- Remove small polygons
---    command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
---    input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
-    
---    command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
---    'geom', _topology_snap_tolerance, _topology_name||'.edge_data', _bb);
-    
---    command_string := Format('SELECT ST_Union(geom) from (select ST_collect(%1$s) as geom from %3$s where ST_intersects(%1$s,%4$L)) as r', 
- --   'mbr', _topology_snap_tolerance, _topology_name||'.face', _bb);
 
     command_string := Format('SELECT ST_Union(geom) from (select ST_Expand(ST_Envelope(%1$s),%2$s) as geom from %3$s where ST_intersects(%1$s,%4$L) ) as r', 
     'geom', _topology_snap_tolerance, _topology_name||'.edge_data', _bb);
@@ -621,8 +488,6 @@ BEGIN
       RETURN;
     END IF;
 
-      -- select ARRAY(select unnest(line_edges_added)) intqo line_edges_tmp;
-      --RAISE NOTICE 'Added edges for border lines for box % into line_edges_tmp %',  box_id, line_edges_tmp;
 
      IF (_clean_info).simplify_tolerance > 0  THEN
 
@@ -763,23 +628,7 @@ BEGIN
  		  ) as keys', ',', 'r.', ',', temp_table_name, '{}', temp_table_id_column, input_table_geo_column_name, '_other_intersect_id_list');
     RAISE NOTICE '% ', command_string;
     EXECUTE command_string INTO update_fields, update_fields_source;
-   
--- TO get only this with values    
---    command_string := Format('insert into %3$s(%5$s)
--- --select * from (select (ST_dump(st_getFaceGeometry(%1$L,face_id))).geom as %5$s from (
--- --SELECT f.face_id, min(jl.id) as cell_id  FROM
--- --%1$s.face f, 
--- --%4$s jl
--- --WHERE f.mbr && %2$L and jl.cell_geo && f.mbr 
--- --GROUP BY f.face_id
--- --) as r
---    where cell_id = %6$s) as r,
---    %7$s i
---    where i.%5$s && r.%5$s and ST_Intersects(ST_pointOnSurface(r.%5$s),i.%5$s)', 
--- --_topology_name, _bb, temp_table_name, 
--- --_table_name_result_prefix || '_job_list', 
--- --input_table_geo_column_name, box_id, input_table_name);
- 
+    
     -- Insert new geos based on all face id do not check on input table
     command_string := Format('insert into %3$s(%5$s)
  	select * from (select (ST_Dump(topo_update.get_face_geo(%1$L,face_id,%7$s))).geom as %5$s from (

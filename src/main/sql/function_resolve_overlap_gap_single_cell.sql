@@ -236,13 +236,18 @@ BEGIN
 
  
 
+    EXECUTE Format('ANALYZE %s.node', border_topo_info.topology_name);
+    EXECUTE Format('ANALYZE %s.relation', border_topo_info.topology_name);
+    EXECUTE Format('ANALYZE %s.edge_data', border_topo_info.topology_name);
+
+
       
     -- Heal egdes  
     command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L,%3$L)', 
     border_topo_info.topology_name,_bb,outer_cell_boundary_lines);
     EXECUTE command_string;
-    
     command_string = null;
+    
          
     -- Remome small polygons
     -- TODO make check that do not intersect any cell border lines
@@ -261,7 +266,6 @@ BEGIN
       command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L,%3$L)', 
       border_topo_info.topology_name,_bb,outer_cell_boundary_lines);
       --EXECUTE command_string;
-
     
     
     command_string := Format('SELECT EXISTS(SELECT 1 from  %1$s.edge limit 1)',
@@ -297,6 +301,7 @@ BEGIN
     execute Format('SET CONSTRAINTS ALL IMMEDIATE');
     PERFORM topology.DropTopology (border_topo_info.topology_name);
     
+
     -- DROP TABLE IF EXISTS tmp_simplified_border_lines;
  
   ELSIF _cell_job_type = 2 THEN
@@ -759,4 +764,20 @@ $$;
 --  ,3,1);
 --  
 --SELECT topo_update.do_healedges_no_block('test_topo_ar50_t11','0103000020E964000001000000050000000000000050A6074100000000F6F05A410000000050A6074100000000FCF05A4100000000B808084100000000FCF05A4100000000B808084100000000F6F05A410000000050A6074100000000F6F05A41');
+
+
+    --perform pg_sleep(1);
+
+
+--truncate table test_topo_ar50_t11.ar50_utvikling_flate_job_list_donejobs;
+
+--CALL resolve_overlap_gap_single_cell(
+--   'sl_kbj.trl_2019_test_segmenter_mindredata','geo','gid','topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata',                                                                                                                                                                                                                                                   
+--    'topo_sr16_mdata_05',1,25833,'true',                                                                                                                                                                                                                                                                                                                               
+--    '(49,5,10000,3,25,120,240,3,35)',                                                                                                                                                                                                                                                                                                                                  
+--    'topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata_job_list','topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata_grid',
+--    '0103000020E9640000010000000500000000000000A0EA0A4162A964474BDD5A4100000000A0EA0A4142C6ED8430E25A4100000000B49E0B4142C6ED8430E25A4100000000B49E0B4162A964474BDD5A4100000000A0EA0A4162A964474BDD5A41'
+--  ,1,1);
   
+
+--  drop TABLE topo_sr16_mdata_05.edge_data_tmp_365;

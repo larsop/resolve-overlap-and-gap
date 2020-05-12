@@ -182,7 +182,7 @@ EXECUTE Format('CREATE UNLOGGED TABLE %s (
 )',_table_name_result_prefix||'_border_line_many_points',_srid,_srid);
 
 -- Create the simple feature result table  as copy of the input table
-EXECUTE Format('CREATE UNLOGGED TABLE %s AS TABLE %s with NO DATA',_table_name_result_prefix||'_result',_table_to_resolve);
+EXECUTE Format('CREATE TABLE %s AS TABLE %s with NO DATA',_table_name_result_prefix||'_result',_table_to_resolve);
 
 -- Add an extra column to hold a list of other intersections surfaces
 EXECUTE Format('ALTER TABLE %s ADD column _other_intersect_id_list int[]',_table_name_result_prefix||'_result');

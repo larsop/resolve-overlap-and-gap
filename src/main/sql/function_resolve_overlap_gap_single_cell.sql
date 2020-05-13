@@ -308,6 +308,67 @@ BEGIN
   ELSIF _cell_job_type = 2 THEN
    -- add lines from each cell to final Topology layer
    -- this lines will not connect to any line outside each cell
+
+   -- This where typically get core dump on this tread. 
+   -- On vroom2 runing with 18 threads it works OK, but if we increase this to 28 threads the server core dumps 90% of times, 
+   -- when it starts a this stage 
+   -- Added a block command to se if coould help on Segmentation fault, but it does seem to help that much, maybe some
+   
+   --I also cheked that no threads area handling the same cell by greping in hte logs
+   --start work at timeofday:Wed May 13 07:56:51.546346 2020 CEST for X topo_sr16_mdata_05_136, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.555409 2020 CEST for X topo_sr16_mdata_05_139, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.572900 2020 CEST for X topo_sr16_mdata_05_141, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.475363 2020 CEST for X topo_sr16_mdata_05_14, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.585137 2020 CEST for X topo_sr16_mdata_05_182, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.493934 2020 CEST for X topo_sr16_mdata_05_185, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.569853 2020 CEST for X topo_sr16_mdata_05_191, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.536768 2020 CEST for X topo_sr16_mdata_05_198, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.558216 2020 CEST for X topo_sr16_mdata_05_199, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.534759 2020 CEST for X topo_sr16_mdata_05_204, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.527720 2020 CEST for X topo_sr16_mdata_05_224, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.501900 2020 CEST for X topo_sr16_mdata_05_237, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.485634 2020 CEST for X topo_sr16_mdata_05_258, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.535268 2020 CEST for X topo_sr16_mdata_05_288, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.500788 2020 CEST for X topo_sr16_mdata_05_346, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.575592 2020 CEST for X topo_sr16_mdata_05_355, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.478700 2020 CEST for X topo_sr16_mdata_05_366, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.505508 2020 CEST for X topo_sr16_mdata_05_369, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.496298 2020 CEST for X topo_sr16_mdata_05_371, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.510623 2020 CEST for X topo_sr16_mdata_05_376, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.475735 2020 CEST for X topo_sr16_mdata_05_435, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.541407 2020 CEST for X topo_sr16_mdata_05_451, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.488792 2020 CEST for X topo_sr16_mdata_05_485, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.484015 2020 CEST for X topo_sr16_mdata_05_50, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.537174 2020 CEST for X topo_sr16_mdata_05_531, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.480665 2020 CEST for X topo_sr16_mdata_05_539, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.496305 2020 CEST for X topo_sr16_mdata_05_543, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.528266 2020 CEST for X topo_sr16_mdata_05_6, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.558211 2020 CEST for X topo_sr16_mdata_05_92, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   --start work at timeofday:Wed May 13 07:56:51.475735 2020 CEST for X topo_sr16_mdata_05_94, _topology_snap_tolerance 1, with _cell_job_type 2 and min_length_line 0.049s, (_clean_info).chaikins_max_degrees) 240
+   
+   -- And I cheked that no lines where crossing the cell borders
+   --SELECT f.* FROM 
+   --topo_sr16_mdata_05.face f,
+   --(SELECT ST_ExteriorRing(geo) as  geo from topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata_grid) g
+   --where ST_Intersects(f.mbr,g.geo)
+   --;
+   -- face_id | mbr 
+   ---------+-----
+   --(0 rows)
+   
+    area_to_block := _bb;
+
+    command_string := Format('select count(*) from (select * from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L) for update SKIP LOCKED) as r;', _job_list_name, area_to_block);
+    EXECUTE command_string INTO num_boxes_free;
+
+    command_string := Format('select count(*) from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
+    EXECUTE command_string INTO num_boxes_intersect;
+    
+    IF num_boxes_intersect != num_boxes_free THEN
+      RAISE NOTICE 'Wait to handle add cell border edges for _cell_job_type %, num_boxes_intersect %, num_boxes_free %, for area_to_block % ',  
+      _cell_job_type, num_boxes_intersect, num_boxes_free, area_to_block;
+      RETURN;
+    END IF;
  
     has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;
     command_string := Format('SELECT EXISTS(SELECT 1 from to_regclass(%L) where to_regclass is not null)',has_edges_temp_table_name);

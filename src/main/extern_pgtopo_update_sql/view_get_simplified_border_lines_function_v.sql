@@ -17,47 +17,35 @@ DECLARE
   -- This is used to sure that no lines can snap to each other between two cells
   -- The size wil the this value multiplied by _topology_snap_tolerance;
   -- TODO make this as parameter
-  cell_boundary_tolerance_with_multi real = 6;
-  
-  -- This is the boundary geom that contains lines pieces that will added after each single cell is done
+ 
   boundary_geom geometry;
-  bb_boundary_inner geometry;
-  bb_boundary_outer geometry;
+  inner_boundary_geom geometry;
   
-  -- This is is a box used to make small glue lines. This lines is needed to make that we don't do any snap out side our own cell
-  bb_inner_glue_geom geometry;
-  boundary_glue_geom geometry;
-
-  -- The inpux
-  boundary_with float = _topology_snap_tolerance*1.1;
-  glue_boundary_with float = _topology_snap_tolerance * cell_boundary_tolerance_with_multi;
-  overlap_width_inner float = 0;
-  try_update_invalid_rows int;
-  
+  -- TODO make paramter
   _max_point_in_line int = 10000;
   
   cell_id int;
   
 BEGIN
 	
-	
-  -- buffer in to work with geom that lines are only meter from the border
-  -- will only work with polygons
-  -- make the the polygon that contains lines	that will be added in the post process
-  bb_boundary_outer := ST_Expand (_bb, boundary_with);
-  bb_boundary_inner := ST_Expand (_bb, (boundary_with * - 1));
-  boundary_geom := ST_MakePolygon ((
-      SELECT ST_ExteriorRing (ST_Expand (_bb, boundary_with)) AS outer_ring), ARRAY (
-        SELECT ST_ExteriorRing (ST_Expand (_bb, ((boundary_with + overlap_width_inner) * - 1))) AS inner_rings));
-        
-  -- make the the polygon that contains lines is used a glue lines
-  bb_inner_glue_geom := ST_Expand (_bb, ((boundary_with + glue_boundary_with) * - 1));
-  boundary_glue_geom := ST_MakePolygon ((
-      SELECT ST_ExteriorRing (bb_boundary_inner) AS outer_ring), ARRAY (
-        SELECT ST_ExteriorRing (bb_inner_glue_geom) AS inner_rings));
-  -- holds the lines inside bb_boundary_inner
-  -- get the all the line parts based the bb_boundary_outer
+
+  command_string := Format('select id from %1$s g WHERE g.%2$s = %3$L ',
+  _table_name_result_prefix||'_grid', 
+  _input_table_geo_column_name, 
+  _bb);
+  EXECUTE command_string into cell_id;
+
+
+  inner_boundary_geom := ST_Expand(_bb, (-2*_topology_snap_tolerance));
   
+  boundary_geom := ST_MakePolygon ((
+      SELECT ST_ExteriorRing (_bb) AS outer_ring), ARRAY (
+       SELECT ST_ExteriorRing (inner_boundary_geom) AS inner_rings));
+
+  
+  RAISE NOTICE 'removed _bb %  ',  ST_AsText(_bb);
+  
+  --_bb := _bb;
   command_string := Format('CREATE TEMP TABLE tmp_data_all_lines AS WITH 
     rings AS (
  	  SELECT ST_ExteriorRing((ST_DumpRings((st_dump(%3$s)).geom)).geom) as geom
@@ -98,8 +86,7 @@ BEGIN
    
  	)
     select geom, ST_NPoints(geom) AS npoints, min_cell_id from  tmp_data_this_cell_lines
-    ', 
- 	_input_table_name, 
+    ',_input_table_name, 
  	_bb, 
  	_input_table_geo_column_name, 
  	_topology_snap_tolerance,
@@ -109,13 +96,7 @@ BEGIN
   EXECUTE command_string;
 
   
-  command_string := Format('select id from %1$s g WHERE g.%2$s = %3$L ',
-  _table_name_result_prefix||'_grid', 
-  _input_table_geo_column_name, 
-  _bb
- 	);
-  EXECUTE command_string into cell_id;
-
+ 
   command_string := Format('create index on tmp_data_all_lines using gist(geom)', 'idxtmp_data_all_lines_geom' || Md5(ST_AsBinary (_bb)));
   EXECUTE command_string;
   
@@ -139,7 +120,8 @@ BEGIN
   EXECUTE Format('WITH long_lines AS 
     (DELETE FROM tmp_data_all_lines r where npoints >  %2$s and ST_Intersects(geom,%3$L) and min_cell_id = %4$s RETURNING geom) 
     INSERT INTO %1$s (geo) SELECT distinct (ST_dump(geom)).geom as geo from long_lines'
-  ,_table_name_result_prefix||'_border_line_many_points', _max_point_in_line, ST_ExteriorRing(_bb), cell_id);
+  ,_table_name_result_prefix||'_border_line_many_points', _max_point_in_line, 
+  ST_ExteriorRing(_bb), cell_id);
 
     
  
@@ -148,20 +130,20 @@ BEGIN
   EXECUTE Format('INSERT INTO %s (geo, point_geo)
   SELECT l.geom as geo, NULL AS point_geo
   FROM tmp_data_all_lines l where ST_Intersects(geom,%2$L) and min_cell_id = %3$s and ST_IsValid(l.geom) = true '
-  ,_table_name_result_prefix||'_border_line_segments', ST_ExteriorRing(_bb), cell_id );
+  ,_table_name_result_prefix||'_border_line_segments', boundary_geom, cell_id );
 
       
   -- return the result of inner geos to handled imediatly
   RETURN QUERY
   SELECT * FROM (
     SELECT l.geom as geo, false as outer_border_line FROM
-    tmp_data_all_lines l WHERE  ST_CoveredBy(l.geom,_bb)
+    tmp_data_all_lines l WHERE  ST_CoveredBy(l.geom,inner_boundary_geom)
     union 
     SELECT ST_Intersection(ST_Union(
     ST_StartPoint(out.geom),
     ST_EndPoint(out.geom)),_bb) as geo
     , true as outer_border_line FROM
-    tmp_data_all_lines out where ST_Intersects(out.geom,ST_ExteriorRing(_bb))
+    tmp_data_all_lines out where ST_Intersects(out.geom,boundary_geom)
  
   ) AS f;
 END
@@ -188,3 +170,7 @@ $function$;
 
 
 
+--SELECT ST_AsText(ST_Expand(ST_GeomFromText('POLYGON((243550 7017284.3080504,243550 7019790.78879725,246431.25 7019790.78879725,246431.25 7017284.3080504,243550 7017284.3080504))'),-1));
+---------------------------------------------------------------------------------------------------------------------------------------
+--POLYGON((243551 7017285.3080504,243551 7019789.78879725,246430.25 7019789.78879725,246430.25 7017285.3080504,243551 7017285.3080504))
+ 

@@ -72,6 +72,9 @@ SELECT 'utm_check_added_faces', count(mbr) from test_topo_t3.face;
 
 SELECT 'utm_check_added_simple_feature_polygons', count(*) from test_topo_t3.overlap_gap_input_t3_result;
 
+-- Records from this function would mean an invalid topology was created
+SELECT 'validation', * FROM topology.ValidateTopology('test_topo_t3');
+
 SELECT 'utm', topology.droptopology('test_topo_t3');
 
 

@@ -140,7 +140,7 @@ BEGIN
       FOR i_stmts IN 1 .. Array_length(stmts, 1)
       LOOP
          stmts_final[i_stmts+analyze_stmts] = stmts[i_stmts];
-         IF (MOD(i_stmts,200) = 0 AND cell_job_type = 2)
+         IF (MOD(i_stmts,200) = 0 AND (cell_job_type = 3 OR cell_job_type = 2 ))
             THEN
            analyze_stmts := analyze_stmts + 1;
            stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.edge_data;', (_topology_info).topology_name);

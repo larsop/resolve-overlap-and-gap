@@ -484,10 +484,10 @@ BEGIN
                               (
                                 SELECT f.* 
                                   FROM temp_left_over_borders i, %1$s.face f 
-                                where ST_intersects(i.geo,f.mbr)
+                                where ST_DWithin(i.geo,f.mbr,%2$s)
                                 for update
                               ) as r;', 
-    _topology_name);
+    _topology_name,snap_tolerance_fixed);
     EXECUTE command_string INTO num_locked;
     RAISE NOTICE 'Locked %  faces for update top toplogy % and _cell_job_type %, for area_to_block % ',  
     num_locked, _topology_name, _cell_job_type, area_to_block;
@@ -496,11 +496,11 @@ BEGIN
                               (
                                 SELECT e.* 
                                   FROM temp_left_over_borders i, %1$s.face f, %1$s.edge_data e 
-                                WHERE ST_intersects(i.geo,f.mbr) AND 
+                                WHERE ST_DWithin(i.geo,f.mbr,%2$s) AND 
                                 (e.left_face = f.face_id OR e.right_face = f.face_id)
                                 for update
                               ) as r;', 
-    _topology_name);
+    _topology_name,snap_tolerance_fixed);
     EXECUTE command_string INTO num_locked;
     RAISE NOTICE 'Locked %  edge_data for update top toplogy % and _cell_job_type %, for area_to_block % ',  
     num_locked, _topology_name, _cell_job_type, area_to_block;

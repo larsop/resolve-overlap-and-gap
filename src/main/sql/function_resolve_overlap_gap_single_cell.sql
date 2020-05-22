@@ -88,6 +88,7 @@ DECLARE
   heal_edge_status int;
   heal_edge_retry_num int;
   
+  num_locked int;
 
 
 BEGIN
@@ -464,9 +465,6 @@ BEGIN
       RETURN;
     END IF;
 
-
-
-    
     
     border_topo_info.topology_name := _topology_name;
 
@@ -474,6 +472,53 @@ BEGIN
     (select geo from topo_update.get_left_over_borders(%1$L,%2$L,%3$L,%4$L) as r) as r', 
     overlapgap_grid, input_table_geo_column_name, _bb, _table_name_result_prefix,_topology_snap_tolerance*inner_cell_distance);
     EXECUTE command_string;
+    
+
+    -- add rowlevel lock based info from Sandro https://trac.osgeo.org/postgis/ticket/4684
+    --A pessimistic approach might lock:
+    --EVERY FACE whos MBR intersects the input line
+    --EVERY EDGE having any of those faces on its right or left side
+    --EVERY ISOLATED NODE within tolerance distance from the input line
+    
+    command_string := Format('SELECT count(r.*) FROM 
+                              (
+                                SELECT f.* 
+                                  FROM temp_left_over_borders i, %1$s.face f 
+                                where ST_intersects(i.geo,f.mbr)
+                                for update
+                              ) as r;', 
+    _topology_name);
+    EXECUTE command_string INTO num_locked;
+    RAISE NOTICE 'Locked %  faces for update top toplogy % and _cell_job_type %, for area_to_block % ',  
+    num_locked, _topology_name, _cell_job_type, area_to_block;
+   
+    command_string := Format('SELECT count(r.*) FROM 
+                              (
+                                SELECT e.* 
+                                  FROM temp_left_over_borders i, %1$s.face f, %1$s.edge_data e 
+                                WHERE ST_intersects(i.geo,f.mbr) AND 
+                                (e.left_face = f.face_id OR e.right_face = f.face_id)
+                                for update
+                              ) as r;', 
+    _topology_name);
+    EXECUTE command_string INTO num_locked;
+    RAISE NOTICE 'Locked %  edge_data for update top toplogy % and _cell_job_type %, for area_to_block % ',  
+    num_locked, _topology_name, _cell_job_type, area_to_block;
+
+
+    command_string := Format('SELECT count(r.*) FROM 
+                              (
+                                SELECT n.* 
+                                  FROM temp_left_over_borders i, %1$s.node n 
+                                where ST_DWithin(i.geo,n.geom,%2$s)
+                                for update
+                              ) as r;', 
+    _topology_name,snap_tolerance_fixed);
+    EXECUTE command_string INTO num_locked;
+    RAISE NOTICE 'Locked %  nodes for update toplogy % and _cell_job_type %, for area_to_block % ',  
+    num_locked, _topology_name, _cell_job_type, area_to_block;
+
+    
 
 
       -- add border smale border lines

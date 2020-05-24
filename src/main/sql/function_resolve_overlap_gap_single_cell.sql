@@ -370,7 +370,9 @@ BEGIN
       _cell_job_type, num_boxes_intersect, num_boxes_free, area_to_block;
       RETURN;
     END IF;
- 
+
+       BEGIN
+
     has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;
     command_string := Format('SELECT EXISTS(SELECT 1 from to_regclass(%L) where to_regclass is not null)',has_edges_temp_table_name);
     
@@ -405,6 +407,15 @@ BEGIN
 
     END IF;
     
+        EXCEPTION
+      WHEN OTHERS THEN
+  RAISE NOTICE 'Do rollback at timeofday:% for layer %, with _cell_job_type % and box id % .', 
+  Timeofday(), _topology_name || '_', _cell_job_type, box_id;
+
+    ROLLBACK;
+      RETURN;
+    END;	    
+
 
   ELSIF _cell_job_type = 3 THEN
   
@@ -555,16 +566,27 @@ BEGIN
      
     border_topo_info.topology_name := _topology_name;
 
-
+    BEGIN 
       -- add border smale border lines
       command_string := Format('SELECT topo_update.add_border_lines(%1$L,geo,%2$s,%3$L) from temp_left_over_borders group by geo order by ST_Length(geo) asc', 
       _topology_name, snap_tolerance_fixed, _table_name_result_prefix);
 
       EXECUTE command_string into line_edges_added;
       RAISE NOTICE 'Added edges for border lines for box % into line_edges_added %',  box_id, line_edges_added;
+      
+      
 
-    drop table temp_left_over_borders;
+    --drop table temp_left_over_borders;
     
+    EXCEPTION
+      WHEN OTHERS THEN
+  RAISE NOTICE 'Do rollback at timeofday:% for layer %, with _cell_job_type % and box id % .', 
+  Timeofday(), _topology_name || '_', _cell_job_type, box_id;
+
+    ROLLBACK;
+      RETURN;
+    END;	    
+
      
    ELSIF _cell_job_type = 4 THEN
     -- heal border edges
@@ -636,6 +658,8 @@ BEGIN
     END IF;
 
 
+    BEGIN 
+    
     command_string := Format('CREATE TEMP table temp_left_over_borders as select geo FROM
     (select geo from topo_update.get_left_over_borders(%1$L,%2$L,%3$L,%4$L) as r) as r', 
     overlapgap_grid, input_table_geo_column_name, _bb, _table_name_result_prefix,_topology_snap_tolerance*inner_cell_distance);
@@ -713,6 +737,17 @@ BEGIN
       _utm);
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
     RAISE NOTICE 'Removed % clean small polygons for after adding to main face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
+
+    --drop table temp_left_over_borders;
+    
+    EXCEPTION
+      WHEN OTHERS THEN
+  RAISE NOTICE 'Do rollback at timeofday:% for layer %, with _cell_job_type % and box id % .', 
+  Timeofday(), _topology_name || '_', _cell_job_type, box_id;
+
+    ROLLBACK;
+      RETURN;
+    END;	    
 
   ELSIF _cell_job_type = 6 THEN
   

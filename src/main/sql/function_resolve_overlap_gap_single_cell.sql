@@ -448,6 +448,9 @@ BEGIN
     command_string := Format('CREATE TEMP table temp_left_over_borders as select geo FROM
     (select geo from topo_update.get_left_over_borders(%1$L,%2$L,%3$L,%4$L) as r) as r', 
     overlapgap_grid, input_table_geo_column_name, _bb, _table_name_result_prefix,_topology_snap_tolerance*inner_cell_distance);
+    
+    RAISE NOTICE 'command_string1 % ',  command_string;
+    
     EXECUTE command_string;
 
 
@@ -455,49 +458,55 @@ BEGIN
     
                                  
      command_string := Format('WITH 
-                              face_mbr AS 
-                              (
-                                SELECT distinct f2.mbr as geom 
-                                  FROM temp_left_over_borders i, 
-                                       %1$s.face f, 
-                                       %1$s.edge_data e, 
-                                       %1$s.face f2
-                                WHERE ST_DWithin(i.geo,e.geom,%2$s) AND 
-                                (
-                                  (e.left_face = f.face_id AND f2.face_id = e.left_face)
-                                  OR 
-                                  (e.right_face = f.face_id AND f2.face_id = e.right_face) 
-                                ) 
-                              ),
                               edge_line AS 
                               (
                                 SELECT distinct e.geom as geom 
-                                  FROM temp_left_over_borders i, 
-                                       %1$s.edge_data e
+                                FROM 
+                                temp_left_over_borders i, 
+                                %1$s.edge_data e
                                 WHERE ST_DWithin(i.geo,e.geom,%2$s) 
+                                UNION 
+                                SELECT i.geo AS geom
+                                FROM temp_left_over_borders i
                               ),
                               edge_bb AS
                               (
-                                SELECT ST_Envelope(e.geom) as geom FROM edge_line e
+                                SELECT ST_Union(ST_Envelope(e.geom)) as geom FROM edge_line e
                               ),
-                              exting_data AS
+                              face_1 AS 
                               (
-                              SELECT ST_Union(r.geom,e.geom) as geom FROM face_mbr r, edge_bb e
+                                SELECT distinct f.mbr as geom 
+                                FROM 
+                                edge_bb i, 
+                                %1$s.face f
+                                WHERE ST_DWithin(i.geom,f.mbr,%2$s) 
+                                UNION 
+                                SELECT i.geom
+                                FROM edge_bb i
                               ),
-                              input AS
+                              face_2 AS 
                               (
-                                SELECT ST_Union(ST_Envelope(i.geo)) as geom FROM temp_left_over_borders i
+                                SELECT distinct f.mbr as geom 
+                                FROM 
+                                face_1 i, 
+                                %1$s.face f
+                                WHERE ST_DWithin(i.geom,f.mbr,%2$s) 
+                                UNION 
+                                SELECT i.geom
+                                FROM edge_bb i
                               ),
-                              input_bb AS
+                              final_block AS
                               (
-                                SELECT ST_Union(geom,%3$L) as geom from input
+                                SELECT ST_Union(ST_Expand(e.geom,%2$s)) as geom FROM face_2 e
                               )
-                              SELECT ST_Union(e.geom,i.geom) FROM exting_data e, input_bb i', 
+                              SELECT ST_Multi(geom) FROM final_block i', 
     _topology_name,snap_tolerance_fixed,_bb);
 
+    RAISE NOTICE 'command_string2 % ',  command_string;
+      
     EXECUTE command_string INTO area_to_block;
     
-    
+     
     IF area_to_block is NULL or ST_Area(area_to_block) = 0.0 THEN
        RAISE NOTICE 'Failed to make block for _cell_job_type %, num_boxes_intersect %, num_boxes_free %',  
       _cell_job_type, num_boxes_intersect, num_boxes_free;
@@ -529,11 +538,11 @@ BEGIN
       command_string := Format('SELECT count(r.*) FROM 
                                (
                                  SELECT f.* 
-                                   FROM temp_left_over_borders i, %1$s.face f 
+                                    FROM temp_left_over_borders i, %1$s.face f 
                                  where ST_intersects(i.geo,f.mbr)
                                  for update
                                ) as r;', 
-     _topology_name);
+     _topology_name,area_to_block);
      EXECUTE command_string INTO num_locked;
      RAISE NOTICE 'Locked %  faces for update top toplogy % and _cell_job_type %, for area_to_block % ',  
      num_locked, _topology_name, _cell_job_type, area_to_block;
@@ -542,7 +551,7 @@ BEGIN
                                (
                                  SELECT e.* 
                                    FROM temp_left_over_borders i, %1$s.face f, %1$s.edge_data e 
-                                 WHERE ST_intersects(i.geo,f.mbr) AND 
+                                 WHERE ST_intersects(i.geo,f.mbr) AND  
                                  (e.left_face = f.face_id OR e.right_face = f.face_id)
                                  for update
                                ) as r;', 
@@ -563,7 +572,32 @@ BEGIN
      EXECUTE command_string INTO num_locked;
      RAISE NOTICE 'Locked %  nodes for update toplogy % and _cell_job_type %, for area_to_block % ',  
      num_locked, _topology_name, _cell_job_type, area_to_block;
-     
+
+       command_string := Format('SELECT count(r.*) FROM 
+                               (
+                                 SELECT e.* 
+                                   FROM %1$s.edge_data e 
+                                 where ST_DWithin(%3$L,e.geom,%2$s)
+                                 for update
+                               ) as r;', 
+     _topology_name,snap_tolerance_fixed,area_to_block);
+     EXECUTE command_string INTO num_locked;
+     RAISE NOTICE 'Locked %  edges based on area_to_block for update toplogy % and _cell_job_type %, for area_to_block % ',  
+     num_locked, _topology_name, _cell_job_type, area_to_block;
+
+   
+    command_string := Format('SELECT count(r.*) FROM 
+                               (
+                                 SELECT f.* 
+                                   FROM %1$s.face f 
+                                 where ST_DWithin(%3$L,f.mbr,%2$s)
+                                 for update
+                               ) as r;', 
+     _topology_name,snap_tolerance_fixed,area_to_block);
+     EXECUTE command_string INTO num_locked;
+     RAISE NOTICE 'Locked %  edges based on area_to_block for update toplogy % and _cell_job_type %, for area_to_block % ',  
+     num_locked, _topology_name, _cell_job_type, area_to_block;
+
     border_topo_info.topology_name := _topology_name;
 
     BEGIN 

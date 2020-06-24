@@ -148,7 +148,7 @@ BEGIN
   -- ----------------------------- Create help tables
   -- TOOD find out how to handle log tables used for debug
 
-EXECUTE Format('CREATE UNLOGGED TABLE %s (
+EXECUTE Format('CREATE TABLE %s (
   id serial PRIMARY KEY NOT NULL, 
   log_time timestamp DEFAULT Now(), 
   line_geo_lost boolean,

@@ -1,4 +1,10 @@
-CREATE OR REPLACE FUNCTION topo_update.add_border_lines (_topology_name character varying, _new_line_raw geometry, _snap_tolerance float, _table_name_result_prefix varchar)
+drop function if exists topo_update.add_border_lines (_topology_name character varying, _new_line_raw geometry, _snap_tolerance float, _table_name_result_prefix varchar);
+
+CREATE OR REPLACE FUNCTION topo_update.add_border_lines (_topology_name character varying, 
+_new_line_raw geometry, 
+_snap_tolerance float, 
+_table_name_result_prefix varchar,
+_do_retry_add boolean)
   RETURNS integer[]
   AS $$
 DECLARE
@@ -75,7 +81,16 @@ BEGIN
     'Warn2, will do retry, topo_update.add_border_lines with tolerance :'||tolerance_retry_value||' and tolerance_retry_num '|| tolerance_retry_num ||'for topology '||_topology_name, 
     v_state, v_msg, v_detail, v_hint, v_context, new_line);
     
-    
+   
+   IF (_do_retry_add = false) THEN
+   
+      RAISE NOTICE '_do_retry_add is false, just log  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
+      EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) 
+                      VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', 
+                      no_cutline_filename, TRUE, 'Will not do retry ', v_state, v_msg, v_detail, v_hint, v_context, new_line);
+
+     RETURN edges_added;
+   END IF;
 	-- Try with different snap to
 	
     LOOP
@@ -99,8 +114,7 @@ BEGIN
         THEN
          RAISE EXCEPTION 'failed after trying with tolerance, got dead lock: state  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
         END IF;
-  
-
+  	
       END;	    
 
 

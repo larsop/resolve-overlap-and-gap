@@ -57,7 +57,17 @@ BEGIN
     GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
     v_context = PG_EXCEPTION_CONTEXT;
     RAISE NOTICE 'failed with in default case  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
-    
+
+    IF (_do_retry_add = false) THEN
+   
+      RAISE NOTICE '_do_retry_add is false, just log  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
+      EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) 
+                      VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', 
+                      no_cutline_filename, TRUE, 'Will not do retry ', v_state, v_msg, v_detail, v_hint, v_context, new_line);
+
+     RETURN edges_added;
+    END IF;
+
     SELECT Position('deadlock detected' IN v_msg) INTO deadlock_detected;
     
     IF (deadlock_detected > 0 ) THEN
@@ -82,15 +92,6 @@ BEGIN
     v_state, v_msg, v_detail, v_hint, v_context, new_line);
     
    
-   IF (_do_retry_add = false) THEN
-   
-      RAISE NOTICE '_do_retry_add is false, just log  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
-      EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) 
-                      VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', 
-                      no_cutline_filename, TRUE, 'Will not do retry ', v_state, v_msg, v_detail, v_hint, v_context, new_line);
-
-     RETURN edges_added;
-   END IF;
 	-- Try with different snap to
 	
     LOOP

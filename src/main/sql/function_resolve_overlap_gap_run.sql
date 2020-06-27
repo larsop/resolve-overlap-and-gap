@@ -35,7 +35,7 @@ DECLARE
   -- Holds the sql for a functin to call
   func_call text;
   -- Holds the reseult from paralell calls
-  call_result boolean;
+  call_result int;
   -- the number of cells created in the grid
   num_cells int;
   -- the table name prefix to be used for results tables
@@ -160,9 +160,9 @@ BEGIN
       RAISE NOTICE 'Start to run overlap for % stmts_final and gap for table % cell_job_type % at loop_number %', 
       Array_length(stmts_final, 1), (_input).table_to_resolve, cell_job_type, loop_number;
       
-      SELECT execute_parallel (stmts_final, _max_parallel_jobs,true) INTO call_result;
+      SELECT execute_parallel (stmts_final, _max_parallel_jobs,true,null,false) INTO call_result;
 
-      IF (call_result = FALSE AND last_run_stmts = Array_length(stmts, 1)) THEN
+      IF (call_result = 0 AND last_run_stmts = Array_length(stmts, 1)) THEN
         RAISE EXCEPTION 'FFailed to run overlap and gap for % at loop_number % for the following statement list %', 
         (_input).table_to_resolve, loop_number, stmts_final;
       END IF;

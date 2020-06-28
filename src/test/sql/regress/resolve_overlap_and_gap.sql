@@ -21,7 +21,9 @@ null, -- _max_average_vertex_length, in meter both for utm and deegrees, this us
 40, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
 320 -- OR The angle has to be greather than this given value, This is used to avoid to touch all angles 
 )
-,5,4);
+,5,4,
+false  --if set to false, it will do topology.ValidateTopology and stop to if the this call returns any rows
+);
 
 SELECT 'degrees_check_failed_lines', count(geo) from test_topo_t2.overlap_gap_input_t2_no_cut_line_failed;
 

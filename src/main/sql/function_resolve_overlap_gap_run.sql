@@ -18,7 +18,8 @@ _clean_info resolve_overlap_data_clean_type, -- different parameters used if nee
 --(_clean_info).min_area_to_keep float, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
 
 _max_parallel_jobs int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
-_max_rows_in_each_cell int -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
+_max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
+_contiune_after_stat_exception boolean DEFAULT true -- if set to false, it will do topology.ValidateTopology and stop to if the this call returns any rows 
 )
 LANGUAGE plpgsql
 AS $$
@@ -60,6 +61,16 @@ DECLARE
   analyze_stmts int;
   
   last_run_stmts int;
+  
+  num_topo_error_in_final_layer int;
+  v_state text;
+  v_msg text;
+  v_detail text;
+  v_hint text;
+  v_context text;
+
+  start_time timestamp WITH time zone;
+
 
 BEGIN
   table_name_result_prefix := (_topology_info).topology_name || Substring((_input).table_to_resolve FROM (Position('.' IN (_input).table_to_resolve)));
@@ -156,11 +167,34 @@ BEGIN
       stmts := '{}';
 
 
-      
-      RAISE NOTICE 'Start to run overlap for % stmts_final and gap for table % cell_job_type % at loop_number %', 
-      Array_length(stmts_final, 1), (_input).table_to_resolve, cell_job_type, loop_number;
-      
-      SELECT execute_parallel (stmts_final, _max_parallel_jobs,true,null,false) INTO call_result;
+
+      BEGIN
+        SELECT execute_parallel (stmts_final, _max_parallel_jobs,true,null,_contiune_after_stat_exception) INTO call_result;
+
+      EXCEPTION WHEN OTHERS THEN
+        GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT, v_context = PG_EXCEPTION_CONTEXT;
+        RAISE NOTICE 'Failed run execute_parallel cell_job_type: % , in loop_number %, state  : % message: % detail : % hint : % context: %', 
+            cell_job_type, loop_number, v_state, v_msg, v_detail, v_hint, v_context;
+        IF _contiune_after_stat_exception = false THEN
+          -- Do a validation is any erros found stop to execute
+          start_time := Clock_timestamp();
+
+          command_string := Format('SELECT count(*) FROM topology.ValidateTopology(%L)',(_topology_info).topology_name );
+          RAISE NOTICE 'Start to ValidateTopology for cell_job_type % at loop_number % running % ', 
+          cell_job_type, loop_number, command_string;
+          execute command_string into num_topo_error_in_final_layer;
+
+          RAISE NOTICE 'Found % errors when ValidateTopology for cell_job_type % at loop_number % for topology % in % secs', 
+          num_topo_error_in_final_layer, cell_job_type, loop_number, (_topology_info).topology_name, (Extract(EPOCH FROM (Clock_timestamp() - start_time)));
+
+          IF num_topo_error_in_final_layer > 0 THEN
+         	 -- If any erros found break 
+         	 RAISE EXCEPTION 'Failed run execute_parallel cell_job_type and error found : % , in loop_number %, state  : % message: % detail : % hint : % context: %', 
+             cell_job_type, loop_number, v_state, v_msg, v_detail, v_hint, v_context;
+          END IF;
+        END IF;
+      END;      
+  
 
       IF (call_result = 0 AND last_run_stmts = Array_length(stmts, 1)) THEN
         RAISE EXCEPTION 'FFailed to run overlap and gap for % at loop_number % for the following statement list %', 

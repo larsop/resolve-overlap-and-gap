@@ -19,7 +19,8 @@ _clean_info resolve_overlap_data_clean_type, -- different parameters used if nee
 --(_clean_info).min_area_to_keep float, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
 
 _max_parallel_jobs int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
-_max_rows_in_each_cell int -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
+_max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
+_contiune_after_stat_exception boolean -- if set to false, it will do topology.ValidateTopology and stop to if the this call returns any rows 
 );
 
 DROP FUNCTION IF EXISTS resolve_overlap_gap_init(

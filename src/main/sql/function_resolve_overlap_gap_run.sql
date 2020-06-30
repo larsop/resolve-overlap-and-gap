@@ -1,4 +1,86 @@
 -- This is the main funtion used resolve overlap and gap
+CREATE OR REPLACE PROCEDURE resolve_overlap_gap_run(
+
+_input resolve_overlap_data_input_type, 
+--(_input).table_to_resolve varchar, -- The table to resolv, imcluding schema name
+--(_input).table_pk_column_name varchar, -- The primary of the input table
+--(_input).table_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
+--(_input).table_srid int, -- the srid for the given geo column on the table analyze
+--(_input).utm boolean, 
+
+_topology_info resolve_overlap_data_topology_type,
+---(_topology_info).topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset and th efinal result
+-- NB. Any exting data will related to topology_name will be deleted
+--(_topology_info).topology_snap_tolerance float, -- this is tolerance used as base when creating the the postgis topolayer
+
+_clean_info resolve_overlap_data_clean_type, -- different parameters used if need to clean up your data
+--(_clean_info).simplify_tolerance float, -- is this is more than zero simply will called with
+--(_clean_info).do_chaikins boolean, -- here we will use chaikins togehter with simply to smooth lines
+--(_clean_info).min_area_to_keep float, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
+
+_max_parallel_jobs int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
+_max_rows_in_each_cell int,
+_contiune_after_stat_exception boolean  -- if set to false, it will do topology.ValidateTopology and stop to if the this call returns any rows 
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+contiune_after_stat_exception boolean = true; -- DEFAULT true, -- if set to false, it will do topology.ValidateTopology and stop to if the this call returns any rows 
+BEGIN
+
+CALL resolve_overlap_gap_run(_input , 
+_topology_info, 
+_clean_info,
+_max_parallel_jobs,
+_max_rows_in_each_cell,
+_contiune_after_stat_exception,
+contiune_after_stat_exception);
+
+END
+$$;
+
+
+-- This is the main funtion used resolve overlap and gap
+CREATE OR REPLACE PROCEDURE resolve_overlap_gap_run(
+
+_input resolve_overlap_data_input_type, 
+--(_input).table_to_resolve varchar, -- The table to resolv, imcluding schema name
+--(_input).table_pk_column_name varchar, -- The primary of the input table
+--(_input).table_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
+--(_input).table_srid int, -- the srid for the given geo column on the table analyze
+--(_input).utm boolean, 
+
+_topology_info resolve_overlap_data_topology_type,
+---(_topology_info).topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset and th efinal result
+-- NB. Any exting data will related to topology_name will be deleted
+--(_topology_info).topology_snap_tolerance float, -- this is tolerance used as base when creating the the postgis topolayer
+
+_clean_info resolve_overlap_data_clean_type, -- different parameters used if need to clean up your data
+--(_clean_info).simplify_tolerance float, -- is this is more than zero simply will called with
+--(_clean_info).do_chaikins boolean, -- here we will use chaikins togehter with simply to smooth lines
+--(_clean_info).min_area_to_keep float, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
+
+_max_parallel_jobs int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
+_max_rows_in_each_cell int)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+_contiune_after_stat_exception boolean = true; -- DEFAULT true, -- if set to false, it will do topology.ValidateTopology and stop to if the this call returns any rows 
+_validate_topoplogy_for_each_run boolean =false; -- if set to true, it will do topology.ValidateTopology at each loop return if it's error 
+BEGIN
+
+CAll resolve_overlap_gap_run(_input , 
+_topology_info, 
+_clean_info,
+_max_parallel_jobs,
+_max_rows_in_each_cell,
+true,
+false);
+
+END
+$$;
+
+-- This is the main funtion used resolve overlap and gap
 CREATE OR REPLACE PROCEDURE resolve_overlap_gap_run (
 _input resolve_overlap_data_input_type, 
 --(_input).table_to_resolve varchar, -- The table to resolv, imcluding schema name
@@ -19,7 +101,8 @@ _clean_info resolve_overlap_data_clean_type, -- different parameters used if nee
 
 _max_parallel_jobs int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
 _max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
-_contiune_after_stat_exception boolean DEFAULT true -- if set to false, it will do topology.ValidateTopology and stop to if the this call returns any rows 
+_contiune_after_stat_exception boolean, -- DEFAULT true, -- if set to false, it will do topology.ValidateTopology and stop to if the this call returns any rows 
+_validate_topoplogy_for_each_run boolean -- DEFAULT false -- if set to true, it will do topology.ValidateTopology at each loop return if it's error 
 )
 LANGUAGE plpgsql
 AS $$
@@ -194,6 +277,25 @@ BEGIN
           END IF;
         END IF;
       END;      
+      
+      IF _validate_topoplogy_for_each_run THEN
+          start_time := Clock_timestamp();
+          
+          command_string := Format('SELECT count(*) FROM topology.ValidateTopology(%L)',(_topology_info).topology_name );
+          RAISE NOTICE 'Start to ValidateTopology because _validate_topoplogy_for_each_run is true for cell_job_type % at loop_number % running % ', 
+          cell_job_type, loop_number, command_string;
+          execute command_string into num_topo_error_in_final_layer;
+
+          RAISE NOTICE 'Found % errors when ValidateTopology for cell_job_type % at loop_number % for topology % in % secs', 
+          num_topo_error_in_final_layer, cell_job_type, loop_number, (_topology_info).topology_name, (Extract(EPOCH FROM (Clock_timestamp() - start_time)));
+
+          IF num_topo_error_in_final_layer > 0 THEN
+         	 -- If any erros found break 
+         	 RAISE EXCEPTION 'error found when topology.ValidateTopology for job_type : % , in loop_number %', 
+             cell_job_type, loop_number;
+          END IF;
+      
+      END IF;
   
 
       IF (call_result = 0 AND last_run_stmts = Array_length(stmts, 1)) THEN

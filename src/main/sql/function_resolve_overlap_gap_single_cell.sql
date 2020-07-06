@@ -496,9 +496,20 @@ BEGIN
                                 SELECT i.geom
                                 FROM edge_bb i
                               ),
+                              edge_2 AS 
+                              (
+                                SELECT distinct e.geom as geom 
+                                FROM 
+                                face_2 i, 
+                                %1$s.edge_data e
+                                WHERE ST_DWithin(i.geom,e.geom,%2$s) 
+                                UNION 
+                                SELECT i.geom
+                                FROM face_2 i
+                              ),
                               final_block AS
                               (
-                                SELECT ST_Union(ST_Expand(e.geom,%2$s)) as geom FROM face_2 e
+                                SELECT ST_Union(ST_Expand(e.geom,%2$s)) as geom FROM edge_2 e
                               )
                               SELECT ST_Multi(geom) FROM final_block i', 
     _topology_name,snap_tolerance_fixed,_bb);

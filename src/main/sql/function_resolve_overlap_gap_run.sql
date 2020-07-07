@@ -204,7 +204,7 @@ BEGIN
 	      RAISE WARNING 'EXIT with % jobs for cell_job_type % at loop_number % for topology % ', 
           Array_length(stmts_final, 1), cell_job_type, loop_number, (_topology_info).topology_name;
           RAISE WARNING 'stmts to run --> %', stmts_final;
-          exit;
+          return ;
 	    END IF;
   
 	    start_time := Clock_timestamp();

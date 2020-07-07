@@ -99,10 +99,10 @@ CALL
 utm_check_failed_lines|0
 utm_check_border_lines|8
 utm_check_added_faces|2
-utm_check_added_simple_feature_polygons|2
+utm_check_added_simple_feature_polygons|0
 CALL
 utm_check_failed_lines|0
 utm_check_border_lines|8
 utm_check_added_faces|7
-utm_check_added_simple_feature_polygons|9
+utm_check_added_simple_feature_polygons|7
 utm|Topology 'test_topo_t3' dropped

@@ -71,6 +71,30 @@ _contiune_after_stat_exception boolean, -- if set to false, it will do topology.
 _validate_topoplogy_for_each_run boolean -- DEFAULT false -- if set to true, it will do topology.ValidateTopology at each loop return if it's error 
 );
 
+
+DROP PROCEDURE IF EXISTS resolve_overlap_gap_run(
+_input resolve_overlap_data_input_type, 
+--(_input).table_to_resolve varchar, -- The table to resolv, imcluding schema name
+--(_input).table_pk_column_name varchar, -- The primary of the input table
+--(_input).table_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
+--(_input).table_srid int, -- the srid for the given geo column on the table analyze
+--(_input).utm boolean, 
+
+_topology_info resolve_overlap_data_topology_type,
+---(_topology_info).topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset and th efinal result
+-- NB. Any exting data will related to topology_name will be deleted
+--(_topology_info).topology_snap_tolerance float, -- this is tolerance used as base when creating the the postgis topolayer
+
+_clean_info resolve_overlap_data_clean_type, -- different parameters used if need to clean up your data
+--(_clean_info).simplify_tolerance float, -- is this is more than zero simply will called with
+--(_clean_info).do_chaikins boolean, -- here we will use chaikins togehter with simply to smooth lines
+--(_clean_info).min_area_to_keep float, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
+
+_max_parallel_jobs int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
+_max_rows_in_each_cell int,
+_debug_options resolve_overlap_data_debug_options_type
+);
+
 DROP FUNCTION IF EXISTS resolve_overlap_gap_init(
 _table_name_result_prefix varchar,
 _table_to_resolve varchar, -- The schema.table name with polygons to analyze for gaps and intersects
@@ -185,6 +209,8 @@ DROP FUNCTION IF EXISTS execute_parallel(stmts text[], num_parallel_thread int,o
 DROP FUNCTION IF EXISTS execute_parallel(stmts text[], num_parallel_thread int,open_close_conn boolean,user_connstr text,boolean);
 
 DROP FUNCTION IF EXISTS "vsr_get_data_type"(_t regclass, _c text);
+
+DROP TYPE IF EXISTS  resolve_overlap_data_debug_options_type cascade;
 
 -- Drop function used by view_ar5_forest_split_distinct_func.sql
 drop schema topo_update cascade;

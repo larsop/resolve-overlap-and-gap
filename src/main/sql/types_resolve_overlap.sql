@@ -68,3 +68,41 @@ END;
 $$
 LANGUAGE plpgsql;
 
+CREATE TYPE resolve_overlap_data_debug_options_type AS (
+contiune_after_stat_exception boolean, -- if set to false, it will do topology.ValidateTopology and stop to if the this call returns any rows 
+validate_topoplogy_for_each_run boolean, -- if set to true, it will do topology.ValidateTopology at each loop return if it's error 
+run_add_border_line_as_single_thread boolean, -- if set to false, it will in many cases generate topo errors beacuse of running in many parralell threads
+start_at_job_type int, -- if set to more than 1 it will skip init procces and start at given job_type
+start_at_loop_nr int, -- many of jobs are ran in loops beacuse because if get an exception or cell is not allowed handle because cell close to is also started to work , this cell will gandled in the next loop.
+stop_at_job_type int, -- if set to more than 0 the job will stop  when this job type is reday to run and display a set sql to run
+stop_at_loop_nr int -- if set to more than 0 the job will stop  when this job type is reday to run and display a set sql to run
+);
+
+CREATE OR REPLACE FUNCTION resolve_overlap_data_debug_options_func(
+_contiune_after_stat_exception boolean default true, -- if set to false, it will do topology.ValidateTopology and stop to if the this call returns any rows 
+_validate_topoplogy_for_each_run boolean default false, -- if set to true, it will do topology.ValidateTopology at each loop return if it's error 
+_run_add_border_line_as_single_thread boolean default true, --  if set to false, it will in many cases generate topo errors beacuse of running in many parralell threads
+_start_at_job_type int default 1, -- if set to more than 1 it will skip init procces and start at given job_type
+_start_at_loop_nr int default 1, -- many of jobs are ran in loops beacuse because if get an exception or cell is not allowed handle because cell close to is also started to work , this cell will gandled in the next loop.
+_stop_at_job_type int default 0, -- if set to more than 0 the job will stop  when this job type is reday to run and display a set sql to run
+_stop_at_loop_nr int default 0 -- if set to more than 0 the job will stop  when this job type is reday to run and display a set sql to run
+)
+RETURNS resolve_overlap_data_debug_options_type
+  AS $$
+DECLARE
+  ct resolve_overlap_data_debug_options_type;
+BEGIN
+  ct = (
+    _contiune_after_stat_exception,
+    _validate_topoplogy_for_each_run,
+    _run_add_border_line_as_single_thread,
+    _start_at_job_type,
+    _start_at_loop_nr,
+    _stop_at_job_type,
+    _stop_at_loop_nr
+    );
+  
+  return ct;
+END;
+$$
+LANGUAGE plpgsql;

@@ -509,7 +509,7 @@ BEGIN
                               ),
                               final_block AS
                               (
-                                SELECT ST_Union(ST_Expand(e.geom,%2$s)) as geom FROM edge_2 e
+                                SELECT ST_Envelope(ST_Collect(ST_Expand(e.geom,%2$s))) as geom FROM edge_2 e
                               )
                               SELECT ST_Multi(geom) FROM final_block i', 
     _topology_name,snap_tolerance_fixed,_bb);

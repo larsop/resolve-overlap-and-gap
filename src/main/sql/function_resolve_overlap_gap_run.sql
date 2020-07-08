@@ -153,10 +153,12 @@ BEGIN
 
     END IF;
     
-    command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%L,%s)', 
-    (_input).table_to_resolve, (_input).table_geo_collumn_name, (_input).table_srid, (_input).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input).table_pk_column_name, _clean_info, cell_job_type);
-    EXECUTE command_string;
-    COMMIT;
+    IF loop_number = 1 THEN
+      command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%L,%s)', 
+      (_input).table_to_resolve, (_input).table_geo_collumn_name, (_input).table_srid, (_input).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input).table_pk_column_name, _clean_info, cell_job_type);
+      EXECUTE command_string;
+      COMMIT;
+    END IF;
 
     --EXIT WHEN cell_job_type = 4;
     

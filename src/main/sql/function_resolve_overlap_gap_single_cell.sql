@@ -456,8 +456,8 @@ BEGIN
 
 
      -- Anohter test block base on mbr Sandro https://trac.osgeo.org/postgis/ticket/4684
-    
-                                 
+     -- Causes topology errors most of the times
+     -- This is just keep because the best be able bøock this based data in postgis topology layer
      command_string := Format('WITH 
                               edge_line AS 
                               (
@@ -514,6 +514,46 @@ BEGIN
                               SELECT ST_Multi(geom) FROM final_block i', 
     _topology_name,snap_tolerance_fixed,_bb);
 
+   
+    -- We try to input as blocking
+    command_string := Format('WITH 
+                              direct_intersect AS 
+                              (
+                                SELECT ST_Envelope(ST_Collect(geom)) as geom FROM 
+                                (
+                                  SELECT distinct od.%5$s as geom 
+                                  FROM 
+                                  temp_left_over_borders i, 
+                                  %4$s od
+                                  WHERE ST_DWithin(i.geo,od.%5$s,%2$s) 
+                                  UNION 
+                                  SELECT i.geo AS geom
+                                  FROM temp_left_over_borders i
+                                ) as r
+                              ),
+                              in_direct_intersect AS
+                              (
+                                SELECT ST_Envelope(ST_Collect(geom)) as geom FROM 
+                                (
+                                  SELECT distinct od.%5$s as geom 
+                                  FROM 
+                                  direct_intersect i, 
+                                  %4$s od
+                                  WHERE ST_DWithin(i.geom,od.%5$s,%2$s) 
+                                  UNION 
+                                  SELECT i.geo AS geom
+                                  FROM temp_left_over_borders i
+                                ) as r
+                              ),
+                              final_block AS
+                              (
+                                SELECT ST_Envelope(ST_Collect(ST_Expand(e.geom,%2$s))) as geom FROM in_direct_intersect e
+                              )
+                              SELECT ST_Multi(geom) FROM final_block i', 
+    _topology_name,snap_tolerance_fixed,_bb,
+    input_table_name, input_table_geo_column_name);
+
+
     RAISE NOTICE 'command_string2 % ',  command_string;
       
     EXECUTE command_string INTO area_to_block;
@@ -541,7 +581,7 @@ BEGIN
     
  
  
-      -- add rowlevel lock based info from Sandro https://trac.osgeo.org/postgis/ticket/4684
+     -- add rowlevel lock based info from Sandro https://trac.osgeo.org/postgis/ticket/4684
      --A pessimistic approach might lock:
      --EVERY FACE whos MBR intersects the input line
      --EVERY EDGE having any of those faces on its right or left side
@@ -996,5 +1036,3 @@ $$;
 --    '0103000020E9640000010000000500000000000000A0EA0A4162A964474BDD5A4100000000A0EA0A4142C6ED8430E25A4100000000B49E0B4142C6ED8430E25A4100000000B49E0B4162A964474BDD5A4100000000A0EA0A4162A964474BDD5A41'
 --  ,1,1);
   
-
---  drop TABLE topo_sr16_mdata_05.edge_data_tmp_365;

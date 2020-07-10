@@ -587,69 +587,32 @@ BEGIN
      --EVERY EDGE having any of those faces on its right or left side
      --EVERY ISOLATED NODE within tolerance distance from the input line
 
-      command_string := Format('SELECT count(r.*) FROM 
+      command_string := Format('WITH face_01 AS 
                                (
                                  SELECT f.* 
                                     FROM temp_left_over_borders i, %1$s.face f 
-                                 where ST_intersects(i.geo,f.mbr)
-                                 for update
-                               ) as r;', 
-     _topology_name,area_to_block);
-     EXECUTE command_string INTO num_locked;
-     RAISE NOTICE 'Locked %  faces for update top toplogy % and _cell_job_type %, for area_to_block % ',  
-     num_locked, _topology_name, _cell_job_type, area_to_block;
-
-      command_string := Format('SELECT count(r.*) FROM 
-                               (
+                                 WHERE ST_DWithin(i.geo,f.mbr,%2$s)
+                                 FOR UPDATE
+                               ),
+                               edge_01 AS (
                                  SELECT e.* 
-                                   FROM temp_left_over_borders i, %1$s.face f, %1$s.edge_data e 
-                                 WHERE ST_intersects(i.geo,f.mbr) AND  
-                                 (e.left_face = f.face_id OR e.right_face = f.face_id)
+                                   FROM face_01 f, 
+                                   %1$s.edge_data e 
+                                 WHERE (e.left_face = f.face_id OR e.right_face = f.face_id)
                                  for update
-                               ) as r;', 
-     _topology_name);
-     EXECUTE command_string INTO num_locked;
-     RAISE NOTICE 'Locked %  edge_data for update top toplogy % and _cell_job_type %, for area_to_block % ',  
-     num_locked, _topology_name, _cell_job_type, area_to_block;
-
- 
-      command_string := Format('SELECT count(r.*) FROM 
-                               (
+                               ),
+                               node_01 AS (
                                  SELECT n.* 
                                    FROM temp_left_over_borders i, %1$s.node n 
                                  where ST_DWithin(i.geo,n.geom,%2$s)
                                  for update
-                               ) as r;', 
+                               ) 
+                               SELECT ( (SELECT count(*) from edge_01) + (SELECT count(*) from node_01) )', 
      _topology_name,snap_tolerance_fixed);
      EXECUTE command_string INTO num_locked;
-     RAISE NOTICE 'Locked %  nodes for update toplogy % and _cell_job_type %, for area_to_block % ',  
+     RAISE NOTICE 'Locked %  rows for update top toplogy % and _cell_job_type %, for area_to_block % ',  
      num_locked, _topology_name, _cell_job_type, area_to_block;
-
-       command_string := Format('SELECT count(r.*) FROM 
-                               (
-                                 SELECT e.* 
-                                   FROM %1$s.edge_data e 
-                                 where ST_DWithin(%3$L,e.geom,%2$s)
-                                 for update
-                               ) as r;', 
-     _topology_name,snap_tolerance_fixed,area_to_block);
-     EXECUTE command_string INTO num_locked;
-     RAISE NOTICE 'Locked %  edges based on area_to_block for update toplogy % and _cell_job_type %, for area_to_block % ',  
-     num_locked, _topology_name, _cell_job_type, area_to_block;
-
-   
-    command_string := Format('SELECT count(r.*) FROM 
-                               (
-                                 SELECT f.* 
-                                   FROM %1$s.face f 
-                                 where ST_DWithin(%3$L,f.mbr,%2$s)
-                                 for update
-                               ) as r;', 
-     _topology_name,snap_tolerance_fixed,area_to_block);
-     EXECUTE command_string INTO num_locked;
-     RAISE NOTICE 'Locked %  edges based on area_to_block for update toplogy % and _cell_job_type %, for area_to_block % ',  
-     num_locked, _topology_name, _cell_job_type, area_to_block;
-
+     
     border_topo_info.topology_name := _topology_name;
 
     BEGIN 

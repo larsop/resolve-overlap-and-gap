@@ -554,9 +554,8 @@ BEGIN
     input_table_name, input_table_geo_column_name);
 
 
-    RAISE NOTICE 'command_string2 % ',  command_string;
-      
-    EXECUTE command_string INTO area_to_block;
+	-- RAISE NOTICE 'command_string2 % ',  command_string;
+    -- EXECUTE command_string INTO area_to_block;
     
      
     IF area_to_block is NULL or ST_Area(area_to_block) = 0.0 THEN
@@ -587,27 +586,57 @@ BEGIN
      --EVERY EDGE having any of those faces on its right or left side
      --EVERY ISOLATED NODE within tolerance distance from the input line
 
-      command_string := Format('WITH face_01 AS 
+
+--Lock all edges intersecting the incoming input line
+--Lock all faces found on both sides of the above edges
+--Lock all edges having any of the above faces on their side
+
+      command_string := Format('WITH face_01 AS --EVERY FACE whos MBR intersects the input line  (used tolerance)
                                (
                                  SELECT f.* 
-                                    FROM temp_left_over_borders i, %1$s.face f 
+                                    FROM temp_left_over_borders i,
+                                    %1$s.face f 
                                  WHERE ST_DWithin(i.geo,f.mbr,%2$s)
                                  FOR UPDATE
                                ),
-                               edge_01 AS (
+                               edge_01 AS ( --EVERY EDGE having any of those faces on its right or left side
                                  SELECT e.* 
                                    FROM face_01 f, 
                                    %1$s.edge_data e 
                                  WHERE (e.left_face = f.face_id OR e.right_face = f.face_id)
                                  for update
                                ),
-                               node_01 AS (
+                               node_01 AS ( --EVERY ISOLATED NODE within tolerance distance from the input line
                                  SELECT n.* 
                                    FROM temp_left_over_borders i, %1$s.node n 
                                  where ST_DWithin(i.geo,n.geom,%2$s)
                                  for update
-                               ) 
-                               SELECT ( (SELECT count(*) from edge_01) + (SELECT count(*) from node_01) )', 
+                               ), 
+                               edge_02 AS ( --Lock all edges intersecting the incoming input line
+                                 SELECT e.* 
+                                   FROM temp_left_over_borders i, 
+                                   %1$s.edge_data e 
+                                 WHERE ST_DWithin(i.geo,e.geom,%2$s)
+                                 for update
+                              ),
+                              face_02 AS ( --Lock all faces found on both sides of the above edges
+                                 SELECT f.* 
+                                    FROM edge_02 e,
+                                    %1$s.face f 
+                                 WHERE (e.left_face = f.face_id OR e.right_face = f.face_id)
+                                 FOR UPDATE
+                              ),
+                              edge_03 AS ( --Lock all edges having any of the above faces on their side
+                                 SELECT e.* 
+                                   FROM face_01 f, 
+                                   %1$s.edge_data e 
+                                 WHERE (e.left_face = f.face_id OR e.right_face = f.face_id)
+                                 for update
+                              )
+                              SELECT ( (SELECT count(*) from edge_01) + 
+                                       (SELECT count(*) from node_01) +
+                                       (SELECT count(*) from edge_03)
+                                     )', 
      _topology_name,snap_tolerance_fixed);
      EXECUTE command_string INTO num_locked;
      RAISE NOTICE 'Locked %  rows for update top toplogy % and _cell_job_type %, for area_to_block % ',  
@@ -999,3 +1028,4 @@ $$;
 --    '0103000020E9640000010000000500000000000000A0EA0A4162A964474BDD5A4100000000A0EA0A4142C6ED8430E25A4100000000B49E0B4142C6ED8430E25A4100000000B49E0B4162A964474BDD5A4100000000A0EA0A4162A964474BDD5A41'
 --  ,1,1);
   
+

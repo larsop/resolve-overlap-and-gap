@@ -555,9 +555,12 @@ BEGIN
 
 
 	-- RAISE NOTICE 'command_string2 % ',  command_string;
-    -- EXECUTE command_string INTO area_to_block;
+	-- with less blocking up fromt we get a lot deadlocks and execution time increases  
+	-- We may also get topology errors , but I need to more on this
+    EXECUTE command_string INTO area_to_block;
     
      
+	-- with no spatial blocking up front we get a lot deadlocks and execution time increases  
     IF area_to_block is NULL or ST_Area(area_to_block) = 0.0 THEN
        RAISE NOTICE 'Failed to make block for _cell_job_type %, num_boxes_intersect %, num_boxes_free %',  
       _cell_job_type, num_boxes_intersect, num_boxes_free;

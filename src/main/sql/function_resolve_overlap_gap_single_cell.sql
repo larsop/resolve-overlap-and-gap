@@ -591,7 +591,7 @@ BEGIN
 --Lock all faces found on both sides of the above edges
 --Lock all edges having any of the above faces on their side
 
-      command_string := Format('WITH face_01 AS --EVERY FACE whos MBR intersects the input line  (tested with ST_DWithin and tolerance and then execution time increase may be 30%)
+      command_string := Format('WITH face_01 AS --EVERY FACE whos MBR intersects the input line  (tested with ST_DWithin and tolerance and then execution time increase may be 30 percent)
                                (
                                  SELECT f.* 
                                     FROM temp_left_over_borders i,
@@ -612,7 +612,7 @@ BEGIN
                                  where ST_DWithin(i.geo,n.geom,%2$s)
                                  for update
                                ), 
-                               edge_02 AS ( --Lock all edges intersecting the incoming input line (tested with ST_DWithin and tolerance and then execution time increase may be 30%)
+                               edge_02 AS ( --Lock all edges intersecting the incoming input line (tested with ST_DWithin and tolerance and then execution time increase may be 30 percent)
                                  SELECT e.* 
                                    FROM temp_left_over_borders i, 
                                    %1$s.edge_data e 

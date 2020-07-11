@@ -628,7 +628,7 @@ BEGIN
                               ),
                               edge_03 AS ( --Lock all edges having any of the above faces on their side
                                  SELECT e.* 
-                                   FROM face_01 f, 
+                                   FROM face_02 f, 
                                    %1$s.edge_data e 
                                  WHERE (e.left_face = f.face_id OR e.right_face = f.face_id)
                                  for update

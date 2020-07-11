@@ -625,17 +625,21 @@ BEGIN
                                     %1$s.face f 
                                  WHERE (e.left_face = f.face_id OR e.right_face = f.face_id)
                                  FOR UPDATE
-                              ),
-                              edge_03 AS ( --Lock all edges having any of the above faces on their side
-                                 SELECT e.* 
-                                   FROM face_02 f, 
-                                   %1$s.edge_data e 
-                                 WHERE (e.left_face = f.face_id OR e.right_face = f.face_id)
-                                 for update
                               )
+-- With this block we got deadlocks all the time which kills the performace, 
+-- when trying to around 1200 cellborder crossing lines we got more than 1000 deadlocks and then we where done with only around 1/4 of the lines.
+-- A jobs that shoud take 2 minutes I just killed after 10 miuntes. 
+--                              ,
+--                              edge_03 AS ( --Lock all edges having any of the above faces on their side
+--                                 SELECT e.* 
+--                                   FROM face_02 f, 
+--                                   %1$s.edge_data e 
+--                                 WHERE (e.left_face = f.face_id OR e.right_face = f.face_id)
+--                                 for update
+--                              )
                               SELECT ( (SELECT count(*) from edge_01) + 
                                        (SELECT count(*) from node_01) +
-                                       (SELECT count(*) from edge_03)
+                                       (SELECT count(*) from face_02)
                                      )', 
      _topology_name,snap_tolerance_fixed);
      EXECUTE command_string INTO num_locked;

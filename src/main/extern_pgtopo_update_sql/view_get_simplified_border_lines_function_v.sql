@@ -53,7 +53,7 @@ BEGIN
  	  where ST_Intersects(v.%3$s,%2$L)
  	),
  	lines_intersect_cell as (
-      SELECT( ST_Dump(ST_Multi(ST_LineMerge(ST_union(rings.geom))))).geom 
+      SELECT( ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(rings.geom,%7$s)))))).geom  
       from rings
     ),
     touch_lines_intersects AS (
@@ -72,7 +72,7 @@ BEGIN
       (
       SELECT min(g.id) as min_cell_id, l.geom 
       FROM
-      ( SELECT (ST_Dump(ST_Multi(ST_LineMerge(ST_union(geom))))).geom FROM
+      ( SELECT (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(geom,%7$s)))))).geom FROM
       ( 
         SELECT distinct geom from 
          (SELECT geom from lines_intersect_cell l1 union SELECT geom from touch_lines_intersects l2) as l
@@ -91,7 +91,8 @@ BEGIN
  	_input_table_geo_column_name, 
  	_topology_snap_tolerance,
  	_table_name_result_prefix||'_grid', 
- 	ST_ExteriorRing(_bb)
+ 	ST_ExteriorRing(_bb),
+ 	_topology_snap_tolerance
  	);
   EXECUTE command_string;
 

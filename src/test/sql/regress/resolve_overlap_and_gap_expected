@@ -1,108 +1,26 @@
 CALL
 degrees_check_failed_lines|0
-degrees_check_border_lines|8
+degrees_check_border_lines|12
 degrees_check_added_faces|7
 degrees_check_added_simple_feature_geom|7
-degrees_check_added_simple_feature_c1|7
-degrees_check_added_simple_feature_c2|7
-degrees_check_added_simple_feature_c3|7
+degrees_check_added_simple_feature_c1|6
+degrees_check_added_simple_feature_c2|6
+degrees_check_added_simple_feature_c3|6
 degrees|Topology 'test_topo_t2' dropped
 CALL
 utm_check_failed_lines|0
-utm_check_border_lines|8
+utm_check_border_lines|12
 utm_check_added_faces|7
 utm_check_added_simple_feature_polygons|7
 utm|Topology 'test_topo_t3' dropped
-WARNING:  EXIT with 20 jobs for cell_job_type 3 at loop_number 1 for topology test_topo_t3 
-WARNING:  stmts to run --> {"CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000506629E8C962EF408C65392A3C835941506629E8C962EF408C65392A42835941C4DA304ACA0DF9408C65392A42835941C4DA304ACA0DF9408C65392A3C835941506629E8C962EF408C65392A3C835941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000C4DA304A4A0CF9406D32978123CA5941C4DA304A4A0CF9406D32978129CA5941FE94347BCAE105416D32978129CA5941FE94347BCAE105416D32978123CA5941C4DA304A4A0CF9406D32978123CA5941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000506629E8C962EF40FC4BE8D5AFA65941506629E8C962EF406D32978129CA5941506629E8C965EF406D32978129CA5941506629E8C965EF40FC4BE8D5AFA65941506629E8C962EF40FC4BE8D5AFA65941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000506629E8C962EF40FC4BE8D5AFA65941506629E8C962EF40FC4BE8D5B5A65941C4DA304ACA0DF940FC4BE8D5B5A65941C4DA304ACA0DF940FC4BE8D5AFA65941506629E8C962EF40FC4BE8D5AFA65941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000C4DA304A4A0CF940AB98DBD2543C5941C4DA304A4A0CF9408C65392A42835941C4DA304ACA0DF9408C65392A42835941C4DA304ACA0DF940AB98DBD2543C5941C4DA304A4A0CF940AB98DBD2543C5941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000506629E8C962EF408C65392A3C835941506629E8C962EF40FC4BE8D5B5A65941506629E8C965EF40FC4BE8D5B5A65941506629E8C965EF408C65392A3C835941506629E8C962EF408C65392A3C835941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000302EE277FE59D9408C65392A3C835941302EE277FE59D9408C65392A42835941506629E8C965EF408C65392A42835941506629E8C965EF408C65392A3C835941302EE277FE59D9408C65392A3C835941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000302EE277FE59D940FC4BE8D5AFA65941302EE277FE59D940FC4BE8D5B5A65941506629E8C965EF40FC4BE8D5B5A65941506629E8C965EF40FC4BE8D5AFA65941302EE277FE59D940FC4BE8D5AFA65941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000302EE277FE59D9406D32978123CA5941302EE277FE59D9406D32978129CA5941506629E8C965EF406D32978129CA5941506629E8C965EF406D32978123CA5941302EE277FE59D9406D32978123CA5941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000302EE277FE59D9408C65392A3C835941302EE277FE59D940FC4BE8D5B5A65941302EE277FE5FD940FC4BE8D5B5A65941302EE277FE5FD9408C65392A3C835941302EE277FE59D9408C65392A3C835941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000302EE277FE59D940FC4BE8D5AFA65941302EE277FE59D9406D32978129CA5941302EE277FE5FD9406D32978129CA5941302EE277FE5FD940FC4BE8D5AFA65941302EE277FE59D940FC4BE8D5AFA65941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000302EE277FE59D940AB98DBD2543C5941302EE277FE59D9408C65392A42835941302EE277FE5FD9408C65392A42835941302EE277FE5FD940AB98DBD2543C5941302EE277FE59D940AB98DBD2543C5941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000FE94347B0AE105418C65392A3C835941FE94347B0AE105416D32978129CA5941FE94347BCAE105416D32978129CA5941FE94347BCAE105418C65392A3C835941FE94347B0AE105418C65392A3C835941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000FE94347B0AE10541AB98DBD2543C5941FE94347B0AE105418C65392A42835941FE94347BCAE105418C65392A42835941FE94347BCAE10541AB98DBD2543C5941FE94347B0AE10541AB98DBD2543C5941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000C4DA304A4A0CF9408C65392A3C835941C4DA304A4A0CF9408C65392A42835941FE94347BCAE105418C65392A42835941FE94347BCAE105418C65392A3C835941C4DA304A4A0CF9408C65392A3C835941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000C4DA304A4A0CF940AB98DBD2543C5941C4DA304A4A0CF940AB98DBD25A3C5941FE94347BCAE10541AB98DBD25A3C5941FE94347BCAE10541AB98DBD2543C5941C4DA304A4A0CF940AB98DBD2543C5941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000C4DA304A4A0CF940FC4BE8D5AFA65941C4DA304A4A0CF9406D32978129CA5941C4DA304ACA0DF9406D32978129CA5941C4DA304ACA0DF940FC4BE8D5AFA65941C4DA304A4A0CF940FC4BE8D5AFA65941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000C4DA304A4A0CF9408C65392A3C835941C4DA304A4A0CF940FC4BE8D5B5A65941C4DA304ACA0DF940FC4BE8D5B5A65941C4DA304ACA0DF9408C65392A3C835941C4DA304A4A0CF9408C65392A3C835941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000506629E8C962EF406D32978123CA5941506629E8C962EF406D32978129CA5941C4DA304ACA0DF9406D32978129CA5941C4DA304ACA0DF9406D32978123CA5941506629E8C962EF406D32978123CA5941',3,1);","CALL resolve_overlap_gap_single_cell(
-  'test_data.overlap_gap_input_t3','geo','c1t3','test_topo_t3.overlap_gap_input_t3',
-  'test_topo_t3',1,25833,'true',
-  '(49,0,,0,10000,120,240,0,40)',
-  'test_topo_t3.overlap_gap_input_t3_job_list','test_topo_t3.overlap_gap_input_t3_grid','0103000020E96400000100000005000000302EE277FE59D940AB98DBD2543C5941302EE277FE59D940AB98DBD25A3C5941C4DA304ACA0DF940AB98DBD25A3C5941C4DA304ACA0DF940AB98DBD2543C5941302EE277FE59D940AB98DBD2543C5941',3,1);"}
 CALL
 utm_check_failed_lines|0
-utm_check_border_lines|8
+utm_check_border_lines|12
 utm_check_added_faces|2
 utm_check_added_simple_feature_polygons|0
 CALL
 utm_check_failed_lines|0
-utm_check_border_lines|8
+utm_check_border_lines|12
 utm_check_added_faces|7
 utm_check_added_simple_feature_polygons|7
 utm|Topology 'test_topo_t3' dropped

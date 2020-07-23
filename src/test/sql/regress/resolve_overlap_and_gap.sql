@@ -1,3 +1,7 @@
+-- To avoid error since binary geo seems to vary from local systen and Travis 
+SET client_min_messages TO ERROR;
+
+
 CREATE EXTENSION dblink; -- needed by  execute_parallel
 
 -- Create data test case degrees

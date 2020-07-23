@@ -371,20 +371,7 @@ BEGIN
    ---------+-----
    --(0 rows)
    
-    area_to_block := _bb;
-
-    command_string := Format('select count(*) from (select * from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L) for update SKIP LOCKED) as r;', _job_list_name, area_to_block);
-    EXECUTE command_string INTO num_boxes_free;
-
-    command_string := Format('select count(*) from %1$s where cell_geo && %2$L and ST_intersects(cell_geo,%2$L);', _job_list_name, area_to_block);
-    EXECUTE command_string INTO num_boxes_intersect;
-    
-    IF num_boxes_intersect != num_boxes_free THEN
-      RAISE NOTICE 'Wait to handle add cell border edges for _cell_job_type %, num_boxes_intersect %, num_boxes_free %, for area_to_block % ',  
-      _cell_job_type, num_boxes_intersect, num_boxes_free, area_to_block;
-      RETURN;
-    END IF;
-
+  
        BEGIN
 
     has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;

@@ -174,7 +174,7 @@ BEGIN
     input_table_name, input_table_geo_column_name, _bb, _topology_snap_tolerance, _table_name_result_prefix);
     EXECUTE command_string ;
     
-    command_string := Format('SELECT ST_SetSRID(ST_Multi(ST_Union(geo)),%1$s)::Geometry(MultiPoint, %1$s) from tmp_simplified_border_lines g where outer_border_line = true',
+    command_string := Format('SELECT ST_SetSRID(ST_Multi(ST_CollectionExtract(ST_Union(geo),1)),%1$s)::Geometry(MultiPoint, %1$s) from tmp_simplified_border_lines g where outer_border_line = true',
     _srid);
     EXECUTE command_string into outer_cell_boundary_lines ;
     

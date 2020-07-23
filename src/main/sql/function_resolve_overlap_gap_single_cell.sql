@@ -303,7 +303,21 @@ BEGIN
     execute Format('SET CONSTRAINTS ALL IMMEDIATE');
     PERFORM topology.DropTopology (border_topo_info.topology_name);
     
+    COMMIT;
+    
+    IF (has_edges) THEN
+      command_string := Format('SELECT ARRAY(SELECT topology.TopoGeo_addLinestring(%3$L,r.geom,%1$s)) FROM 
+                                  (SELECT geom from %2$s order by is_closed desc, num_points desc) as r', 
+      _topology_snap_tolerance, has_edges_temp_table_name, _topology_name);
+      EXECUTE command_string into line_edges_added;
 
+       command_string := Format('DROP TABLE IF EXISTS %s',has_edges_temp_table_name);
+      EXECUTE command_string;
+
+       command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
+      _topology_name, inner_cell_boundary_geom);
+
+    END IF;
     -- DROP TABLE IF EXISTS tmp_simplified_border_lines;
  
   ELSIF _cell_job_type = 2 THEN

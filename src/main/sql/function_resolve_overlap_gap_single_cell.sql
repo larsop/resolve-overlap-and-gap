@@ -302,8 +302,28 @@ BEGIN
     END IF;
     execute Format('SET CONSTRAINTS ALL IMMEDIATE');
     PERFORM topology.DropTopology (border_topo_info.topology_name);
-    
+
+    -- Mark step of job one as done, in case we get a error when added later 
+    -- TODO make proc for this since the same code is used later also
+    RAISE NOTICE 'done work at timeofday:% for layer %, with _cell_job_type %', Timeofday(), border_topo_info.topology_name, _cell_job_type;
+    command_string := Format('update %1$s set block_bb = %2$L where cell_geo = %3$L', _job_list_name, _bb, _bb);
+    EXECUTE command_string;
+  
+    done_time := Clock_timestamp();
+    used_time := (Extract(EPOCH FROM (done_time - start_time)));
+    RAISE NOTICE 'work done for cell % at % border_layer_id %, using % sec', box_id, done_time, border_topo_info.border_layer_id, used_time;
+    -- This is a list of lines that fails
+    -- this is used for debug
+    IF used_time > 10 THEN
+      RAISE NOTICE 'very long time used for lines, % time with geo for _bb % ', used_time, box_id;
+      EXECUTE Format('INSERT INTO %s (execute_time, info, sql, geo) VALUES (%s, %L, %L, %L)', _table_name_result_prefix || '_long_time_log2', used_time, 'simplefeature_c2_topo_surface_border_retry', command_string, _bb);
+    END IF;
+    PERFORM topo_update.clear_blocked_area (_bb, _job_list_name);
+    RAISE NOTICE 'leave work at timeofday:% for layer %, with _cell_job_type % for cell %', Timeofday(), border_topo_info.topology_name, _cell_job_type, box_id;
+
     COMMIT;
+    
+    -- Starte next phase
     
     IF (has_edges) THEN
       command_string := Format('SELECT ARRAY(SELECT topology.TopoGeo_addLinestring(%3$L,r.geom,%1$s)) FROM 
@@ -318,6 +338,10 @@ BEGIN
       _topology_name, inner_cell_boundary_geom);
 
     END IF;
+    
+    -- No need to post operation because this already done
+    RETURN ;
+    
     -- DROP TABLE IF EXISTS tmp_simplified_border_lines;
  
   ELSIF _cell_job_type = 2 THEN
@@ -953,6 +977,8 @@ BEGIN
   ELSE
     RAISE EXCEPTION 'Invalid _cell_job_type % ', _cell_job_type;
   END IF;
+
+  -- TODO make proc since this code is used in other places
   RAISE NOTICE 'done work at timeofday:% for layer %, with _cell_job_type %', Timeofday(), border_topo_info.topology_name, _cell_job_type;
   command_string := Format('update %1$s set block_bb = %2$L where cell_geo = %3$L', _job_list_name, _bb, _bb);
   EXECUTE command_string;

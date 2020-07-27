@@ -135,12 +135,7 @@ BEGIN
   --    EXECUTE command_string;
   --  END IF;
 
-    IF cell_job_type = 3 THEN
-      -- try fixed failed lines before make simple feature in single thread
-      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE) from %4$s r where line_geo_lost = true' , 
-      (_topology_info).topology_name, (_topology_info).topology_snap_tolerance, table_name_result_prefix, table_name_result_prefix||'_no_cut_line_failed');
-      EXECUTE command_string;
-      
+    IF cell_job_type = 3 and loop_number = 1 THEN
       -- add very long lines feature in single thread
       -- Most parts of this will not be healed and smooting if we keep it this way
       command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE) from %4$s r', 
@@ -152,7 +147,18 @@ BEGIN
       COMMIT;
 
     END IF;
+
     
+   IF cell_job_type = 4 and loop_number = 1 THEN
+      -- try fixed failed lines before make simple feature in single thread
+      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE) from %4$s r where line_geo_lost = true' , 
+      (_topology_info).topology_name, (_topology_info).topology_snap_tolerance, table_name_result_prefix, table_name_result_prefix||'_no_cut_line_failed');
+      EXECUTE command_string;
+
+      COMMIT;
+
+    END IF;
+
     IF loop_number = 1 THEN
       command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%L,%s)', 
       (_input).table_to_resolve, (_input).table_geo_collumn_name, (_input).table_srid, (_input).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input).table_pk_column_name, _clean_info, cell_job_type);

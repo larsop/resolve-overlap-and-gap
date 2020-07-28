@@ -404,17 +404,10 @@ BEGIN
     EXECUTE command_string into has_edges;
     RAISE NOTICE 'cell % cell_job_type %, has_edges %, _loop_number %', box_id, _cell_job_type, has_edges, _loop_number;
     IF (has_edges) THEN
-     IF _loop_number = 1 THEN 
-       -- TODO fix added edges to be correct
-       command_string := Format('SELECT ARRAY(SELECT topology.TopoGeo_addLinestring(%3$L,r.geom,%1$s)) FROM 
-                                 (SELECT geom from %2$s order by is_closed desc, num_points desc) as r', _topology_snap_tolerance, has_edges_temp_table_name, _topology_name);
-     ELSE
        --< postgres, 2020-03-20 13:38:33 CET, resolve_cha, 2020-03-20 13:38:33.920 CET >ERROR:  cannot accumulate null arrays
        --command_string := Format('SELECT ARRAY_AGG(topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L)) FROM (SELECT geom from %2$s order by is_closed desc, num_points desc) as r', _topology_snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (_bb), _topology_name, _table_name_result_prefix);
-       command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L,FALSE) FROM (SELECT geom from %2$s order by is_closed desc, num_points desc) as r',
+     command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L,FALSE) FROM (SELECT geom from %2$s order by is_closed desc, num_points desc) as r',
        _topology_snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (_bb), _topology_name, _table_name_result_prefix);
-       
-     END IF;
      EXECUTE command_string into line_edges_added;
 
      command_string := Format('DROP TABLE IF EXISTS %s',has_edges_temp_table_name);

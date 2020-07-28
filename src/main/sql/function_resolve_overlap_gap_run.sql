@@ -151,8 +151,19 @@ BEGIN
     
    IF cell_job_type = 4 and loop_number = 1 THEN
       -- try fixed failed lines before make simple feature in single thread
-      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE) from %4$s r where line_geo_lost = true' , 
+      command_string := Format('WITH topo_updated AS (
+      SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,true), geo 
+      from %4$s r 
+      where line_geo_lost = true group by geo
+      )
+      update %4$s u 
+      set line_geo_lost = false
+      FROM topo_updated tu
+      where tu.geo = u.geo and (SELECT bool_or(x IS NOT NULL) FROM unnest(tu.add_border_lines) x)' , 
       (_topology_info).topology_name, (_topology_info).topology_snap_tolerance, table_name_result_prefix, table_name_result_prefix||'_no_cut_line_failed');
+      
+      RAISE NOTICE 'Try to add failed lines %', command_string;
+  
       EXECUTE command_string;
 
       COMMIT;

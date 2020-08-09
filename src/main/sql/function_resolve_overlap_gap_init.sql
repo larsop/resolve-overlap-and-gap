@@ -50,7 +50,8 @@ BEGIN
   EXECUTE Format('ALTER TABLE %s.face SET unlogged', _topology_schema_name);
   EXECUTE Format('ALTER TABLE %s.relation SET unlogged', _topology_schema_name);
   -- Create indexes
-  EXECUTE Format('CREATE INDEX ON %s.node(containing_face)', _topology_schema_name);
+  -- This Inxdes does not seem to help since  containing_face is null;
+  -- EXECUTE Format('CREATE INDEX ON %s.node(containing_face)', _topology_schema_name);
   EXECUTE Format('CREATE INDEX ON %s.relation(layer_id)', _topology_schema_name);
   EXECUTE Format('CREATE INDEX ON %s.relation(abs(element_id))', _topology_schema_name);
   EXECUTE Format('CREATE INDEX ON %s.edge_data USING GIST (geom)', _topology_schema_name);
@@ -176,6 +177,7 @@ EXECUTE Format('CREATE UNLOGGED TABLE %s (
   id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), geo Geometry(LineString, %s), point_geo Geometry(Point, %s)
 )',_table_name_result_prefix||'_border_line_segments',_srid,_srid);
 
+EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', _table_name_result_prefix||'_border_line_segments', 'geo');
 
 EXECUTE Format('CREATE UNLOGGED TABLE %s (
   id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), geo Geometry(LineString, %s)

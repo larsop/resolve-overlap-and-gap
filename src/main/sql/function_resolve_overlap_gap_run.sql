@@ -182,9 +182,22 @@ BEGIN
     last_run_stmts := 0;
     LOOP
 
-      command_string := Format('SELECT ARRAY(SELECT sql_to_run||%L as func_call FROM %s WHERE block_bb is null 
+      IF cell_job_type = 3 THEN
+        command_string := Format('SELECT ARRAY(SELECT sql_to_run||%1$L as func_call FROM %2$s WHERE block_bb is null 
+        ORDER BY ST_X(ST_Centroid(%3$s)), ST_Y(ST_Centroid(%3$s)) limit %4$s ) ',  
+        loop_number||');',
+        job_list_name,
+        'cell_geo',
+        _max_parallel_jobs*2
+        ) ;
+      ELSE 
+        command_string := Format('SELECT ARRAY(SELECT sql_to_run||%L as func_call FROM %s WHERE block_bb is null 
         ORDER BY inside_cell desc, num_polygons desc )',  
-      loop_number||');',job_list_name);
+        loop_number||');',job_list_name);
+      END IF;
+
+      
+      
       --RAISE NOTICE 'command_string %', command_string;
       EXECUTE command_string INTO stmts;
       EXIT

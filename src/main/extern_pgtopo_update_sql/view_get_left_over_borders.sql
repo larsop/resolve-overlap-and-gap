@@ -17,11 +17,11 @@ BEGIN
     SELECT l.geo, min(g.id) as min_id 
     FROM %1$s l,
     %2$s g
-    where ST_Intersects(l.geo,g.cell_geo)
+    where ST_Intersects(%4$L,l.geo) and ST_Intersects(l.geo,g.cell_geo)
     group by l.geo
     ) AS r,
     %2$s g 
-    WHERE ST_Intersects(g.cell_geo,  ST_PointOnSurface(%4$L)) and r.min_id = g.id',
+    WHERE g.cell_geo && %4$L and ST_Intersects(g.cell_geo,  ST_PointOnSurface(%4$L)) and r.min_id = g.id',
   _table_name_result_prefix||'_border_line_segments',
   _table_name_result_prefix||'_job_list', 
   _input_table_geo_column_name, 

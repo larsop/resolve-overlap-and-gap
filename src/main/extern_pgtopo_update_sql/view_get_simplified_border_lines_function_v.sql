@@ -55,28 +55,26 @@ BEGIN
  	  where ST_Intersects(v.%3$s,%2$L)
  	),
  	lines_intersect_cell as (
-      SELECT( ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(rings.geom,%7$s)))))).geom  
+      SELECT distinct rings.geom  
       from rings
     ),
     touch_lines_intersects AS (
       SELECT distinct ST_ExteriorRing(v.%3$s) AS geom
       FROM lines_intersect_cell l, 
       %1$s v
- 	  WHERE ST_Intersects(v.%3$s,l.geom) 
+ 	  WHERE ST_Intersects(v.%3$s,l.geom) and ST_Disjoint(v.%3$s,%2$L)
  	),
     all_lines AS (SELECT distinct r.geom as geom from 
-     ( SELECT l1.geom as geom from lines_intersect_cell l1 
+     ( SELECT distinct (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(l1.geom,%7$s)))))).geom as geom 
+       from lines_intersect_cell l1 
        union 
-       SELECT l2.geom as geom from touch_lines_intersects l2
+       SELECT distinct (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(l2.geom,%7$s)))))).geom as geom 
+       from touch_lines_intersects l2
      ) as r
     ),
     line_parts AS ( 
-      SELECT 
-      (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(geom,%7$s)))))).geom
-      -- (ST_Dump(ST_Union(ST_AsEWKT(geom)))).geom
-      -- (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(geom,%7$s)))))).geom 
-      -- la.geom 
-      FROM
+      SELECT (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(la.geom,%7$s)))))).geom
+      FROM 
       all_lines la
     ),
     tmp_data_this_cell_lines AS (
@@ -97,7 +95,7 @@ BEGIN
       WHERE ST_IsEmpty(r.geom) is false      
    
  	)
-    select geom, ST_NPoints(geom) AS npoints, min_cell_id from tmp_data_this_cell_lines
+    select geom, ST_NPoints(geom) AS npoints,min_cell_id from tmp_data_this_cell_lines
     ',_input_table_name, 
  	_bb, 
  	_input_table_geo_column_name, 
@@ -182,9 +180,29 @@ BEGIN
 END
 $function$;
 
+--drop table tmp_data_all_linesb54ff161031c2fb96c987afa0f0136c3;
+--
+--TRUNCATE test_topo_ar5_t2.ar5_2019_komm_flate_border_line_segments ;
+--
+--drop table if exists test_tmp_simplified_border_data ;
+--drop table if exists test_tmp_simplified_border_data_lines ;
+--drop table if exists test_tmp_simplified_border_data_point ;
+--
+--\timing
+--create table test_tmp_simplified_border_data as 
+--(select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
+--FROM topo_update.get_simplified_border_lines('org_ar5arsversjon.ar5_2019_komm_flate','geo',
+--'0103000020A210000001000000050000004C2DA6334D08364084EB6B66108051404C2DA6334D08364059250B83E0865140EC132053A63F364059250B83E0865140EC132053A63F364084EB6B66108051404C2DA6334D08364084EB6B6610805140'::geometry
+--,1e-06,'test_topo_ar5_t2.ar5_2019_komm_flate') g);
+--
+--create table test_tmp_simplified_border_data_lines as select geo from test_tmp_simplified_border_data where outer_border_line = false;
+--alter table test_tmp_simplified_border_data_lines add column id serial;
+--
+--create table test_tmp_simplified_border_data_point as select geo from test_tmp_simplified_border_data where outer_border_line = TRUE;
+--alter table test_tmp_simplified_border_data_point add column id serial;
 
 --TRUNCATE topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata_border_line_segments ;
---
+
 --drop table if exists test_tmp_simplified_border_data ;
 --drop table if exists test_tmp_simplified_border_data_lines ;
 --drop table if exists test_tmp_simplified_border_data_point ;

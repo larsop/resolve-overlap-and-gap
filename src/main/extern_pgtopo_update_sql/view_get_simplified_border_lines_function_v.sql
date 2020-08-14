@@ -64,30 +64,40 @@ BEGIN
       %1$s v
  	  WHERE ST_Intersects(v.%3$s,l.geom) 
  	),
+    all_lines AS (SELECT distinct r.geom as geom from 
+     ( SELECT l1.geom as geom from lines_intersect_cell l1 
+       union 
+       SELECT l2.geom as geom from touch_lines_intersects l2
+     ) as r
+    ),
+    line_parts AS ( 
+      SELECT 
+      (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(geom,%7$s)))))).geom
+      -- (ST_Dump(ST_Union(ST_AsEWKT(geom)))).geom
+      -- (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(geom,%7$s)))))).geom 
+      -- la.geom 
+      FROM
+      all_lines la
+    ),
     tmp_data_this_cell_lines AS (
       SELECT 
-      case WHEN ST_IsValid (r.geom) = FALSE THEN ST_MakeValid(r.geom)
-      ELSE r.geom
+      case WHEN ST_IsValid (r.geom) = FALSE THEN 
+       ST_MakeValid(r.geom)
+       ELSE r.geom
       END as geom,
       min_cell_id
-      FROM 
-      (
-      SELECT min(g.id) as min_cell_id, l.geom 
-      FROM
-      ( SELECT (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(geom,%7$s)))))).geom FROM
-      ( 
-        SELECT distinct geom from 
-         (SELECT geom from lines_intersect_cell l1 union SELECT geom from touch_lines_intersects l2) as l
-      ) as l
-      ) as l,
-      %5$s g
-      where ST_Intersects(l.geom,g.%3$s)
-      group by l.geom
+      FROM (
+        SELECT min(g.id) as min_cell_id, l.geom 
+        FROM
+        line_parts l,
+        %5$s g
+        where ST_Intersects(l.geom,g.%3$s)
+        group by l.geom
       ) AS r 
       WHERE ST_IsEmpty(r.geom) is false      
    
  	)
-    select geom, ST_NPoints(geom) AS npoints, min_cell_id from  tmp_data_this_cell_lines
+    select geom, ST_NPoints(geom) AS npoints, min_cell_id from tmp_data_this_cell_lines
     ',_input_table_name, 
  	_bb, 
  	_input_table_geo_column_name, 

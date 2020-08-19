@@ -102,7 +102,7 @@ BEGIN
  	_topology_snap_tolerance,
  	_table_name_result_prefix||'_grid', 
  	ST_ExteriorRing(_bb),
- 	_topology_snap_tolerance,
+ 	_topology_snap_tolerance/10, -- If snap to much here we may with not connected lines.
  	tmp_table_name
  	);
   EXECUTE command_string;
@@ -193,7 +193,7 @@ $function$;
 --(select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
 --FROM topo_update.get_simplified_border_lines('org_ar5arsversjon.ar5_2019_komm_flate','geo',
 --'0103000020A210000001000000050000004C2DA6334D08364084EB6B66108051404C2DA6334D08364059250B83E0865140EC132053A63F364059250B83E0865140EC132053A63F364084EB6B66108051404C2DA6334D08364084EB6B6610805140'::geometry
---,1e-06,'test_topo_ar5_t2.ar5_2019_komm_flate') g);
+--,1e-05,'test_topo_ar5_t2.ar5_2019_komm_flate') g);
 --
 --create table test_tmp_simplified_border_data_lines as select geo from test_tmp_simplified_border_data where outer_border_line = false;
 --alter table test_tmp_simplified_border_data_lines add column id serial;
@@ -224,4 +224,41 @@ $function$;
 --SELECT ST_AsText(ST_Expand(ST_GeomFromText('POLYGON((243550 7017284.3080504,243550 7019790.78879725,246431.25 7019790.78879725,246431.25 7017284.3080504,243550 7017284.3080504))'),-1));
 ---------------------------------------------------------------------------------------------------------------------------------------
 --POLYGON((243551 7017285.3080504,243551 7019789.78879725,246430.25 7019789.78879725,246430.25 7017285.3080504,243551 7017285.3080504))
- 
+
+
+
+
+--drop table if exists test_tmp_simplified_border_data ;
+--
+--\timing
+--create table test_tmp_simplified_border_data as 
+--(select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
+--FROM topo_update.get_simplified_border_lines('org_jm.jm_ukomm_flate','geo',
+----'0103000020A21000000100000005000000228D33786B142640EEFDA9DA05FB4D40228D33786B142640DD971EAD84014E40392509B3D1472640DD971EAD84014E40392509B3D1472640EEFDA9DA05FB4D40228D33786B142640EEFDA9DA05FB4D40'::geometry
+--'0103000020A21000000100000005000000B40BDACA07DE2240EEFDA9DA05FB4D40B40BDACA07DE2240CC31937F03084E40E23B8540D4442340CC31937F03084E40E23B8540D4442340EEFDA9DA05FB4D40B40BDACA07DE2240EEFDA9DA05FB4D40'::geometry
+--,1e-05,'test_topo_jm.jm_ukomm_flate') g);
+--
+--drop table if exists test_tmp_simplified_border_data_lines ;
+--drop table if exists test_tmp_simplified_border_data_point ;
+--
+--create table test_tmp_simplified_border_data_lines as select geo::geometry(LineString,4258) from test_tmp_simplified_border_data where outer_border_line = false;
+--alter table test_tmp_simplified_border_data_lines add column id serial;
+--
+--create table test_tmp_simplified_border_data_point as select geo from test_tmp_simplified_border_data where outer_border_line = TRUE;
+--alter table test_tmp_simplified_border_data_point add column id serial;
+--
+--CALL resolve_overlap_gap_single_cell(
+--  'org_jm.jm_ukomm_flate','geo','figurid','test_topo_jm.jm_ukomm_flate',
+--  'test_topo_jm',1e-05,4258,'false',
+--  '(300,0,,0,140,120,240,0,35)',
+--  'test_topo_jm.jm_ukomm_flate_job_list','test_topo_jm.jm_ukomm_flate_grid',
+--  '0103000020A21000000100000005000000228D33786B142640EEFDA9DA05FB4D40228D33786B142640DD971EAD84014E40392509B3D1472640DD971EAD84014E40392509B3D1472640EEFDA9DA05FB4D40228D33786B142640EEFDA9DA05FB4D40'
+--  ,1,1);
+  
+
+--CALL resolve_overlap_gap_single_cell(
+--  'org_ar5arsversjon.ar5_2019_komm_flate','geo','sl_sdeid','test_topo_ar5_t2.ar5_2019_komm_flate',
+--  'test_topo_ar5_t2',0.0001,4258,'false',
+--  '(49,0,,0,140,120,240,0,35)',
+--  'test_topo_ar5_t2.ar5_2019_komm_flate_job_list','test_topo_ar5_t2.ar5_2019_komm_flate_grid','0103000020A21000000100000005000000B01528D072332B401477E5B53C9F5040B01528D072332B40BEEA23EFDCAC504032B00F4ED7102C40BEEA23EFDCAC504032B00F4ED7102C401477E5B53C9F5040B01528D072332B401477E5B53C9F5040',1,1)
+--  

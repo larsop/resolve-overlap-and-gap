@@ -90,6 +90,7 @@ DECLARE
   
   num_locked int;
 
+  tmp_simplified_border_lines_name text;
 
 BEGIN
 	
@@ -97,6 +98,8 @@ BEGIN
   RAISE NOTICE '% ', command_string;
   EXECUTE command_string INTO box_id;
 
+  tmp_simplified_border_lines_name := 'temp_simplified_lines'|| _topology_name || box_id;
+  
   RAISE NOTICE 'enter at timeofday:% for layer %, with _cell_job_type % and box id % .', 
   Timeofday(), _topology_name || '_', _cell_job_type, box_id;
   
@@ -169,13 +172,14 @@ BEGIN
     -- get the siple feature data both the line_types and the inner lines.
     -- the boundery linnes are saved in a table for later usage
     
-    command_string := Format('create temp table tmp_simplified_border_lines as 
+    command_string := Format('create temp table %s as 
     (select g.geo, g.outer_border_line FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L) g)', 
-    input_table_name, input_table_geo_column_name, _bb, _topology_snap_tolerance, _table_name_result_prefix);
+    tmp_simplified_border_lines_name, input_table_name, input_table_geo_column_name, _bb, _topology_snap_tolerance, _table_name_result_prefix);
     EXECUTE command_string ;
     
-    command_string := Format('SELECT ST_SetSRID(ST_Multi(ST_CollectionExtract(ST_Union(geo),1)),%1$s)::Geometry(MultiPoint, %1$s) from tmp_simplified_border_lines g where outer_border_line = true',
-    _srid);
+    command_string := Format('SELECT ST_SetSRID(ST_Multi(ST_CollectionExtract(ST_Union(geo),1)),%1$s)::Geometry(MultiPoint, %1$s) 
+    from %2$s g where outer_border_line = true',
+    _srid, tmp_simplified_border_lines_name);
     EXECUTE command_string into outer_cell_boundary_lines ;
     
     IF ST_NumGeometries(outer_cell_boundary_lines) = 0 THEN
@@ -185,22 +189,26 @@ BEGIN
 
     
     IF (_clean_info).simplify_tolerance > 0  THEN
-        command_string := Format('UPDATE tmp_simplified_border_lines l
+        command_string := Format('UPDATE %4$s l
         SET geo = ST_simplifyPreserveTopology(l.geo,%1$s)
         WHERE NOT ST_DWithin(%2$L,l.geo,%3$s)',
-        (_clean_info).simplify_tolerance , outer_cell_boundary_lines,snap_tolerance_fixed);
+        (_clean_info).simplify_tolerance , 
+        outer_cell_boundary_lines,
+        snap_tolerance_fixed,
+        tmp_simplified_border_lines_name);
         EXECUTE command_string;
     END IF;
     
     IF (_clean_info).chaikins_nIterations > 0 THEN
-        command_string := Format('UPDATE tmp_simplified_border_lines l
+        command_string := Format('UPDATE %6$s l
         SET geo = ST_simplifyPreserveTopology(topo_update.chaikinsAcuteAngle(l.geo,%1$L,%2$L), %3$s)
         WHERE NOT ST_DWithin(%4$L,l.geo,%5$s)',
         _utm,
         _clean_info,
         _topology_snap_tolerance/2,
         outer_cell_boundary_lines,
-        snap_tolerance_fixed);
+        snap_tolerance_fixed,
+        tmp_simplified_border_lines_name);
         EXECUTE command_string;
     END IF;
 
@@ -232,11 +240,17 @@ BEGIN
     border_topo_info.snap_tolerance := snap_tolerance_fixed;
     --command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::Text, %L) from tmp_simplified_border_lines g where line_type = 0 order by is_closed desc, num_points desc', border_topo_info);
     --RAISE NOTICE 'command_string %', command_string;
-    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geom,%2$s,%3$L,TRUE) FROM (select geo as geom from tmp_simplified_border_lines g where outer_border_line = false) as r',
-    border_topo_info.topology_name, border_topo_info.snap_tolerance, _table_name_result_prefix);
+    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geom,%2$s,%3$L,TRUE) 
+    FROM (select geo as geom from %4$s g where outer_border_line = false) as r',
+    border_topo_info.topology_name, 
+    border_topo_info.snap_tolerance, 
+    _table_name_result_prefix,
+    tmp_simplified_border_lines_name);
     EXECUTE command_string;
 
- 
+    --command_string := Format('DROP TABLE IF EXISTS %1$s', tmp_simplified_border_lines_name);
+    --EXECUTE command_string;
+    
 
     EXECUTE Format('ANALYZE %s.node', border_topo_info.topology_name);
     EXECUTE Format('ANALYZE %s.relation', border_topo_info.topology_name);
@@ -342,7 +356,6 @@ BEGIN
     -- No need to post operation because this already done
     RETURN ;
     
-    -- DROP TABLE IF EXISTS tmp_simplified_border_lines;
  
   ELSIF _cell_job_type = 2 THEN
    -- add lines from each cell to final Topology layer

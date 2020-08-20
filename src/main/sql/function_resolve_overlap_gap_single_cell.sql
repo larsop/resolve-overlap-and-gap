@@ -971,18 +971,16 @@ BEGIN
     RAISE EXCEPTION 'Invalid _cell_job_type % ', _cell_job_type;
   END IF;
 
-  -- TODO make proc since this code is used in other places
-  RAISE NOTICE 'done work at timeofday:% for layer %, with _cell_job_type %', Timeofday(), border_topo_info.topology_name, _cell_job_type;
   command_string := Format('update %1$s set block_bb = %2$L where cell_geo = %3$L', _job_list_name, _bb, _bb);
   EXECUTE command_string;
   
   done_time := Clock_timestamp();
   used_time := (Extract(EPOCH FROM (done_time - start_time)));
-  RAISE NOTICE 'work done for cell % at % border_layer_id %, using % sec', box_id, done_time, border_topo_info.border_layer_id, used_time;
+  RAISE NOTICE 'Work done for cell % at % topologgy % and cell_job_type % , using % sec', 
+  box_id, done_time, _topology_name , _cell_job_type, used_time;
   -- This is a list of lines that fails
   -- this is used for debug
-  IF used_time > 10 THEN
-    RAISE NOTICE 'very long time used for lines, % time with geo for _bb % ', used_time, box_id;
+  IF used_time > 60 THEN
     EXECUTE Format('INSERT INTO %s (execute_time, info, sql, geo) VALUES (%s, %L, %L, %L)', _table_name_result_prefix || '_long_time_log2', used_time, 'simplefeature_c2_topo_surface_border_retry', command_string, _bb);
   END IF;
   PERFORM topo_update.clear_blocked_area (_bb, _job_list_name);

@@ -22,7 +22,7 @@ BEGIN
         -- using perform ST_RemEdgeModFace(_atopology, remove_edge);  seem make invalid faces somtimes
         PERFORM ST_RemEdgeNewFace (_atopology, remove_edge);
         remove_count := 1;
-        RAISE NOTICE 'For tiny face_id % has egde_id % been removed', _face_id, remove_edge;
+        --RAISE NOTICE 'For tiny face_id % has egde_id % been removed', _face_id, remove_edge;
       END IF;
       EXCEPTION
       WHEN OTHERS THEN

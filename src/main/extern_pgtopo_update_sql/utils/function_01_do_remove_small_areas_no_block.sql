@@ -33,8 +33,9 @@ BEGIN
                 END AS mbr_area,
                 g.face_id
  				from ( 
- 					select g.face_id , g.mbr from %3$s g 
- 					where g.mbr && %4$L and ST_Intersects(g.mbr,%4$L)
+ 					select g1.face_id , g1.mbr 
+                    from %3$s g1 
+ 					where g1.mbr && %4$L and ST_Intersects(g1.mbr,%4$L)
  				) as g WHERE (ST_Disjoint(g.mbr,%7$L) OR %7$L is null)
  			) as g 
  			where  g.mbr_area < %5$s 
@@ -45,7 +46,7 @@ BEGIN
   LOOP
     -- RAISE NOTICE 'execute command_string; %', command_string;
     EXECUTE command_string INTO num_rows;
-    RAISE NOTICE 'removed num_rows %  (num_rows_total %) tiny polygons from % using min_mbr_area %', num_rows, num_rows_total, _table_name, min_mbr_area;
+    RAISE NOTICE 'Removed num_rows %  (num_rows_total %) tiny polygons from % using min_mbr_area %', num_rows, num_rows_total, _table_name, min_mbr_area;
     IF num_rows = 0 OR num_rows IS NULL THEN
       EXIT;
       -- exit loop

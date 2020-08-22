@@ -1,6 +1,6 @@
 CALL
 degrees_check_failed_lines|0
-degrees_check_border_lines|12
+degrees_check_border_lines|6
 degrees_check_added_faces|7
 degrees_check_added_simple_feature_geom|7
 degrees_check_added_simple_feature_c1|6
@@ -9,18 +9,18 @@ degrees_check_added_simple_feature_c3|6
 degrees|Topology 'test_topo_t2' dropped
 CALL
 utm_check_failed_lines|0
-utm_check_border_lines|12
+utm_check_border_lines|5
 utm_check_added_faces|7
 utm_check_added_simple_feature_polygons|7
 utm|Topology 'test_topo_t3' dropped
 CALL
 utm_check_failed_lines|0
-utm_check_border_lines|12
+utm_check_border_lines|5
 utm_check_added_faces|2
 utm_check_added_simple_feature_polygons|0
 CALL
 utm_check_failed_lines|0
-utm_check_border_lines|12
+utm_check_border_lines|5
 utm_check_added_faces|7
 utm_check_added_simple_feature_polygons|7
 utm|Topology 'test_topo_t3' dropped

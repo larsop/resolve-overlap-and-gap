@@ -7,7 +7,7 @@ CREATE OR REPLACE FUNCTION topo_update.get_face_area(_atopology varchar, _face_i
 DECLARE
   -- holds dynamic sql to be able to use the same code for different
   command_string text;
-  face_area float = 0;
+  face_area float = null;
   v_state text;
   v_msg text;
   v_detail text;
@@ -16,7 +16,7 @@ DECLARE
   face_id_found boolean = false;
 
 BEGIN
-  command_string := Format('select false FROM %1$s.face where face_id = %2$s limit 1', _atopology, _face_id);
+  command_string := Format('select true FROM %1$s.face where face_id = %2$s limit 1', _atopology, _face_id);
   EXECUTE command_string INTO face_id_found;
 
   IF face_id_found = true THEN 

@@ -271,11 +271,11 @@ BEGIN
       start_time_delta_job := Clock_timestamp();
       RAISE NOTICE 'Start clean small polygons for face_table_name % at %', face_table_name, Clock_timestamp();
       -- remove small polygons in temp
-      num_rows_removed := topo_update.do_remove_small_areas_no_block (
+      call topo_update.do_remove_small_areas_no_block (
       border_topo_info.topology_name, (_clean_info).min_area_to_keep, face_table_name, _bb,_utm,outer_cell_boundary_lines);
     
       used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
-      RAISE NOTICE 'Removed % clean small polygons for face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
+      RAISE NOTICE 'Done clean small polygons for face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
     
       --heal border edges removing small small polygins
       --Do we need to this??????, only if we do simplify later, no we do simplify before, if change the code to do simplify in the topplogy layer we may need to do this.
@@ -849,10 +849,10 @@ BEGIN
     RAISE NOTICE 'Start clean small polygons for border plygons face_table_name % at %', face_table_name, Clock_timestamp();
     -- remove small polygons in temp
     -- TODO 6 sould be based on other values
-    num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, (_clean_info).min_area_to_keep, face_table_name, ST_Expand(_bb,(_topology_snap_tolerance * -6)),
+    call topo_update.do_remove_small_areas_no_block (_topology_name, (_clean_info).min_area_to_keep, face_table_name, ST_Expand(_bb,(_topology_snap_tolerance * -6)),
       _utm);
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
-    RAISE NOTICE 'Removed % clean small polygons for after adding to main face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
+    RAISE NOTICE 'clean small polygons for after adding to main face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
 
     --drop table temp_left_over_borders;
     
@@ -891,10 +891,10 @@ BEGIN
     RAISE NOTICE 'Start clean small polygons for cell plygons face_table_name % at %', face_table_name, Clock_timestamp();
     -- remove small polygons in temp
     -- TODO 6 sould be based on other values
-    num_rows_removed := topo_update.do_remove_small_areas_no_block (_topology_name, (_clean_info).min_area_to_keep, face_table_name, ST_Expand(_bb,(_topology_snap_tolerance * -6)),
+    call topo_update.do_remove_small_areas_no_block (_topology_name, (_clean_info).min_area_to_keep, face_table_name, ST_Expand(_bb,(_topology_snap_tolerance * -6)),
       _utm);
     used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
-    RAISE NOTICE 'Removed % clean small polygons for after adding to main face_table_name % at % used_time: %', num_rows_removed, face_table_name, Clock_timestamp(), used_time;
+    RAISE NOTICE 'clean small polygons for after adding to main face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
 
 
   ELSIF _cell_job_type = 7 THEN

@@ -92,7 +92,9 @@ DECLARE
 
   tmp_simplified_border_lines_name text;
 
-    DECLARE border_line_rec RECORD;
+  border_line_rec RECORD;
+  line_edges_geo_failed geometry[]; 
+
 
 BEGIN
 	
@@ -343,7 +345,7 @@ BEGIN
       IF (_utm = false) THEN
        FOR border_line_rec IN EXECUTE Format('SELECT geom FROM
        (SELECT geom, ST_IsClosed(geom) as is_closed, ST_NPoints(geom) as num_points 
-       from  %2$s.edge_data where ST_Length(geom,true) >= %3$s) as r order by is_closed desc',
+       from  %2$s.edge_data where ST_Length(geom,true) >= %3$s) as r order by is_closed desc, num_points desc',
        has_edges_temp_table_name,
        border_topo_info.topology_name,
        min_length_line)
@@ -352,13 +354,13 @@ BEGIN
 	      perform topology.TopoGeo_addLinestring(_topology_name,border_line_rec.geom,_topology_snap_tolerance);  
 	      EXCEPTION
           WHEN OTHERS THEN
-          perform topo_update.add_border_lines(_topology_name,border_line_rec.geom,_topology_snap_tolerance,_table_name_result_prefix,FALSE);
+            perform array_append(line_edges_geo_failed,border_line_rec.geom);
          END;	    
         END LOOP; 
       ELSE
        FOR border_line_rec IN EXECUTE Format('SELECT geom FROM
        (SELECT geom, ST_IsClosed(geom) as is_closed, ST_NPoints(geom) as num_points 
-       from  %2$s.edge_data where ST_Length(geom) >= %3$s) as r order by is_closed desc',
+       from  %2$s.edge_data where ST_Length(geom) >= %3$s) as r order by is_closed desc, num_points desc',
        has_edges_temp_table_name,
        border_topo_info.topology_name,
        min_length_line)
@@ -367,7 +369,7 @@ BEGIN
 	      perform topology.TopoGeo_addLinestring(_topology_name,border_line_rec.geom,_topology_snap_tolerance);  
 	      EXCEPTION
           WHEN OTHERS THEN
-          perform topo_update.add_border_lines(_topology_name,border_line_rec.geom,_topology_snap_tolerance,_table_name_result_prefix,FALSE);
+            perform array_append(line_edges_geo_failed,border_line_rec.geom);
          END;	    
         END LOOP; 
       END IF;
@@ -376,8 +378,15 @@ BEGIN
 
     END IF;
    
-        execute Format('SET CONSTRAINTS ALL IMMEDIATE');
+    execute Format('SET CONSTRAINTS ALL IMMEDIATE');
     PERFORM topology.DropTopology (border_topo_info.topology_name);
+
+    IF array_upper(line_edges_geo_failed, 1) IS NOT NULL THEN
+    FOR i IN 1 .. array_upper(line_edges_geo_failed, 1)
+    LOOP
+      perform topo_update.add_border_lines(_topology_name,line_edges_geo_failed[i],_topology_snap_tolerance,_table_name_result_prefix,FALSE);
+    END LOOP;
+    END IF;
 
     -- No need to post operation because this already done
     RETURN ;

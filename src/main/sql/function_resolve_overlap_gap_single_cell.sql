@@ -92,6 +92,8 @@ DECLARE
 
   tmp_simplified_border_lines_name text;
 
+    DECLARE border_line_rec RECORD;
+
 BEGIN
 	
   command_string := Format('select id from %1$s where cell_geo = %2$L', _job_list_name, _bb);
@@ -308,14 +310,12 @@ BEGIN
       END IF;
 
       
-      EXECUTE command_string;
+---      EXECUTE command_string;
       
-      EXECUTE Format('CREATE INDEX ON %s(is_closed,num_points)', has_edges_temp_table_name);
+ --     EXECUTE Format('CREATE INDEX ON %s(is_closed,num_points)', has_edges_temp_table_name);
 
       
     END IF;
-    execute Format('SET CONSTRAINTS ALL IMMEDIATE');
-    PERFORM topology.DropTopology (border_topo_info.topology_name);
 
     -- Mark step of job one as done, in case we get a error when added later 
     -- TODO make proc for this since the same code is used later also
@@ -335,29 +335,56 @@ BEGIN
     PERFORM topo_update.clear_blocked_area (_bb, _job_list_name);
     RAISE NOTICE 'leave work at timeofday:% for layer %, with _cell_job_type % for cell %', Timeofday(), border_topo_info.topology_name, _cell_job_type, box_id;
 
-    COMMIT;
+--    COMMIT;
     
     -- Starte next phase
     
     IF (has_edges) THEN
-      command_string := Format('SELECT ARRAY(SELECT topology.TopoGeo_addLinestring(%3$L,r.geom,%1$s)) FROM 
-                                  (SELECT geom from %2$s order by is_closed desc, num_points desc) as r', 
-      _topology_snap_tolerance, has_edges_temp_table_name, _topology_name);
-      EXECUTE command_string into line_edges_added;
-
-       command_string := Format('DROP TABLE IF EXISTS %s',has_edges_temp_table_name);
-      EXECUTE command_string;
-
+      IF (_utm = false) THEN
+       FOR border_line_rec IN EXECUTE Format('SELECT geom FROM
+       (SELECT geom, ST_IsClosed(geom) as is_closed, ST_NPoints(geom) as num_points 
+       from  %2$s.edge_data where ST_Length(geom,true) >= %3$s) as r order by is_closed desc',
+       has_edges_temp_table_name,
+       border_topo_info.topology_name,
+       min_length_line)
+        LOOP
+	     BEGIN 
+	      perform topology.TopoGeo_addLinestring(_topology_name,border_line_rec.geom,_topology_snap_tolerance);  
+	      EXCEPTION
+          WHEN OTHERS THEN
+          perform topo_update.add_border_lines(_topology_name,border_line_rec.geom,_topology_snap_tolerance,_table_name_result_prefix,FALSE);
+         END;	    
+        END LOOP; 
+      ELSE
+       FOR border_line_rec IN EXECUTE Format('SELECT geom FROM
+       (SELECT geom, ST_IsClosed(geom) as is_closed, ST_NPoints(geom) as num_points 
+       from  %2$s.edge_data where ST_Length(geom) >= %3$s) as r order by is_closed desc',
+       has_edges_temp_table_name,
+       border_topo_info.topology_name,
+       min_length_line)
+        LOOP
+	     BEGIN 
+	      perform topology.TopoGeo_addLinestring(_topology_name,border_line_rec.geom,_topology_snap_tolerance);  
+	      EXCEPTION
+          WHEN OTHERS THEN
+          perform topo_update.add_border_lines(_topology_name,border_line_rec.geom,_topology_snap_tolerance,_table_name_result_prefix,FALSE);
+         END;	    
+        END LOOP; 
+      END IF;
        command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
       _topology_name, inner_cell_boundary_geom);
 
     END IF;
-    
+   
+        execute Format('SET CONSTRAINTS ALL IMMEDIATE');
+    PERFORM topology.DropTopology (border_topo_info.topology_name);
+
     -- No need to post operation because this already done
     RETURN ;
     
  
   ELSIF _cell_job_type = 2 THEN
+   -- TODO remove this one
    -- add lines from each cell to final Topology layer
    -- this lines will not connect to any line outside each cell
 
@@ -610,9 +637,7 @@ BEGIN
       RETURN;
     END IF;
 
-    
-    
- 
+
  
      -- add rowlevel lock based info from Sandro https://trac.osgeo.org/postgis/ticket/4684
      --A pessimistic approach might lock:
@@ -682,27 +707,17 @@ BEGIN
      
     border_topo_info.topology_name := _topology_name;
 
-    BEGIN 
-      -- add border smale border lines
-      command_string := Format('SELECT topo_update.add_border_lines(%1$L,geo,%2$s,%3$L,FALSE) from temp_left_over_borders group by geo order by ST_Length(geo) asc', 
-      _topology_name, snap_tolerance_fixed, _table_name_result_prefix);
-
-      EXECUTE command_string into line_edges_added;
-      RAISE NOTICE 'Added edges for border lines for box % into line_edges_added %',  box_id, line_edges_added;
-      
-      
-
-    --drop table temp_left_over_borders;
-    
-    EXCEPTION
-      WHEN OTHERS THEN
-  RAISE NOTICE 'Do rollback at timeofday:% for layer %, with _cell_job_type % and box id % .', 
-  Timeofday(), _topology_name || '_', _cell_job_type, box_id;
-
-    ROLLBACK;
-      RETURN;
-    END;	    
-
+      FOR border_line_rec IN EXECUTE Format('SELECT geo FROM temp_left_over_borders')
+        LOOP
+	     BEGIN 
+	      perform topology.TopoGeo_addLinestring(_topology_name,border_line_rec.geo,_topology_snap_tolerance);  
+	      EXCEPTION
+          WHEN OTHERS THEN
+          perform topo_update.add_border_lines(_topology_name,border_line_rec.geo,_topology_snap_tolerance,_table_name_result_prefix,FALSE);
+         END;	    
+        END LOOP; 
+     
+     
      
    ELSIF _cell_job_type = 4 THEN
     -- heal border edges

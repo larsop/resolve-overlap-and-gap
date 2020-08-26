@@ -369,7 +369,7 @@ BEGIN
 	      perform topology.TopoGeo_addLinestring(_topology_name,border_line_rec.geom,_topology_snap_tolerance);  
 	      EXCEPTION
           WHEN OTHERS THEN
-            perform array_append(line_edges_geo_failed,border_line_rec.geom);
+            line_edges_geo_failed := array_append(line_edges_geo_failed,border_line_rec.geom);
          END;	    
         END LOOP; 
       END IF;
@@ -719,14 +719,20 @@ BEGIN
       FOR border_line_rec IN EXECUTE Format('SELECT geo FROM temp_left_over_borders')
         LOOP
 	     BEGIN 
-	      perform topology.TopoGeo_addLinestring(_topology_name,border_line_rec.geo,_topology_snap_tolerance);  
+	      perform topology.TopoGeo_addLinestring(_topology_name,border_line_rec.geo,_topology_snap_tolerance); 
 	      EXCEPTION
           WHEN OTHERS THEN
-          perform topo_update.add_border_lines(_topology_name,border_line_rec.geo,_topology_snap_tolerance,_table_name_result_prefix,FALSE);
+          line_edges_geo_failed := array_append(line_edges_geo_failed,border_line_rec.geo);
          END;	    
         END LOOP; 
      
-     
+    IF array_upper(line_edges_geo_failed, 1) IS NOT NULL THEN
+    FOR i IN 1 .. array_upper(line_edges_geo_failed, 1)
+    LOOP
+      perform topo_update.add_border_lines(_topology_name,line_edges_geo_failed[i],_topology_snap_tolerance,_table_name_result_prefix,FALSE);
+    END LOOP;
+    END IF;
+ 
      
    ELSIF _cell_job_type = 4 THEN
     -- heal border edges

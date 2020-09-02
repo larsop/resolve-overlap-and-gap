@@ -787,22 +787,30 @@ BEGIN
      
     border_topo_info.topology_name := _topology_name;
 
-      FOR border_line_rec IN EXECUTE Format('SELECT geo FROM temp_left_over_borders')
-        LOOP
-	     BEGIN 
-	      perform topology.TopoGeo_addLinestring(_topology_name,border_line_rec.geo,_topology_snap_tolerance); 
-	      EXCEPTION
-          WHEN OTHERS THEN
-          line_edges_geo_failed := array_append(line_edges_geo_failed,border_line_rec.geo);
-         END;	    
-        END LOOP; 
-     
-    IF array_upper(line_edges_geo_failed, 1) IS NOT NULL THEN
-    FOR i IN 1 .. array_upper(line_edges_geo_failed, 1)
-    LOOP
-      perform topo_update.add_border_lines(_topology_name,line_edges_geo_failed[i],_topology_snap_tolerance,_table_name_result_prefix,FALSE);
-    END LOOP;
-    END IF;
+      -- add border smale border lines
+  command_string := Format('SELECT topo_update.add_border_lines(%1$L,geo,%2$s,%3$L,FALSE) from temp_left_over_borders group by geo order by ST_Length(geo) asc', 
+  _topology_name, snap_tolerance_fixed, _table_name_result_prefix);
+
+  EXECUTE command_string into line_edges_added;
+  RAISE NOTICE 'Added edges for border lines for box % into line_edges_added %',  box_id, line_edges_added;
+
+-- This faster       
+--      FOR border_line_rec IN EXECUTE Format('SELECT geo FROM temp_left_over_borders')
+--        LOOP
+----     BEGIN 
+----      perform topology.TopoGeo_addLinestring(_topology_name,border_line_rec.geo,_topology_snap_tolerance); 
+----      EXCEPTION
+--          WHEN OTHERS THEN
+--          line_edges_geo_failed := array_append(line_edges_geo_failed,border_line_rec.geo);
+--         END;--    
+--        END LOOP; 
+--     
+--    IF array_upper(line_edges_geo_failed, 1) IS NOT NULL THEN
+--    FOR i IN 1 .. array_upper(line_edges_geo_failed, 1)
+--    LOOP
+--      perform topo_update.add_border_lines(_topology_name,line_edges_geo_failed[i],_topology_snap_tolerance,_table_name_result_prefix,FALSE);
+--    END LOOP;
+--    END IF;
  
      
    ELSIF _cell_job_type = 4 THEN

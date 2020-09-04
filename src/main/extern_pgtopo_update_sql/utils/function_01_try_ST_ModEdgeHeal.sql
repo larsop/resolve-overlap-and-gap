@@ -20,9 +20,8 @@ BEGIN
   	
      GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
                 v_context = PG_EXCEPTION_CONTEXT;
-     RAISE NOTICE 'FAILED select ST_ModEdgeHeal(%, %, %) state  : %  message: % detail : % hint   : % context: %', 
-     Quote_literal(_atopology), _edge_to_live, _edge_to_eat,
-     v_state, v_msg, v_detail, v_hint, v_context;
+  --   RAISE NOTICE 'FAILED select ST_ModEdgeHeal(%, %, %) state  : %  message: % detail : % hint   : % context: %', 
+  --   Quote_literal(_atopology), _edge_to_live, _edge_to_eat,v_state, v_msg, v_detail, v_hint, v_context;
      result := -1;
   END;
   RETURN result;

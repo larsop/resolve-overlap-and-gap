@@ -120,7 +120,6 @@ BEGIN
   
   FOR cell_job_type IN start_at_job_type..7 LOOP
 
-
   -- This is not working it uses a very long time  both add this data and glu lnes together later
   --  IF cell_job_type = 3 THEN
   --      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geom,%2$s,%3$L) from  (
@@ -182,27 +181,35 @@ BEGIN
     last_run_stmts := 0;
     LOOP
 
+      EXIT WHEN (cell_job_type = 1 AND loop_number = 2)
+      or cell_job_type = 2;
+
       IF cell_job_type = 3 THEN
         command_string := Format('SELECT ARRAY(SELECT sql_to_run||%1$L as func_call FROM %2$s WHERE block_bb is null 
         ORDER BY ST_X(ST_Centroid(%3$s)), ST_Y(ST_Centroid(%3$s)) limit %4$s ) ',  
         loop_number||');',
         job_list_name,
         'cell_geo',
-        _max_parallel_jobs*2
-        ) ;
+        _max_parallel_jobs*10
+        );
       ELSE 
-        command_string := Format('SELECT ARRAY(SELECT sql_to_run||%L as func_call FROM %s WHERE block_bb is null 
-        ORDER BY inside_cell desc, num_polygons desc )',  
-        loop_number||');',job_list_name);
+        command_string := Format('SELECT ARRAY(SELECT sql_to_run||%1$L as func_call FROM %2$s WHERE block_bb is null 
+        ORDER BY ST_X(ST_Centroid(%3$s)), ST_Y(ST_Centroid(%3$s)) ) ',  
+        loop_number||');',
+        job_list_name,
+        'cell_geo',
+        _max_parallel_jobs*10
+        );
       END IF;
 
       
       
       --RAISE NOTICE 'command_string %', command_string;
       EXECUTE command_string INTO stmts;
-      EXIT
-      WHEN Array_length(stmts, 1) IS NULL OR
-        stmts IS NULL;
+     
+      EXIT WHEN 
+        Array_length(stmts, 1) IS NULL OR
+        stmts IS NULL ;
         
       RAISE NOTICE 'Kicking off % jobs for cell_job_type % at loop_number % for topology % at % ', 
            Array_length(stmts, 1), cell_job_type, loop_number, (_topology_info).topology_name, now();
@@ -213,7 +220,8 @@ BEGIN
       FOR i_stmts IN 1 .. Array_length(stmts, 1)
       LOOP
          stmts_final[i_stmts+analyze_stmts] = stmts[i_stmts];
-         IF (MOD(i_stmts,200) = 0 AND (cell_job_type = 3 OR cell_job_type = 2 ))
+         IF ((cell_job_type < 4) and 
+             (i_stmts=(_max_parallel_jobs*2) or MOD(i_stmts,800) = 0))
             THEN
            analyze_stmts := analyze_stmts + 1;
            stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.edge_data;', (_topology_info).topology_name);

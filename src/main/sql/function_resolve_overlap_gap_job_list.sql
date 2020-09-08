@@ -1,10 +1,10 @@
 -- This is the main funtion used resolve overlap and gap
 CREATE OR REPLACE FUNCTION resolve_overlap_gap_job_list (
 table_to_resolve_ varchar, -- The table to resolve
-geo_collumn_name_ varchar, -- the name of geometry column on the table to analyze
+_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
 _srid int, -- the srid for the given geo column on the table analyze
 _utm boolean, 
-overlapgap_grid_ varchar, -- the name of the content based grid table
+_overlapgap_grid varchar, -- the name of the content based grid table
 _table_name_result_prefix varchar,
 topology_name_ varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset. -- NB. Any exting data will related to topology_name will be deleted
 _topology_snap_tolerance float, -- the tolrence to be used when add data
@@ -58,7 +58,7 @@ BEGIN
   %L,
   %s,%s,', 
   Quote_literal(table_to_resolve_), 
-  Quote_literal(geo_collumn_name_), 
+  Quote_literal(_geo_collumn_name), 
   Quote_literal(input_table_pk_column_name_), 
   Quote_literal(_table_name_result_prefix), 
   Quote_literal(topology_name_),
@@ -67,18 +67,18 @@ BEGIN
   Quote_literal(_utm), 
   _clean_info,
   Quote_literal(job_list_name_), 
-  Quote_literal(overlapgap_grid_));
+  Quote_literal(_overlapgap_grid));
   RAISE NOTICE 'sql_to_run_grid %', sql_to_run_grid;
 
   sql_to_block_cmd := Format('select resolve_overlap_gap_block_cell(%s,%s,%s,%s,', 
-  Quote_literal(table_to_resolve_), Quote_literal(geo_collumn_name_), Quote_literal(input_table_pk_column_name_), Quote_literal(job_list_name_));
+  Quote_literal(table_to_resolve_), Quote_literal(_geo_collumn_name), Quote_literal(input_table_pk_column_name_), Quote_literal(job_list_name_));
   
   
   -- make       
  -- select ST_asText( ST_Expand ( (ST_Dump( get_single_lineparts)).geom, 0000.1)) from  topo_update.get_single_lineparts(ST_ExteriorRing('0103000020E964000001000000050000000000000060E30641000000005ACC5A410000000060E30641000000008FD85A4100000000006A0841000000008FD85A4100000000006A0841000000005ACC5A410000000060E30641000000005ACC5A41'));      
 
 --  select ST_asText( ST_Expand ( (ST_Dump( get_single_lineparts)).geom, 0000.1)) 
---  from  topo_update.get_single_lineparts(ST_ExteriorRing(geo_collumn_name_));      
+--  from  topo_update.get_single_lineparts(ST_ExteriorRing(_geo_collumn_name));      
 
 
 	 
@@ -110,16 +110,15 @@ BEGIN
     command_string := Format('
  	INSERT INTO %s(inside_cell,grid_thread_cell,num_polygons,row_number,sql_to_run,cell_geo,sql_to_block) 
  	SELECT
-    r.inside_cell, 
+    true as inside_cell, 
     r.grid_thread_cell,
     r.num_polygons,
     r.row_number,
-    %s||quote_literal(r.'||geo_collumn_name_||'::Varchar)||%s as sql_to_run, 
-    r.'||geo_collumn_name_||' as cell_geo, 
-    %s||quote_literal(r.'||geo_collumn_name_||'::Varchar)||%s as sql_to_block
+    %s||quote_literal(r.'||_geo_collumn_name||'::Varchar)||%s as sql_to_run, 
+    r.'||_geo_collumn_name||' as cell_geo, 
+    %s||quote_literal(r.'||_geo_collumn_name||'::Varchar)||%s as sql_to_block
  	from (
     select 
-    r.inside_cell,
     r.grid_thread_cell,
     r.num_polygons,
     r.row_number,
@@ -142,12 +141,17 @@ BEGIN
  	Quote_literal(sql_to_block_cmd), 
  	Quote_literal(');'),
  	
-    geo_collumn_name_,
+    _geo_collumn_name,
     _topology_snap_tolerance * cell_boundary_tolerance_with_multi,
-    geo_collumn_name_,
-    overlapgap_grid_,
- 	overlapgap_grid_,
- 	geo_collumn_name_);
+    _geo_collumn_name,
+    _overlapgap_grid,
+ 	_overlapgap_grid,
+ 	_geo_collumn_name);
+
+ 
+    EXECUTE command_string;
+  
+
   ELSE
     command_string := Format('
  	INSERT INTO %s(inside_cell,grid_thread_cell,num_polygons,row_number,sql_to_run,cell_geo,sql_to_block) 
@@ -156,30 +160,31 @@ BEGIN
     r.grid_thread_cell,
     r.num_polygons,
     r.row_number,
-    %s||quote_literal(r.'||geo_collumn_name_||'::Varchar)||%s as sql_to_run, 
-    r.'||geo_collumn_name_||' as cell_geo, 
-    %s||quote_literal(r.'||geo_collumn_name_||'::Varchar)||%s as sql_to_block
+    %s||quote_literal(r.'||_geo_collumn_name||'::Varchar)||%s as sql_to_run, 
+    r.'||_geo_collumn_name||' as cell_geo, 
+    %s||quote_literal(r.'||_geo_collumn_name||'::Varchar)||%s as sql_to_block
  	from %s r', 
  	job_list_name_, 
  	Quote_literal(sql_to_run_grid), 
  	Quote_literal(',' || _cell_job_type || ','), 
  	Quote_literal(sql_to_block_cmd), 
  	Quote_literal(');'), 
- 	overlapgap_grid_);
+ 	_overlapgap_grid);
+ 	
+ 	RAISE NOTICE 'command_string %', command_string;
+    EXECUTE command_string;
+
   END IF;
-  
-  RAISE NOTICE 'command_string %', command_string;
-  EXECUTE command_string;
-  command_string := Format('CREATE INDEX ON %s USING GIST (cell_geo);', job_list_name_);
-  RAISE NOTICE 'command_string %', command_string;
-  EXECUTE command_string;
-  command_string := Format('CREATE INDEX ON %s USING GIST (block_bb);', job_list_name_);
-  RAISE NOTICE 'command_string %', command_string;
-  EXECUTE command_string;
-  
-  -- num_polygin
-  
-  IF _cell_job_type = 3 or _cell_job_type = 4 THEN
+
+    
+  EXECUTE Format('CREATE INDEX ON %s USING GIST (cell_geo);', job_list_name_);
+  EXECUTE Format('CREATE INDEX ON %s USING GIST (block_bb);', job_list_name_);
+  EXECUTE Format('CREATE INDEX ON %s (id);', job_list_name_);
+  EXECUTE Format('CREATE INDEX ON %s (num_polygons);', job_list_name_);
+  EXECUTE Format('CREATE INDEX ON %s (inside_cell);', job_list_name_);
+  EXECUTE Format('CREATE INDEX ON %s (id);', job_list_name_ || '_donejobs');
+
+  IF _cell_job_type = 3 or _cell_job_type = 4 or _cell_job_type = 5 THEN 
     command_string := Format('UPDATE %1$s u
     SET num_polygons = r1.num_polygons
     FROM 
@@ -195,36 +200,16 @@ BEGIN
     job_list_name_, _table_name_result_prefix||'_border_line_segments', 'geo');
     RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
-  ELSIF _cell_job_type = 4 THEN
-    command_string := Format('UPDATE %1$s u
-    SET num_polygons = r1.num_polygons
-    FROM 
-    (
-    SELECT count(*) num_polygons, a1.id 
-    FROM 
-    %1$s a1,
-    %2$s a2
-    WHERE a1.cell_geo && a2.%3$s
-    GROUP BY a1.id
-    ) r1
-    WHERE r1.id = u.id', 
-    job_list_name_, topology_name_||'.edge_data', 'geom');
-    RAISE NOTICE 'command_string %', command_string;
-    EXECUTE command_string;
+    
+      
+    EXECUTE Format('UPDATE %1$s g SET inside_cell = false 
+    from 
+    (SELECT distinct (ST_Dump(topo_update.get_single_lineparts(ST_Boundary(%3$s)))).geom from %2$s) as t
+    where g.cell_geo && t.geom and ST_Intersects(g.cell_geo,t.geom)', 
+    job_list_name_,_overlapgap_grid||'_threads',_geo_collumn_name);
+  
   END IF;
- 
-  command_string := Format('CREATE INDEX ON %s (id);', job_list_name_);
-  RAISE NOTICE 'command_string %', command_string;
-  command_string := Format('CREATE INDEX ON %s (id);', job_list_name_);
-  RAISE NOTICE 'command_string %', command_string;
-  command_string := Format('CREATE INDEX ON %s (num_polygons);', job_list_name_);
-  RAISE NOTICE 'command_string %', command_string;
-  command_string := Format('CREATE INDEX ON %s (inside_cell);', job_list_name_);
-  RAISE NOTICE 'command_string %', command_string;
-  EXECUTE command_string;
-  command_string := Format('CREATE INDEX ON %s (id);', job_list_name_ || '_donejobs');
-  RAISE NOTICE 'command_string %', command_string;
-  EXECUTE command_string;
+
 END;
 $$
 LANGUAGE plpgsql;

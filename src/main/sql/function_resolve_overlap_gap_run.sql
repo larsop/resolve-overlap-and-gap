@@ -70,7 +70,7 @@ DECLARE
   v_context text;
 
   start_time timestamp WITH time zone;
- 
+  
   -- Used for debug
   contiune_after_stat_exception boolean DEFAULT true; -- DEFAULT true, -- if set to false, it will do topology.ValidateTopology and stop to if the this call returns any rows 
   validate_topoplogy_for_each_run boolean DEFAULT false; -- if set to true, it will do topology.ValidateTopology at each loop return if it's error 
@@ -185,28 +185,39 @@ BEGIN
       or cell_job_type = 2;
 
       IF cell_job_type = 3 THEN
-        command_string := Format('SELECT ARRAY(SELECT sql_to_run||%1$L as func_call FROM %2$s WHERE block_bb is null 
-        ORDER BY ST_X(ST_Centroid(%3$s)), ST_Y(ST_Centroid(%3$s)) limit %4$s ) ',  
+        command_string := Format('SELECT ARRAY(SELECT j.sql_to_run||%1$L as func_call 
+        FROM %2$s j
+        WHERE j.block_bb is null and j.inside_cell = true
+		ORDER BY ST_X(ST_Centroid(j.%3$s)), ST_Y(ST_Centroid(j.%3$s))
+        ) ',  
         loop_number||');',
         job_list_name,
-        'cell_geo',
-        _max_parallel_jobs*10
-        );
+        'cell_geo');
+        EXECUTE command_string INTO stmts;
+        IF Array_length(stmts, 1) IS NULL OR stmts IS NULL THEN
+           command_string := Format('SELECT ARRAY(SELECT j.sql_to_run||%1$L as func_call 
+           FROM %2$s j
+           WHERE j.block_bb is null and j.inside_cell = false
+           ORDER BY ST_X(ST_Centroid(j.%3$s)), ST_Y(ST_Centroid(j.%3$s)) ) ',  
+           loop_number||');',
+           job_list_name,
+           'cell_geo');
+           EXECUTE command_string INTO stmts;
+        END IF;
       ELSE 
-        command_string := Format('SELECT ARRAY(SELECT sql_to_run||%1$L as func_call FROM %2$s WHERE block_bb is null 
-        ORDER BY ST_X(ST_Centroid(%3$s)), ST_Y(ST_Centroid(%3$s)) ) ',  
+        command_string := Format('SELECT ARRAY(SELECT j.sql_to_run||%1$L as func_call 
+        FROM %2$s j
+        WHERE j.block_bb is null
+        ORDER BY ST_X(ST_Centroid(j.%3$s)), ST_Y(ST_Centroid(j.%3$s)) ) ',  
         loop_number||');',
         job_list_name,
-        'cell_geo',
-        _max_parallel_jobs*10
-        );
-      END IF;
-
-      
-      
-      --RAISE NOTICE 'command_string %', command_string;
-      EXECUTE command_string INTO stmts;
+        'cell_geo');
+               
+        EXECUTE command_string INTO stmts;
      
+      END IF;
+  
+      
       EXIT WHEN 
         Array_length(stmts, 1) IS NULL OR
         stmts IS NULL ;
@@ -221,7 +232,7 @@ BEGIN
       LOOP
          stmts_final[i_stmts+analyze_stmts] = stmts[i_stmts];
          IF ((cell_job_type < 4) and 
-             (i_stmts=(_max_parallel_jobs*2) or MOD(i_stmts,800) = 0))
+             (i_stmts=(_max_parallel_jobs*2) or MOD(i_stmts,400) = 0))
             THEN
            analyze_stmts := analyze_stmts + 1;
            stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.edge_data;', (_topology_info).topology_name);

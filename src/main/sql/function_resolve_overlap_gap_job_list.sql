@@ -34,6 +34,8 @@ DECLARE
   -- TODO make this as parameter
   cell_boundary_tolerance_with_multi real = 12;
   
+  job_list_row_count int;
+  
 BEGIN
   -- ############################# START # create jobList tables
   command_string := Format('DROP table if exists %s', job_list_name_);
@@ -106,7 +108,7 @@ BEGIN
  
   -- add inside cell polygons
   -- TODO solve how to find r.geom
-  IF _cell_job_type = 3 or _cell_job_type = 4 or _cell_job_type = 5 THEN 
+  IF _cell_job_type = 4 or _cell_job_type = 5 THEN 
     command_string := Format('
  	INSERT INTO %s(inside_cell,grid_thread_cell,num_polygons,row_number,sql_to_run,cell_geo,sql_to_block) 
  	SELECT
@@ -147,10 +149,29 @@ BEGIN
     _overlapgap_grid,
  	_overlapgap_grid,
  	_geo_collumn_name);
-
- 
     EXECUTE command_string;
   
+  ELSIF _cell_job_type = 2 THEN 
+    command_string := Format('
+ 	INSERT INTO %s(inside_cell,grid_thread_cell,num_polygons,row_number,sql_to_run,cell_geo,sql_to_block) 
+ 	SELECT
+    false inside_cell, 
+    0 grid_thread_cell,
+    0 num_polygons,
+    0 row_number,
+    %s||quote_literal(r.'||_geo_collumn_name||'::Varchar)||%s as sql_to_run, 
+    r.'||_geo_collumn_name||' as cell_geo, 
+    %s||quote_literal(r.'||_geo_collumn_name||'::Varchar)||%s as sql_to_block
+ 	from %s r', 
+ 	job_list_name_, 
+ 	Quote_literal(sql_to_run_grid), 
+ 	Quote_literal(',' || _cell_job_type || ','), 
+ 	Quote_literal(sql_to_block_cmd), 
+ 	Quote_literal(');'), 
+ 	_overlapgap_grid||'_threads');
+ 	
+ 	RAISE NOTICE 'command_string %', command_string;
+    EXECUTE command_string;
 
   ELSE
     command_string := Format('
@@ -176,6 +197,11 @@ BEGIN
 
   END IF;
 
+ 
+  GET DIAGNOSTICS job_list_row_count = ROW_COUNT;
+  
+  RAISE NOTICE 'Created joblist  %s with %s rows for cell_job_type %s ', job_list_name_, job_list_row_count, _cell_job_type ;
+ 
     
   EXECUTE Format('CREATE INDEX ON %s USING GIST (cell_geo);', job_list_name_);
   EXECUTE Format('CREATE INDEX ON %s USING GIST (block_bb);', job_list_name_);
@@ -184,7 +210,7 @@ BEGIN
   EXECUTE Format('CREATE INDEX ON %s (inside_cell);', job_list_name_);
   EXECUTE Format('CREATE INDEX ON %s (id);', job_list_name_ || '_donejobs');
 
-  IF _cell_job_type = 3 or _cell_job_type = 4 or _cell_job_type = 5 THEN 
+  IF _cell_job_type = 4 or _cell_job_type = 5 THEN 
     command_string := Format('UPDATE %1$s u
     SET num_polygons = r1.num_polygons
     FROM 

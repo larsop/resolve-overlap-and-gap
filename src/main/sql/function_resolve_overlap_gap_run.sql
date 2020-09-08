@@ -138,10 +138,25 @@ BEGIN
       -- add very long lines feature in single thread
       -- Most parts of this will not be healed and smooting if we keep it this way
       command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE) from %4$s r', 
-      (_topology_info).topology_name, (_topology_info).topology_snap_tolerance, 
+      (_topology_info).topology_name, 
+      (_topology_info).topology_snap_tolerance, 
       table_name_result_prefix,
       table_name_result_prefix||'_border_line_many_points');
       EXECUTE command_string;
+      
+      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE) 
+      from 
+      %4$s r,
+      %5$s l
+      where ST_Intersects(l.%6$s,r.geo)',
+      (_topology_info).topology_name, 
+      (_topology_info).topology_snap_tolerance, 
+      table_name_result_prefix,
+      table_name_result_prefix||'_border_line_segments',
+      overlapgap_grid||'_threads'||'_lines',
+      (_input).table_geo_collumn_name);
+      EXECUTE command_string;
+      
 
       COMMIT;
 
@@ -181,30 +196,10 @@ BEGIN
     last_run_stmts := 0;
     LOOP
 
-      EXIT WHEN (cell_job_type = 1 AND loop_number = 2)
-      or cell_job_type = 2;
+      EXIT WHEN (cell_job_type = 1 AND loop_number = 2)  or
+      cell_job_type = 3;
 
-      IF cell_job_type = 3 THEN
-        command_string := Format('SELECT ARRAY(SELECT j.sql_to_run||%1$L as func_call 
-        FROM %2$s j
-        WHERE j.block_bb is null and j.inside_cell = true
-		ORDER BY ST_X(ST_Centroid(j.%3$s)), ST_Y(ST_Centroid(j.%3$s))
-        ) ',  
-        loop_number||');',
-        job_list_name,
-        'cell_geo');
-        EXECUTE command_string INTO stmts;
-        IF Array_length(stmts, 1) IS NULL OR stmts IS NULL THEN
-           command_string := Format('SELECT ARRAY(SELECT j.sql_to_run||%1$L as func_call 
-           FROM %2$s j
-           WHERE j.block_bb is null and j.inside_cell = false
-           ORDER BY ST_X(ST_Centroid(j.%3$s)), ST_Y(ST_Centroid(j.%3$s)) ) ',  
-           loop_number||');',
-           job_list_name,
-           'cell_geo');
-           EXECUTE command_string INTO stmts;
-        END IF;
-      ELSE 
+
         command_string := Format('SELECT ARRAY(SELECT j.sql_to_run||%1$L as func_call 
         FROM %2$s j
         WHERE j.block_bb is null
@@ -215,7 +210,6 @@ BEGIN
                
         EXECUTE command_string INTO stmts;
      
-      END IF;
   
       
       EXIT WHEN 
@@ -251,7 +245,7 @@ BEGIN
 
       BEGIN
 	      
-	    IF stop_at_job_type = cell_job_type AND loop_number = stop_at_loop_nr  THEN  
+	    IF stop_at_job_type = cell_job_type AND loop_number >= stop_at_loop_nr  THEN  
 	      RAISE WARNING 'EXIT with % jobs for cell_job_type % at loop_number % for topology % ', 
           Array_length(stmts_final, 1), cell_job_type, loop_number, (_topology_info).topology_name;
           RAISE WARNING 'stmts to run --> %', stmts_final;

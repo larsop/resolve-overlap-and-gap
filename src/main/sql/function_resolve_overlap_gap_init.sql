@@ -87,8 +87,10 @@ BEGIN
   -- create a content based grid table for input data
   overlapgap_grid_threads := _overlapgap_grid||'_threads'; 
   overlapgap_grid_threads_cell_size := num_cells/5;
-  IF overlapgap_grid_threads_cell_size = 0 THEN
-    overlapgap_grid_threads_cell_size = 1;
+  
+  -- TODO find out what value to use here ????
+  IF overlapgap_grid_threads_cell_size < 10 THEN
+    overlapgap_grid_threads_cell_size = num_cells;
   END IF;
   
   EXECUTE Format('CREATE TABLE %s( id serial, %s geometry(Geometry,%s))', 

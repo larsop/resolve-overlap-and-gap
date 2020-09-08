@@ -244,13 +244,6 @@ BEGIN
 
 
       BEGIN
-	      
-	    IF stop_at_job_type = cell_job_type AND loop_number >= stop_at_loop_nr  THEN  
-	      RAISE WARNING 'EXIT with % jobs for cell_job_type % at loop_number % for topology % ', 
-          Array_length(stmts_final, 1), cell_job_type, loop_number, (_topology_info).topology_name;
-          RAISE WARNING 'stmts to run --> %', stmts_final;
-          return ;
-	    END IF;
   
 	    start_time := Clock_timestamp();
     	IF cell_job_type = 3 and run_add_border_line_as_single_thread = true THEN
@@ -287,7 +280,8 @@ BEGIN
           END IF;
         END IF;
       END;      
-      
+
+      	      
       IF validate_topoplogy_for_each_run THEN
           start_time := Clock_timestamp();
           
@@ -315,6 +309,14 @@ BEGIN
 
       last_run_stmts := Array_length(stmts, 1); 
       loop_number := loop_number + 1;
+
+      IF stop_at_job_type >= cell_job_type AND loop_number >= stop_at_loop_nr  THEN  
+	      RAISE WARNING 'EXIT with % jobs for cell_job_type % at loop_number % for topology % ', 
+          Array_length(stmts_final, 1), cell_job_type, loop_number, (_topology_info).topology_name;
+          RAISE WARNING 'stmts to run --> %', stmts_final;
+          return ;
+	  END IF;
+
 
     END LOOP;
     loop_number := 1;

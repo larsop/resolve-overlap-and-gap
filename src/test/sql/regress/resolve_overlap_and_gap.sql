@@ -108,8 +108,8 @@ CALL resolve_overlap_gap_run(
   false, --  if set to false, it will in many cases generate topo errors beacuse of running in many parralell threads
   1, -- if set to more than 1 it will skip init procces and start at given job_type
   1, -- many of jobs are ran in loops beacuse because if get an exception or cell is not allowed handle because cell close to is also started to work , this cell will gandled in the next loop.
-  3, -- if set to more than 0 the job will stop  when this job type is reday to run and display a set sql to run
-  1 -- if set to more than 0 the job will stop  when this job type is reday to run and display a set sql to run
+  1, -- if set to more than 0 the job will stop  when this job type is reday to run and display a set sql to run
+  2 -- if set to more than 0 the job will stop  when this job type is reday to run and display a set sql to run
   ) 
 );
 
@@ -143,8 +143,8 @@ CALL resolve_overlap_gap_run(
   false, --if set to false, it will do topology.ValidateTopology and stop to if the this call returns any rows
   false, -- if set to true, it will do topology.ValidateTopology at each loop return if it's error 
   false, --  if set to false, it will in many cases generate topo errors beacuse of running in many parralell threads
-  3, -- if set to more than 1 it will skip init procces and start at given job_type
-  2, -- many of jobs are ran in loops beacuse because if get an exception or cell is not allowed handle because cell close to is also started to work , this cell will gandled in the next loop.
+  2, -- if set to more than 1 it will skip init procces and start at given job_type
+  1, -- many of jobs are ran in loops beacuse because if get an exception or cell is not allowed handle because cell close to is also started to work , this cell will gandled in the next loop.
   0, -- if set to more than 0 the job will stop  when this job type is reday to run and display a set sql to run
   0 -- if set to more than 0 the job will stop  when this job type is reday to run and display a set sql to run
   ) 

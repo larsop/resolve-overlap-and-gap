@@ -143,6 +143,22 @@ BEGIN
   _overlapgap_grid,_geo_collumn_name, layer_centroid,_overlapgap_grid);
 
 
+  -- Create a table of grid_threads lines
+  EXECUTE Format('CREATE TABLE %1$s( id serial, %2$s geometry(Geometry,%3$s))', 
+  overlapgap_grid_threads||'_lines', 
+  _geo_collumn_name, 
+  _srid);
+  
+  command_string := Format('INSERT INTO %1$s(%2$s) 
+  SELECT distinct (ST_Dump(topo_update.get_single_lineparts(ST_Boundary(%2$s)))).geom as %2$s
+  from %3$s', 
+  overlapgap_grid_threads||'_lines', 
+  _geo_collumn_name, 
+  overlapgap_grid_threads);
+  EXECUTE command_string;
+  -- Create Index
+  EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', overlapgap_grid_threads||'_lines', _geo_collumn_name);
+ 
   
   -- ----------------------------- DONE - Handle content based grid init
   

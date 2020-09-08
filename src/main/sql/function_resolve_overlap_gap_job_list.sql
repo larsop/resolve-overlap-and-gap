@@ -204,9 +204,12 @@ BEGIN
       
     EXECUTE Format('UPDATE %1$s g SET inside_cell = false 
     from 
-    (SELECT distinct (ST_Dump(topo_update.get_single_lineparts(ST_Boundary(%3$s)))).geom from %2$s) as t
-    where g.cell_geo && t.geom and ST_Intersects(g.cell_geo,t.geom)', 
-    job_list_name_,_overlapgap_grid||'_threads',_geo_collumn_name);
+    %4$s as t
+    where ST_Intersects(g.cell_geo,t.%3$s)', 
+    job_list_name_,
+    _overlapgap_grid||'_threads',
+    _geo_collumn_name, 
+    _overlapgap_grid||'_threads'||'_lines');
   
   END IF;
 

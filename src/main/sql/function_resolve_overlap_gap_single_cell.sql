@@ -97,6 +97,7 @@ DECLARE
   
   this_worker_id int;
   num_jobs_worker_id int;
+  num_min_since_last_analyze int;
 
 BEGIN
 	
@@ -662,28 +663,29 @@ BEGIN
   --RETURN added_rows;
  
   -- do analyse
-  
- 
-  IF _cell_job_type < 4 THEN
+  IF _cell_job_type < 3 THEN
     command_string := Format('select worker_id from %1$s where id = %2$s', _job_list_name, box_id);
     EXECUTE command_string INTO this_worker_id;
   
     IF this_worker_id = 1 THEN 
-      command_string := Format('select count(d.*) 
+      command_string := Format('select count(d.*), 
+      ((EXTRACT(EPOCH FROM max(now()))-EXTRACT(EPOCH FROM max(d.done_time)))/60)::int time_diff 
       from 
       %1$s l,
       %2$s d
-      where d.id = l.id and l.worker_id = %3$s',
+      where d.id = l.id and l.worker_id = %3$s and d.id != %4$s ',
       _job_list_name, 
       _job_list_name||'_donejobs', 
-      this_worker_id);
-      EXECUTE command_string INTO num_jobs_worker_id;
+      this_worker_id,
+      box_id);
+      
+      EXECUTE command_string INTO num_jobs_worker_id, num_min_since_last_analyze;
    
       -- Maybe find a better way for this
-      IF num_jobs_worker_id  = 2 or 
-         (num_jobs_worker_id > 1 and mod(999999,num_jobs_worker_id*num_jobs_worker_id) = 0) THEN
-        RAISE NOTICE 'Do analyze for % for num_jobs_worker_id % and box_id % snd _cell_job_type %', 
-        _topology_name, num_jobs_worker_id, box_id, _cell_job_type;
+      IF num_jobs_worker_id  < 3 or 
+         num_min_since_last_analyze > num_jobs_worker_id*2 THEN
+        RAISE NOTICE 'Do analyze for % for num_jobs_worker_id % and box_id % snd _cell_job_type % and num_min_since_last_analyze % at %', 
+        _topology_name, num_jobs_worker_id, box_id, _cell_job_type, num_min_since_last_analyze, now();
 
         EXECUTE Format('ANALYZE %s.node', _topology_name);
         EXECUTE Format('ANALYZE %s.relation', _topology_name);

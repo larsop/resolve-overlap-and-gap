@@ -1,15 +1,15 @@
 -- This is the main funtion used resolve overlap and gap
 CREATE OR REPLACE FUNCTION resolve_overlap_gap_job_list (
-table_to_resolve_ varchar, -- The table to resolve
+_table_to_resolve varchar, -- The table to resolve
 _geo_collumn_name varchar, -- the name of geometry column on the table to analyze
 _srid int, -- the srid for the given geo column on the table analyze
 _utm boolean, 
 _overlapgap_grid varchar, -- the name of the content based grid table
 _table_name_result_prefix varchar,
-topology_name_ varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset. -- NB. Any exting data will related to topology_name will be deleted
+_topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset. -- NB. Any exting data will related to topology_name will be deleted
 _topology_snap_tolerance float, -- the tolrence to be used when add data
-job_list_name_ varchar, -- the name of job_list table, this table is ued to track of done jobs
-input_table_pk_column_name_ varchar, -- the nam eof the promary collum
+_job_list_name varchar, -- the name of job_list table, this table is ued to track of done jobs
+_input_table_pk_column_name varchar, -- the nam eof the promary collum
 _clean_info resolve_overlap_data_clean_type, -- different parameters used if need to clean up your data
 --(_clean_info).simplify_tolerance float, -- is this is more than zero simply will called with
 --(_clean_info).do_chaikins boolean, -- here we will use chaikins togehter with simply to smooth lines
@@ -38,18 +38,18 @@ DECLARE
   
 BEGIN
   -- ############################# START # create jobList tables
-  command_string := Format('DROP table if exists %s', job_list_name_);
+  command_string := Format('DROP table if exists %s', _job_list_name);
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
   command_string := Format('CREATE unlogged table %s(id serial, start_time timestamp with time zone, inside_cell boolean, grid_thread_cell int, num_polygons int, row_number int, sql_to_block varchar, sql_to_run varchar, cell_geo geometry(geometry,%s),block_bb Geometry(geometry,%s), blocked_by_id int)',
-  job_list_name_,_srid,_srid);
+  _job_list_name,_srid,_srid);
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
   -- create a table for don jobs
-  command_string := Format('DROP table if exists %s', job_list_name_ || '_donejobs');
+  command_string := Format('DROP table if exists %s', _job_list_name || '_donejobs');
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
-  command_string := Format('CREATE unlogged table %s(id int, done_time timestamp with time zone default clock_timestamp())', job_list_name_ || '_donejobs');
+  command_string := Format('CREATE unlogged table %s(id int, done_time timestamp with time zone default clock_timestamp())', _job_list_name || '_donejobs');
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
 
@@ -59,21 +59,21 @@ BEGIN
   %s,%s,%s,%s,
   %L,
   %s,%s,', 
-  Quote_literal(table_to_resolve_), 
+  Quote_literal(_table_to_resolve), 
   Quote_literal(_geo_collumn_name), 
-  Quote_literal(input_table_pk_column_name_), 
+  Quote_literal(_input_table_pk_column_name), 
   Quote_literal(_table_name_result_prefix), 
-  Quote_literal(topology_name_),
+  Quote_literal(_topology_name),
   _topology_snap_tolerance, 
   _srid, 
   Quote_literal(_utm), 
   _clean_info,
-  Quote_literal(job_list_name_), 
+  Quote_literal(_job_list_name), 
   Quote_literal(_overlapgap_grid));
   RAISE NOTICE 'sql_to_run_grid %', sql_to_run_grid;
 
   sql_to_block_cmd := Format('select resolve_overlap_gap_block_cell(%s,%s,%s,%s,', 
-  Quote_literal(table_to_resolve_), Quote_literal(_geo_collumn_name), Quote_literal(input_table_pk_column_name_), Quote_literal(job_list_name_));
+  Quote_literal(_table_to_resolve), Quote_literal(_geo_collumn_name), Quote_literal(_input_table_pk_column_name), Quote_literal(_job_list_name));
   
   
   -- make       
@@ -137,7 +137,7 @@ BEGIN
     %s as r 
     where r.%s && l.geom
     ) as r WHERE r.cell_number = 1', 
- 	job_list_name_, 
+ 	_job_list_name, 
  	Quote_literal(sql_to_run_grid), 
  	Quote_literal(',' || _cell_job_type || ','), 
  	Quote_literal(sql_to_block_cmd), 
@@ -163,7 +163,7 @@ BEGIN
     r.'||_geo_collumn_name||' as cell_geo, 
     %s||quote_literal(r.'||_geo_collumn_name||'::Varchar)||%s as sql_to_block
  	from %s r', 
- 	job_list_name_, 
+ 	_job_list_name, 
  	Quote_literal(sql_to_run_grid), 
  	Quote_literal(',' || _cell_job_type || ','), 
  	Quote_literal(sql_to_block_cmd), 
@@ -185,7 +185,7 @@ BEGIN
     r.'||_geo_collumn_name||' as cell_geo, 
     %s||quote_literal(r.'||_geo_collumn_name||'::Varchar)||%s as sql_to_block
  	from %s r', 
- 	job_list_name_, 
+ 	_job_list_name, 
  	Quote_literal(sql_to_run_grid), 
  	Quote_literal(',' || _cell_job_type || ','), 
  	Quote_literal(sql_to_block_cmd), 
@@ -200,15 +200,15 @@ BEGIN
  
   GET DIAGNOSTICS job_list_row_count = ROW_COUNT;
   
-  RAISE NOTICE 'Created joblist  %s with %s rows for cell_job_type %s ', job_list_name_, job_list_row_count, _cell_job_type ;
+  RAISE NOTICE 'Created joblist  %s with %s rows for cell_job_type %s ', _job_list_name, job_list_row_count, _cell_job_type ;
  
     
-  EXECUTE Format('CREATE INDEX ON %s USING GIST (cell_geo);', job_list_name_);
-  EXECUTE Format('CREATE INDEX ON %s USING GIST (block_bb);', job_list_name_);
-  EXECUTE Format('CREATE INDEX ON %s (id);', job_list_name_);
-  EXECUTE Format('CREATE INDEX ON %s (num_polygons);', job_list_name_);
-  EXECUTE Format('CREATE INDEX ON %s (inside_cell);', job_list_name_);
-  EXECUTE Format('CREATE INDEX ON %s (id);', job_list_name_ || '_donejobs');
+  EXECUTE Format('CREATE INDEX ON %s USING GIST (cell_geo);', _job_list_name);
+  EXECUTE Format('CREATE INDEX ON %s USING GIST (block_bb);', _job_list_name);
+  EXECUTE Format('CREATE INDEX ON %s (id);', _job_list_name);
+  EXECUTE Format('CREATE INDEX ON %s (num_polygons);', _job_list_name);
+  EXECUTE Format('CREATE INDEX ON %s (inside_cell);', _job_list_name);
+  EXECUTE Format('CREATE INDEX ON %s (id);', _job_list_name || '_donejobs');
 
   IF _cell_job_type = 4 or _cell_job_type = 5 THEN 
     command_string := Format('UPDATE %1$s u
@@ -223,7 +223,7 @@ BEGIN
     GROUP BY a1.id
     ) r1
     WHERE r1.id = u.id', 
-    job_list_name_, _table_name_result_prefix||'_border_line_segments', 'geo');
+    _job_list_name, _table_name_result_prefix||'_border_line_segments', 'geo');
     RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
     
@@ -232,7 +232,7 @@ BEGIN
     from 
     %4$s as t
     where ST_Intersects(g.cell_geo,t.%3$s)', 
-    job_list_name_,
+    _job_list_name,
     _overlapgap_grid||'_threads',
     _geo_collumn_name, 
     _overlapgap_grid||'_threads'||'_lines');

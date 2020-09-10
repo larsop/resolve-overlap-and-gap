@@ -14,7 +14,8 @@ _clean_info resolve_overlap_data_clean_type, -- different parameters used if nee
 --(_clean_info).simplify_tolerance float, -- is this is more than zero simply will called with
 --(_clean_info).do_chaikins boolean, -- here we will use chaikins togehter with simply to smooth lines
 --(_clean_info).min_area_to_keep float, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
-_cell_job_type int -- add lines 1 inside cell, 2 boderlines, 3 exract simple
+_max_parallel_jobs int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
+_cell_job_type int -- add lines 1 inside cell, 2 boderlines, 3 exract simple,
 )
   RETURNS void
   AS $$
@@ -41,7 +42,7 @@ BEGIN
   command_string := Format('DROP table if exists %s', _job_list_name);
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
-  command_string := Format('CREATE unlogged table %s(id serial, start_time timestamp with time zone, inside_cell boolean, grid_thread_cell int, num_polygons int, row_number int, sql_to_block varchar, sql_to_run varchar, cell_geo geometry(geometry,%s),block_bb Geometry(geometry,%s), blocked_by_id int)',
+  command_string := Format('CREATE unlogged table %s(id serial, start_time timestamp with time zone, inside_cell boolean, grid_thread_cell int, num_polygons int, row_number int, sql_to_block varchar, sql_to_run varchar, cell_geo geometry(geometry,%s),block_bb Geometry(geometry,%s), blocked_by_id int, worker_id int)',
   _job_list_name,_srid,_srid);
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
@@ -209,6 +210,8 @@ BEGIN
   EXECUTE Format('CREATE INDEX ON %s (num_polygons);', _job_list_name);
   EXECUTE Format('CREATE INDEX ON %s (inside_cell);', _job_list_name);
   EXECUTE Format('CREATE INDEX ON %s (id);', _job_list_name || '_donejobs');
+
+  EXECUTE Format('UPDATE %1$s g SET worker_id = MOD((id-1),%2$s) + 1', _job_list_name, _max_parallel_jobs);
 
   IF _cell_job_type = 4 or _cell_job_type = 5 THEN 
     command_string := Format('UPDATE %1$s u

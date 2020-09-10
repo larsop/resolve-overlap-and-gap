@@ -94,7 +94,9 @@ DECLARE
 
   border_line_rec RECORD;
   line_edges_geo_failed geometry[]; 
-
+  
+  this_worker_id int;
+  num_jobs_worker_id int;
 
 BEGIN
 	
@@ -259,6 +261,7 @@ BEGIN
     EXECUTE Format('ANALYZE %s.node', border_topo_info.topology_name);
     EXECUTE Format('ANALYZE %s.relation', border_topo_info.topology_name);
     EXECUTE Format('ANALYZE %s.edge_data', border_topo_info.topology_name);
+    EXECUTE Format('ANALYZE %s.face', border_topo_info.topology_name);
 
 
       
@@ -652,9 +655,46 @@ BEGIN
   IF used_time > 60 THEN
     EXECUTE Format('INSERT INTO %s (execute_time, info, sql, geo) VALUES (%s, %L, %L, %L)', _table_name_result_prefix || '_long_time_log2', used_time, 'simplefeature_c2_topo_surface_border_retry', command_string, _bb);
   END IF;
-  PERFORM topo_update.clear_blocked_area (_bb, _job_list_name);
+  
+ 
+   PERFORM topo_update.clear_blocked_area (_bb, _job_list_name);
   RAISE NOTICE 'leave work at timeofday:% for layer %, with _cell_job_type % for cell %', Timeofday(), border_topo_info.topology_name, _cell_job_type, box_id;
   --RETURN added_rows;
+ 
+  -- do analyse
+  
+ 
+  IF _cell_job_type < 4 THEN
+    command_string := Format('select worker_id from %1$s where id = %2$s', _job_list_name, box_id);
+    EXECUTE command_string INTO this_worker_id;
+  
+    IF this_worker_id = 1 THEN 
+      command_string := Format('select count(d.*) 
+      from 
+      %1$s l,
+      %2$s d
+      where d.id = l.id and l.worker_id = %3$s',
+      _job_list_name, 
+      _job_list_name||'_donejobs', 
+      this_worker_id);
+      EXECUTE command_string INTO num_jobs_worker_id;
+   
+      -- Maybe find a better way for this
+      IF num_jobs_worker_id  = 2 or 
+         (num_jobs_worker_id > 1 and mod(999999,num_jobs_worker_id*num_jobs_worker_id) = 0) THEN
+        RAISE NOTICE 'Do analyze for % for num_jobs_worker_id % and box_id % snd _cell_job_type %', 
+        _topology_name, num_jobs_worker_id, box_id, _cell_job_type;
+
+        EXECUTE Format('ANALYZE %s.node', _topology_name);
+        EXECUTE Format('ANALYZE %s.relation', _topology_name);
+        EXECUTE Format('ANALYZE %s.edge_data',_topology_name);
+        EXECUTE Format('ANALYZE %s.face', _topology_name);
+      END IF;
+    END IF;
+  END IF;
+
+
+  
 END
 $$;
 

@@ -31,7 +31,6 @@ DECLARE
   this_list_id int;
   -- Holds the list of func_call to run
   stmts text[];
-  stmts_final text[];
 
   -- Holds the sql for a functin to call
   func_call text;
@@ -185,8 +184,8 @@ BEGIN
     END IF;
 
     IF loop_number = 1 THEN
-      command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%L,%s)', 
-      (_input).table_to_resolve, (_input).table_geo_collumn_name, (_input).table_srid, (_input).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input).table_pk_column_name, _clean_info, cell_job_type);
+      command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%L,%s,%s)', 
+      (_input).table_to_resolve, (_input).table_geo_collumn_name, (_input).table_srid, (_input).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input).table_pk_column_name, _clean_info, _max_parallel_jobs, cell_job_type);
       EXECUTE command_string;
       COMMIT;
     END IF;
@@ -199,6 +198,7 @@ BEGIN
       EXIT WHEN (cell_job_type = 1 AND loop_number = 2)  or
       cell_job_type = 3;
 
+      stmts := '{}';
 
         command_string := Format('SELECT ARRAY(SELECT j.sql_to_run||%1$L as func_call 
         FROM %2$s j
@@ -218,28 +218,7 @@ BEGIN
         
       RAISE NOTICE 'Kicking off % jobs for cell_job_type % at loop_number % for topology % at % ', 
            Array_length(stmts, 1), cell_job_type, loop_number, (_topology_info).topology_name, now();
-  
-        
-      stmts_final := '{}';
-      analyze_stmts  := 0;
-      FOR i_stmts IN 1 .. Array_length(stmts, 1)
-      LOOP
-         stmts_final[i_stmts+analyze_stmts] = stmts[i_stmts];
-         IF ((cell_job_type < 4) and 
-             (i_stmts=(_max_parallel_jobs*2) or MOD(i_stmts,400) = 0))
-            THEN
-           analyze_stmts := analyze_stmts + 1;
-           stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.edge_data;', (_topology_info).topology_name);
-           analyze_stmts := analyze_stmts + 1;
-           stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.node;', (_topology_info).topology_name);
-           analyze_stmts := analyze_stmts + 1;
-           stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.face;', (_topology_info).topology_name);
-           analyze_stmts := analyze_stmts + 1;
-           stmts_final[i_stmts+analyze_stmts] := Format('ANALYZE %s.relation;', (_topology_info).topology_name);
-         END IF;
-      END LOOP;
       
-      stmts := '{}';
 
 
 
@@ -248,13 +227,13 @@ BEGIN
 	    start_time := Clock_timestamp();
     	IF cell_job_type = 3 and run_add_border_line_as_single_thread = true THEN
           -- run in single thread to avoid topo errors
-          SELECT execute_parallel (stmts_final, 1,true,null,contiune_after_stat_exception) INTO call_result;
+          SELECT execute_parallel (stmts, 1,true,null,contiune_after_stat_exception) INTO call_result;
         ELSE 
-          SELECT execute_parallel (stmts_final, _max_parallel_jobs,true,null,contiune_after_stat_exception) INTO call_result;
+          SELECT execute_parallel (stmts, _max_parallel_jobs,true,null,contiune_after_stat_exception) INTO call_result;
         END IF;
 
         RAISE NOTICE 'Done running % jobs for cell_job_type % at loop_number % for topology % in % secs', 
-        Array_length(stmts_final, 1), cell_job_type, loop_number, (_topology_info).topology_name, (Extract(EPOCH FROM (Clock_timestamp() - start_time)));
+        Array_length(stmts, 1), cell_job_type, loop_number, (_topology_info).topology_name, (Extract(EPOCH FROM (Clock_timestamp() - start_time)));
   
 
       EXCEPTION WHEN OTHERS THEN
@@ -304,7 +283,7 @@ BEGIN
 
       IF (call_result = 0 AND last_run_stmts = Array_length(stmts, 1)) THEN
         RAISE EXCEPTION 'FFailed to run overlap and gap for % at loop_number % for the following statement list %', 
-        (_input).table_to_resolve, loop_number, stmts_final;
+        (_input).table_to_resolve, loop_number, stmts;
       END IF;
 
       last_run_stmts := Array_length(stmts, 1); 
@@ -312,8 +291,8 @@ BEGIN
 
       IF stop_at_job_type >= cell_job_type AND loop_number >= stop_at_loop_nr  THEN  
 	      RAISE WARNING 'EXIT with % jobs for cell_job_type % at loop_number % for topology % ', 
-          Array_length(stmts_final, 1), cell_job_type, loop_number, (_topology_info).topology_name;
-          RAISE WARNING 'stmts to run --> %', stmts_final;
+          Array_length(stmts, 1), cell_job_type, loop_number, (_topology_info).topology_name;
+          RAISE WARNING 'stmts to run --> %', stmts;
           return ;
 	  END IF;
 

@@ -99,6 +99,8 @@ DECLARE
   num_jobs_worker_id int;
   num_min_since_last_analyze int;
 
+  analyze_done_at timestamp WITH time zone default null;
+ 
 BEGIN
 	
   command_string := Format('select id from %1$s where cell_geo = %2$L', _job_list_name, _bb);
@@ -657,23 +659,23 @@ BEGIN
     EXECUTE Format('INSERT INTO %s (execute_time, info, sql, geo) VALUES (%s, %L, %L, %L)', _table_name_result_prefix || '_long_time_log2', used_time, 'simplefeature_c2_topo_surface_border_retry', command_string, _bb);
   END IF;
   
- 
-   PERFORM topo_update.clear_blocked_area (_bb, _job_list_name);
-  RAISE NOTICE 'leave work at timeofday:% for layer %, with _cell_job_type % for cell %', Timeofday(), border_topo_info.topology_name, _cell_job_type, box_id;
-  --RETURN added_rows;
- 
   -- do analyse
   IF _cell_job_type < 3 THEN
     command_string := Format('select worker_id from %1$s where id = %2$s', _job_list_name, box_id);
     EXECUTE command_string INTO this_worker_id;
   
+    -- 1599830100.882998 | 
+    -- 1599835466.322007
+    
+--    SELECT (EXTRACT(EPOCH FROM TRANSACTION_TIMESTAMP()))- EXTRACT(EPOCH FROM (d.analyze_time)),d.analyze_time, d.done_time from  test_topo_jm_t2.jm_ukomm_flate_job_list_donejobs d
+
     IF this_worker_id = 1 THEN 
       command_string := Format('select count(d.*), 
-      ((EXTRACT(EPOCH FROM max(now()))-EXTRACT(EPOCH FROM max(d.done_time)))/60)::int time_diff 
+      ((EXTRACT(EPOCH FROM now())-EXTRACT(EPOCH FROM max(d.analyze_time)))/60)::int time_diff 
       from 
       %1$s l,
       %2$s d
-      where d.id = l.id and l.worker_id = %3$s and d.id != %4$s ',
+      where d.id = l.id and l.worker_id = %3$s',
       _job_list_name, 
       _job_list_name||'_donejobs', 
       this_worker_id,
@@ -681,9 +683,11 @@ BEGIN
       
       EXECUTE command_string INTO num_jobs_worker_id, num_min_since_last_analyze;
    
-      -- Maybe find a better way for this
-      IF num_jobs_worker_id  < 3 or 
-         num_min_since_last_analyze > num_jobs_worker_id*2 THEN
+      -- Maybe find a better way for this, Do analyze the first 3 rounds and the at least once hour or more more of slowing down
+      IF num_jobs_worker_id  < 3 or num_jobs_worker_id is null or
+         num_min_since_last_analyze > num_jobs_worker_id*2 or
+         num_min_since_last_analyze > 60
+         THEN
         RAISE NOTICE 'Do analyze for % for num_jobs_worker_id % and box_id % snd _cell_job_type % and num_min_since_last_analyze % at %', 
         _topology_name, num_jobs_worker_id, box_id, _cell_job_type, num_min_since_last_analyze, now();
 
@@ -691,11 +695,26 @@ BEGIN
         EXECUTE Format('ANALYZE %s.relation', _topology_name);
         EXECUTE Format('ANALYZE %s.edge_data',_topology_name);
         EXECUTE Format('ANALYZE %s.face', _topology_name);
+        
+        analyze_done_at := TRANSACTION_TIMESTAMP();
+      ELSE
+        RAISE NOTICE 'Not Do analyze for % for num_jobs_worker_id % and box_id % snd _cell_job_type % and num_min_since_last_analyze % at %', 
+        _topology_name, num_jobs_worker_id, box_id, _cell_job_type, num_min_since_last_analyze, now();
       END IF;
     END IF;
   END IF;
 
 
+  command_string := Format('insert into %1$s(id,analyze_time) select gt.id, %4$L from %2$s as gt
+       where ST_Equals(gt.cell_geo,%3$L)', 
+       _job_list_name || '_donejobs',
+       _job_list_name, 
+       _bb,
+       analyze_done_at);
+  EXECUTE command_string;
+ 
+  RAISE NOTICE 'leave work at timeofday:% for layer %, with _cell_job_type % for cell %', Timeofday(), border_topo_info.topology_name, _cell_job_type, box_id;
+ 
   
 END
 $$;

@@ -50,7 +50,8 @@ BEGIN
   command_string := Format('DROP table if exists %s', _job_list_name || '_donejobs');
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
-  command_string := Format('CREATE unlogged table %s(id int, done_time timestamp with time zone default clock_timestamp())', _job_list_name || '_donejobs');
+  command_string := Format('CREATE unlogged table %s(id int, done_time timestamp with time zone default clock_timestamp(), analyze_time timestamp with time zone )', 
+  _job_list_name || '_donejobs');
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
 

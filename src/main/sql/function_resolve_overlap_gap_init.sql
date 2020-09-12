@@ -22,11 +22,13 @@ DECLARE
   drop_result_tables_ boolean = TRUE;
   -- table to keep track of results
   -- the name of the content based based on the grid so each thread work on diffrent cell
-  overlapgap_grid_threads varchar;
-  overlapgap_grid_threads_cell_size int;
-  overlapgap_grid_threads_num_cells int;
+  overlapgap_grid_metagrid_name varchar;
+  overlapgap_grid_metagrid_name_cell_size int;
+  overlapgap_grid_metagrid_name_num_cells int;
   
   layer_centroid geometry;
+  i int;
+  num_metagrids int;
   
 BEGIN
   -- ############################# START # Create Topology master working schema
@@ -85,47 +87,77 @@ BEGIN
   -- Create a second grid for each thread
   -- TODO move to init_job ??
   -- create a content based grid table for input data
-  overlapgap_grid_threads := _overlapgap_grid||'_threads'; 
-  overlapgap_grid_threads_cell_size := num_cells/5;
+  -- TODO Need to find out how to handle meta grids  
+  num_metagrids := (num_cells/100)::int;
   
-  -- TODO find out what value to use here ????
-  IF overlapgap_grid_threads_cell_size < 10 THEN
-    overlapgap_grid_threads_cell_size = num_cells;
+  if num_metagrids = 0 THEN
+    num_metagrids = 1;
   END IF;
   
-  EXECUTE Format('CREATE TABLE %s( id serial, %s geometry(Geometry,%s))', 
-  overlapgap_grid_threads, _geo_collumn_name, _srid);
-  command_string := Format('INSERT INTO %s(%s) 
- 	SELECT q_grid.cell::Geometry(geometry,%s) as %s
- 	from (
- 	select(st_dump(
- 	cbg_content_based_balanced_grid(array[ %L],%s))
- 	).geom as cell) as q_grid', 
- 	overlapgap_grid_threads, _geo_collumn_name, _srid, _geo_collumn_name, 
- 	_overlapgap_grid || ' '|| _geo_collumn_name, overlapgap_grid_threads_cell_size);
-  -- execute the sql command
-  EXECUTE command_string;
-  -- count number of cells in grid
-  command_string := Format('SELECT count(*) from %s', overlapgap_grid_threads);
-  -- execute the sql command
-  EXECUTE command_string INTO overlapgap_grid_threads_num_cells;
+  FOR i IN 1..num_metagrids LOOP
+    overlapgap_grid_metagrid_name_cell_size :=i*100;
+    overlapgap_grid_metagrid_name := _overlapgap_grid||'_metagrid_'||to_char(i, 'fm0000'); 
+    
+    -- TODO find out what value to use here ????
+    IF overlapgap_grid_metagrid_name_cell_size < 10 THEN
+      overlapgap_grid_metagrid_name_cell_size = num_cells;
+    END IF;
+    
+    EXECUTE Format('CREATE TABLE %s( id serial, %s geometry(Geometry,%s))', 
+    overlapgap_grid_metagrid_name, _geo_collumn_name, _srid);
+    command_string := Format('INSERT INTO %s(%s) 
+     SELECT q_grid.cell::Geometry(geometry,%s) as %s
+     from (
+     select(st_dump(
+     cbg_content_based_balanced_grid(array[ %L],%s))
+     ).geom as cell) as q_grid', 
+     overlapgap_grid_metagrid_name, _geo_collumn_name, _srid, _geo_collumn_name, 
+     _overlapgap_grid || ' '|| _geo_collumn_name, overlapgap_grid_metagrid_name_cell_size);
+    -- execute the sql command
+    EXECUTE command_string;
+    -- count number of cells in grid
+    command_string := Format('SELECT count(*) from %s', overlapgap_grid_metagrid_name);
+    -- execute the sql command
+    EXECUTE command_string INTO overlapgap_grid_metagrid_name_num_cells;
+   
+    EXECUTE Format('UPDATE %s set %s = ST_Buffer(%s,-%s)', 
+    overlapgap_grid_metagrid_name, _geo_collumn_name, _geo_collumn_name, _topology_snap_tolerance);
+    
+    -- Create Index
+    EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', overlapgap_grid_metagrid_name, _geo_collumn_name);
+  
+    -- Create a table of grid_metagrid_01 lines
+    EXECUTE Format('CREATE TABLE %1$s( id serial, %2$s geometry(Geometry,%3$s))', 
+    overlapgap_grid_metagrid_name||'_lines', 
+    _geo_collumn_name, 
+    _srid);
+    
+    command_string := Format('INSERT INTO %1$s(%2$s) 
+    SELECT distinct (ST_Dump(topo_update.get_single_lineparts(ST_Boundary(%2$s)))).geom as %2$s
+    from %3$s', 
+    overlapgap_grid_metagrid_name||'_lines', 
+    _geo_collumn_name, 
+    overlapgap_grid_metagrid_name);
+    EXECUTE command_string;
+    -- Create Index
+    EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', overlapgap_grid_metagrid_name||'_lines', _geo_collumn_name);
  
-  EXECUTE Format('UPDATE %s set %s = ST_Buffer(%s,-%s)', 
-  overlapgap_grid_threads, _geo_collumn_name, _geo_collumn_name, _topology_snap_tolerance);
+    --  Will not be used any more, may removed it ???
+    IF i = 1 THEN
+      EXECUTE Format('ALTER TABLE %s ADD column inside_cell boolean default false', _overlapgap_grid);
+      EXECUTE Format('UPDATE %s g SET inside_cell = true from %s t where ST_covers(t.%s,g.%s)', 
+      _overlapgap_grid,overlapgap_grid_metagrid_name,_geo_collumn_name,_geo_collumn_name,_geo_collumn_name);
+    
+      EXECUTE Format('ALTER TABLE %s ADD column grid_thread_cell int default 0', _overlapgap_grid);
+      EXECUTE Format('UPDATE %s g SET grid_thread_cell = t.id from %s t where ST_Intersects(t.%s,g.%s)', 
+      _overlapgap_grid,overlapgap_grid_metagrid_name,_geo_collumn_name,_geo_collumn_name,_geo_collumn_name);
+    END IF;
+
+  END LOOP;
+   
+
   
-  -- Create Index
-  EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', overlapgap_grid_threads, _geo_collumn_name);
-
-  EXECUTE Format('ALTER TABLE %s ADD column inside_cell boolean default false', _overlapgap_grid);
-  EXECUTE Format('UPDATE %s g SET inside_cell = true from %s t where ST_covers(t.%s,g.%s)', 
-  _overlapgap_grid,overlapgap_grid_threads,_geo_collumn_name,_geo_collumn_name,_geo_collumn_name);
-
-  EXECUTE Format('ALTER TABLE %s ADD column grid_thread_cell int default 0', _overlapgap_grid);
-  EXECUTE Format('UPDATE %s g SET grid_thread_cell = t.id from %s t where ST_Intersects(t.%s,g.%s)', 
-  _overlapgap_grid,overlapgap_grid_threads,_geo_collumn_name,_geo_collumn_name,_geo_collumn_name);
-
   EXECUTE Format('ALTER TABLE %s ADD column num_polygons int default 0', _overlapgap_grid);
-  
   EXECUTE Format('UPDATE %s g SET num_polygons = r.num_polygons FROM 
   (select count(t.*) as num_polygons, g.id from %s t, %s g where t.%s && g.%s group by g.id) as r
   where r.id = g.id', 
@@ -145,22 +177,6 @@ BEGIN
   _overlapgap_grid,_geo_collumn_name, layer_centroid,_overlapgap_grid);
 
 
-  -- Create a table of grid_threads lines
-  EXECUTE Format('CREATE TABLE %1$s( id serial, %2$s geometry(Geometry,%3$s))', 
-  overlapgap_grid_threads||'_lines', 
-  _geo_collumn_name, 
-  _srid);
-  
-  command_string := Format('INSERT INTO %1$s(%2$s) 
-  SELECT distinct (ST_Dump(topo_update.get_single_lineparts(ST_Boundary(%2$s)))).geom as %2$s
-  from %3$s', 
-  overlapgap_grid_threads||'_lines', 
-  _geo_collumn_name, 
-  overlapgap_grid_threads);
-  EXECUTE command_string;
-  -- Create Index
-  EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', overlapgap_grid_threads||'_lines', _geo_collumn_name);
- 
   
   -- ----------------------------- DONE - Handle content based grid init
   
@@ -192,10 +208,13 @@ EXECUTE Format('CREATE UNLOGGED TABLE %s (
 )',_table_name_result_prefix||'_long_time_log2',_srid);
 
 EXECUTE Format('CREATE UNLOGGED TABLE %s (
-  id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), geo Geometry(LineString, %s), point_geo Geometry(Point, %s)
+  id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), added_to_master boolean default false, geo Geometry(LineString, %s), point_geo Geometry(Point, %s)
 )',_table_name_result_prefix||'_border_line_segments',_srid,_srid);
 
 EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', _table_name_result_prefix||'_border_line_segments', 'geo');
+
+EXECUTE Format('CREATE INDEX ON %s(%s)', _table_name_result_prefix||'_border_line_segments', 'added_to_master');
+
 
 EXECUTE Format('CREATE UNLOGGED TABLE %s (
   id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), geo Geometry(LineString, %s)

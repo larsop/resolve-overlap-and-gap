@@ -15,7 +15,8 @@ _clean_info resolve_overlap_data_clean_type, -- different parameters used if nee
 --(_clean_info).do_chaikins boolean, -- here we will use chaikins togehter with simply to smooth lines
 --(_clean_info).min_area_to_keep float, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
 _max_parallel_jobs int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
-_cell_job_type int -- add lines 1 inside cell, 2 boderlines, 3 exract simple,
+_cell_job_type int,-- add lines 1 inside cell, 2 boderlines, 3 exract simple,
+_loop_number int
 )
   RETURNS void
   AS $$
@@ -170,7 +171,7 @@ BEGIN
  	Quote_literal(',' || _cell_job_type || ','), 
  	Quote_literal(sql_to_block_cmd), 
  	Quote_literal(');'), 
- 	_overlapgap_grid||'_threads');
+ 	_overlapgap_grid||'_metagrid_'||to_char(1, 'fm0000'));
  	
  	RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
@@ -237,9 +238,9 @@ BEGIN
     %4$s as t
     where ST_Intersects(g.cell_geo,t.%3$s)', 
     _job_list_name,
-    _overlapgap_grid||'_threads',
+    _overlapgap_grid||'_metagrid_'||to_char(1, 'fm0000'),
     _geo_collumn_name, 
-    _overlapgap_grid||'_threads'||'_lines');
+    _overlapgap_grid||'_metagrid_'||to_char(1, 'fm0000')||'_lines');
   
   END IF;
 

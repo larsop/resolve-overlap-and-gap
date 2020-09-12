@@ -119,20 +119,6 @@ BEGIN
   
   FOR cell_job_type IN start_at_job_type..7 LOOP
 
-  -- This is not working it uses a very long time  both add this data and glu lnes together later
-  --  IF cell_job_type = 3 THEN
-  --      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geom,%2$s,%3$L) from  (
-  --       SELECT (ST_dump(ST_LineMerge(ST_Intersection(g.geo,b.geo)))).geom as geom
-  --       from 
-  --       (select ST_union(ST_ExteriorRing(%7$s)) as geo from %4$s g ) as g,
-  --       (select ST_union(geo) as geo from %5$s b ) as b
-  --      ) r where ST_GeometryType(geom) = %6$L', 
-  --    (_topology_info).topology_name, (_topology_info).topology_snap_tolerance, table_name_result_prefix,
-  --    table_name_result_prefix||'_grid', table_name_result_prefix||'_border_line_segments','ST_LineString',
-  --    (_input).table_geo_collumn_name);
-  --    EXECUTE command_string;
-  --  END IF;
-
     IF cell_job_type = 3 and loop_number = 1 THEN
       -- add very long lines feature in single thread
       -- Most parts of this will not be healed and smooting if we keep it this way
@@ -147,12 +133,12 @@ BEGIN
       from 
       %4$s r,
       %5$s l
-      where ST_Intersects(l.%6$s,r.geo)',
+      where ST_Intersects(l.%6$s,r.geo) and r.added_to_master = false',
       (_topology_info).topology_name, 
       (_topology_info).topology_snap_tolerance, 
       table_name_result_prefix,
       table_name_result_prefix||'_border_line_segments',
-      overlapgap_grid||'_threads'||'_lines',
+      overlapgap_grid||'_metagrid_'||to_char(1, 'fm0000')||'_lines',
       (_input).table_geo_collumn_name);
       EXECUTE command_string;
       
@@ -184,8 +170,8 @@ BEGIN
     END IF;
 
     IF loop_number = 1 THEN
-      command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%L,%s,%s)', 
-      (_input).table_to_resolve, (_input).table_geo_collumn_name, (_input).table_srid, (_input).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input).table_pk_column_name, _clean_info, _max_parallel_jobs, cell_job_type);
+      command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%L,%s,%s,%s)', 
+      (_input).table_to_resolve, (_input).table_geo_collumn_name, (_input).table_srid, (_input).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input).table_pk_column_name, _clean_info, _max_parallel_jobs, cell_job_type,loop_number);
       EXECUTE command_string;
       COMMIT;
     END IF;

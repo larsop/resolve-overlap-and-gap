@@ -38,6 +38,8 @@ DECLARE
   
   job_list_row_count int;
   
+  meta_grid_exist varchar;
+  
 BEGIN
   -- ############################# START # create jobList tables
   command_string := Format('DROP table if exists %s', _job_list_name);
@@ -155,6 +157,10 @@ BEGIN
     EXECUTE command_string;
   
   ELSIF _cell_job_type = 2 THEN 
+    command_string := Format('select to_regclass(%L)',_overlapgap_grid||'_metagrid_'||to_char(_loop_number, 'fm0000') );
+    execute command_string into meta_grid_exist;
+    
+    IF meta_grid_exist is not null THEN
     command_string := Format('
  	INSERT INTO %s(inside_cell,grid_thread_cell,num_polygons,row_number,sql_to_run,cell_geo,sql_to_block) 
  	SELECT
@@ -171,11 +177,11 @@ BEGIN
  	Quote_literal(',' || _cell_job_type || ','), 
  	Quote_literal(sql_to_block_cmd), 
  	Quote_literal(');'), 
- 	_overlapgap_grid||'_metagrid_'||to_char(1, 'fm0000'));
+ 	_overlapgap_grid||'_metagrid_'||to_char(_loop_number, 'fm0000'));
  	
  	RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
-
+    END IF;
   ELSE
     command_string := Format('
  	INSERT INTO %s(inside_cell,grid_thread_cell,num_polygons,row_number,sql_to_run,cell_geo,sql_to_block) 
@@ -232,7 +238,8 @@ BEGIN
     RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
     
-      
+     
+    -- TOD remove this
     EXECUTE Format('UPDATE %1$s g SET inside_cell = false 
     from 
     %4$s as t

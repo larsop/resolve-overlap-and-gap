@@ -169,7 +169,7 @@ BEGIN
 
     END IF;
 
-    IF loop_number = 1 THEN
+    IF loop_number = 1 and cell_job_type != 2 THEN
       command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%L,%s,%s,%s)', 
       (_input).table_to_resolve, (_input).table_geo_collumn_name, (_input).table_srid, (_input).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input).table_pk_column_name, _clean_info, _max_parallel_jobs, cell_job_type,loop_number);
       EXECUTE command_string;
@@ -183,6 +183,13 @@ BEGIN
 
       EXIT WHEN (cell_job_type = 1 AND loop_number = 2)  or
       cell_job_type = 3;
+
+      IF cell_job_type = 2 THEN
+        command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%L,%s,%s,%s)', 
+        (_input).table_to_resolve, (_input).table_geo_collumn_name, (_input).table_srid, (_input).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input).table_pk_column_name, _clean_info, _max_parallel_jobs, cell_job_type,loop_number);
+        EXECUTE command_string;
+        COMMIT;
+      END IF;
 
       stmts := '{}';
 

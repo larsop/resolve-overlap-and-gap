@@ -350,7 +350,19 @@ BEGIN
   -- Add border lines for small grids
   
     command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE) from %4$s r 
-    where r.geo && %5$L and ST_CoveredBy(r.geo, %5$L)', 
+    where r.geo && %5$L and ST_CoveredBy(r.geo, %5$L) and r.added_to_master = false', 
+    _topology_name, 
+    _topology_snap_tolerance, 
+    _table_name_result_prefix,
+    _table_name_result_prefix||'_border_line_segments',
+    _bb);
+      
+    RAISE NOTICE 'command_string1 % ',  command_string;
+    
+    EXECUTE command_string;
+
+    command_string := Format('update %4$s r set added_to_master = true
+    where r.geo && %5$L and ST_CoveredBy(r.geo, %5$L) and r.added_to_master = false', 
     _topology_name, 
     _topology_snap_tolerance, 
     _table_name_result_prefix,

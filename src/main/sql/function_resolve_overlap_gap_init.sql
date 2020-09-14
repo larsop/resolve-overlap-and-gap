@@ -242,7 +242,7 @@ EXECUTE Format('CREATE INDEX ON %s(%s)', _table_name_result_prefix||'_border_lin
 
 
 EXECUTE Format('CREATE UNLOGGED TABLE %s (
-  id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), geo Geometry(LineString, %s)
+  id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(),added_to_master boolean default false, geo Geometry(LineString, %s)
 )',_table_name_result_prefix||'_border_line_many_points',_srid,_srid);
 
 -- Create the simple feature result table  as copy of the input table

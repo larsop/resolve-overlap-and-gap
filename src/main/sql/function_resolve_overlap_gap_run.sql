@@ -122,13 +122,18 @@ BEGIN
     IF cell_job_type = 3 and loop_number = 1 THEN
       -- add very long lines feature in single thread
       -- Most parts of this will not be healed and smooting if we keep it this way
-      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE) from %4$s r', 
+      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE) from %4$s r where r.added_to_master = false', 
       (_topology_info).topology_name, 
       (_topology_info).topology_snap_tolerance, 
       table_name_result_prefix,
       table_name_result_prefix||'_border_line_many_points');
       EXECUTE command_string;
-      
+
+      command_string := Format('update %1$s set added_to_master = true
+      where added_to_master = false', 
+      table_name_result_prefix||'_border_line_many_points');
+      EXECUTE command_string;
+
       command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE) 
       from 
       %4$s r,
@@ -142,6 +147,11 @@ BEGIN
       (_input).table_geo_collumn_name);
       EXECUTE command_string;
       
+
+      command_string := Format('update %1$s set added_to_master = true
+      where added_to_master = false', 
+      table_name_result_prefix||'_border_line_segments');
+      EXECUTE command_string;
 
       COMMIT;
 

@@ -91,7 +91,7 @@ BEGIN
   -- TODO move to init_job ??
   -- create a content based grid table for input data
   -- TODO Need to find out how to handle meta grids  
-  reduce_cell_by := 50;
+  reduce_cell_by := 25;
   num_metagrids_try_loop := (num_cells_master_grid/reduce_cell_by)::int;
   
   try_with_grid_metagrid_size :=num_cells_master_grid/reduce_cell_by;
@@ -159,7 +159,7 @@ BEGIN
       tmp_overlapgap_grid := overlapgap_grid_metagrid_name; 
     END IF;
 
-    try_with_grid_metagrid_size := (num_cells_master_grid/reduce_cell_by) - ((num_cells_master_grid/reduce_cell_by)/(i+1));
+    try_with_grid_metagrid_size := (num_cells_master_grid/reduce_cell_by) - ((num_cells_master_grid/reduce_cell_by)/(i+3));
     
 
         --  Will not be used any more, may removed it ???

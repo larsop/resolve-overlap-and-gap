@@ -92,25 +92,33 @@ BEGIN
   -- create a content based grid table for input data
   -- TODO Need to find out how to handle meta grids  
   reduce_cell_by := 25;
-  num_metagrids_try_loop := (num_cells_master_grid/reduce_cell_by)::int;
   
-  try_with_grid_metagrid_size :=num_cells_master_grid/reduce_cell_by;
   -- TODO find out what value to use here ????
-  IF try_with_grid_metagrid_size < 10 THEN
+  IF num_cells_master_grid < 20 THEN
+      num_metagrids_try_loop = 1;
       try_with_grid_metagrid_size = num_cells_master_grid;
+  ELSE
+      num_metagrids_try_loop := 10;
+      try_with_grid_metagrid_size = 20;
   END IF;
   
-  if num_metagrids_try_loop = 0 THEN
-    num_metagrids_try_loop = 1;
-  END IF;
   
-  tmp_overlapgap_grid  = _overlapgap_grid;
-
+  tmp_overlapgap_grid := _overlapgap_grid;
+  
 
   FOR i IN 1..num_metagrids_try_loop LOOP
     overlapgap_grid_metagrid_name := _overlapgap_grid||'_metagrid_'||to_char(next_grid_table_num, 'fm0000'); 
+   
+    IF i > 1 THEN 
+      try_with_grid_metagrid_size := try_with_grid_metagrid_size-1;
+    END IF;
+
+    RAISE NOTICE 'try_with_grid_metagrid_size: %', try_with_grid_metagrid_size;
     
-    
+    if try_with_grid_metagrid_size < 4 THEN
+      try_with_grid_metagrid_size := 4;
+    END IF;
+   
     EXECUTE Format('CREATE TABLE %s( id serial, %s geometry(Geometry,%s))', 
     overlapgap_grid_metagrid_name, _geo_collumn_name, _srid);
     command_string := Format('INSERT INTO %s(%s) 
@@ -159,8 +167,8 @@ BEGIN
       tmp_overlapgap_grid := overlapgap_grid_metagrid_name; 
     END IF;
 
-    try_with_grid_metagrid_size := (num_cells_master_grid/reduce_cell_by) - ((num_cells_master_grid/reduce_cell_by)/(i+3));
     
+
 
         --  Will not be used any more, may removed it ???
     IF i = 1 THEN
@@ -173,7 +181,7 @@ BEGIN
       _overlapgap_grid,overlapgap_grid_metagrid_name,_geo_collumn_name,_geo_collumn_name,_geo_collumn_name);
     END IF;
 
-    EXIT WHEN overlapgap_grid_metagrid_name_num_cells < 4 or try_with_grid_metagrid_size < 0;
+    EXIT WHEN overlapgap_grid_metagrid_name_num_cells < 4 or try_with_grid_metagrid_size < 4;
     
     
 

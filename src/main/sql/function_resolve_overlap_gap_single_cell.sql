@@ -250,7 +250,8 @@ BEGIN
     --command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::Text, %L) from tmp_simplified_border_lines g where line_type = 0 order by is_closed desc, num_points desc', border_topo_info);
     --RAISE NOTICE 'command_string %', command_string;
     command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geom,%2$s,%3$L,TRUE) 
-    FROM (select geo as geom from %4$s g where outer_border_line = false) as r',
+    FROM (select geo as geom from %4$s g where outer_border_line = false) as r 
+    ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom))',
     border_topo_info.topology_name, 
     border_topo_info.snap_tolerance, 
     _table_name_result_prefix,
@@ -331,7 +332,9 @@ BEGIN
     
     IF (has_edges) THEN
 
-       command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L,FALSE) FROM (SELECT geom from %2$s order by is_closed desc, num_points desc) as r',
+       command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L,TRUE) FROM 
+       (SELECT geom from %2$s order by is_closed desc, num_points desc) as r 
+       ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom))',
        _topology_snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (_bb), _topology_name, _table_name_result_prefix);
        EXECUTE command_string into line_edges_added;
 
@@ -349,7 +352,7 @@ BEGIN
   ELSIF _cell_job_type = 2 THEN
   -- Add border lines for small grids
   
-    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE) from %4$s r 
+    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,TRUE) from %4$s r 
     where r.geo && %5$L and ST_CoveredBy(r.geo, %5$L) and r.added_to_master = false 
     ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo))', 
     _topology_name, 
@@ -365,7 +368,7 @@ BEGIN
     _bb);
     EXECUTE command_string;
     
-    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE) from %4$s r 
+    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,TRUE) from %4$s r 
     where r.geo && %5$L and ST_CoveredBy(r.geo, %5$L) and r.added_to_master = false 
     ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo))', 
     _topology_name, 

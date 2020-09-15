@@ -102,7 +102,7 @@ BEGIN
  	_topology_snap_tolerance,
  	_table_name_result_prefix||'_grid', 
  	ST_ExteriorRing(_bb),
- 	_topology_snap_tolerance/10, -- If snap to much here we may with not connected lines.
+ 	_topology_snap_tolerance/20, -- If snap to much here we may with not connected lines.
  	tmp_table_name
  	);
   EXECUTE command_string;

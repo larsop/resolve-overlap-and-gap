@@ -88,7 +88,7 @@ BEGIN
     tolerance_retry_value := _snap_tolerance*tolerance_retry_num*tolerance_retry_diff;
     
     EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, FALSE, 
-    'Warn2, will do retry, topo_update.add_border_lines with tolerance :'||tolerance_retry_value||' and tolerance_retry_num '|| tolerance_retry_num ||'for topology '||_topology_name, 
+    'Warn2 before loop, will do retry, topo_update.add_border_lines with tolerance :'||tolerance_retry_value||' and tolerance_retry_num '|| tolerance_retry_num ||'for topology '||_topology_name, 
     v_state, v_msg, v_detail, v_hint, v_context, new_line);
     
    
@@ -123,7 +123,7 @@ BEGIN
       tolerance_retry_num := tolerance_retry_num  + 1;
       
       EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, FALSE, 
-      'Warn2, will do retry, topo_update.add_border_lines with tolerance :'||tolerance_retry_value||' and tolerance_retry_num '|| tolerance_retry_num ||'for topology '||_topology_name, 
+      'Warn2 in loop, will do retry, topo_update.add_border_lines with tolerance :'||tolerance_retry_value||' and tolerance_retry_num '|| tolerance_retry_num ||'for topology '||_topology_name, 
        v_state, v_msg, v_detail, v_hint, v_context, new_line);
 
     END LOOP;

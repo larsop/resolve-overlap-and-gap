@@ -305,14 +305,14 @@ BEGIN
 
       IF (_utm = false) THEN
        command_string := Format('create unlogged table %1$s as 
-       (SELECT geom, ST_IsClosed(geom) as is_closed, ST_NPoints(geom) as num_points 
+       (SELECT (ST_Dump(ST_LineMerge(ST_Union(geom)))).geom 
        from  %2$s.edge_data where ST_Length(geom,true) >= %3$s)',
        has_edges_temp_table_name,
        border_topo_info.topology_name,
        min_length_line);
       ELSE
        command_string := Format('create unlogged table %1$s as 
-       (SELECT geom, ST_IsClosed(geom) as is_closed, ST_NPoints(geom) as num_points 
+       (SELECT (ST_Dump(ST_LineMerge(ST_Union(geom)))).geom 
        from  %2$s.edge_data where ST_Length(geom) >= %3$s)',
        has_edges_temp_table_name,
        border_topo_info.topology_name,
@@ -321,10 +321,7 @@ BEGIN
 
       
       EXECUTE command_string;
-      
-      EXECUTE Format('CREATE INDEX ON %s(is_closed,num_points)', has_edges_temp_table_name);
-
-      
+           
     END IF;
     execute Format('SET CONSTRAINTS ALL IMMEDIATE');
     PERFORM topology.DropTopology (border_topo_info.topology_name);
@@ -333,7 +330,7 @@ BEGIN
     IF (has_edges) THEN
 
        command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L,TRUE) FROM 
-       (SELECT geom from %2$s order by is_closed desc, num_points desc) as r 
+       (SELECT geom from %2$s) as r 
        ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom))',
        _topology_snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (_bb), _topology_name, _table_name_result_prefix);
        EXECUTE command_string into line_edges_added;

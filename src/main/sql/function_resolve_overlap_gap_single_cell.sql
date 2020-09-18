@@ -249,7 +249,7 @@ BEGIN
     border_topo_info.snap_tolerance := snap_tolerance_fixed;
     --command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::Text, %L) from tmp_simplified_border_lines g where line_type = 0 order by is_closed desc, num_points desc', border_topo_info);
     --RAISE NOTICE 'command_string %', command_string;
-    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geom,%2$s,%3$L,TRUE) 
+    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geom,%2$s,%3$L,FALSE) 
     FROM (select geo as geom from %4$s g where outer_border_line = false) as r 
     ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom))',
     border_topo_info.topology_name, 
@@ -268,6 +268,24 @@ BEGIN
     EXECUTE Format('ANALYZE %s.face', border_topo_info.topology_name);
 
 
+ 
+    command_string := Format('WITH topo_updated AS (
+      SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,true), geo 
+      from %4$s r 
+      where ST_CoveredBy(r.geo, %5$L) group by geo
+      )
+      update %4$s u 
+      set line_geo_lost = false
+      FROM topo_updated tu
+      where tu.geo = u.geo and (SELECT bool_or(x IS NOT NULL) FROM unnest(tu.add_border_lines) x)' , 
+      border_topo_info.topology_name, 
+      border_topo_info.snap_tolerance, 
+      _table_name_result_prefix,
+      _table_name_result_prefix||'_no_cut_line_failed',
+      _bb);
+
+      RAISE NOTICE 'Try to add failed lines %', command_string;
+      EXECUTE command_string;
       
     -- Heal egdes  
 --    command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L,%3$L)', 

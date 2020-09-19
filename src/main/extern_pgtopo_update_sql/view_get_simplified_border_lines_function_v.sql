@@ -54,19 +54,19 @@ BEGIN
  	  FROM %1$s v
  	  where ST_Intersects(v.%3$s,%2$L)
  	),
- 	lines_intersect_cell as (
+ 	lines_intersect_cell_border as (
       SELECT distinct rings.geom  
-      from rings
+      from rings where ST_Intersects(geom,%6$L)
     ),
     touch_lines_intersects AS (
       SELECT distinct ST_ExteriorRing(v.%3$s) AS geom
-      FROM lines_intersect_cell l, 
+      FROM lines_intersect_cell_border l, 
       %1$s v
  	  WHERE ST_Intersects(v.%3$s,l.geom) and ST_Disjoint(v.%3$s,%2$L)
  	),
     all_lines AS (SELECT distinct r.geom as geom from 
      ( SELECT distinct (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(l1.geom,%7$s)))))).geom as geom 
-       from lines_intersect_cell l1 
+       from lines_intersect_cell_border l1 
        union 
        SELECT distinct (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(l2.geom,%7$s)))))).geom as geom 
        from touch_lines_intersects l2
@@ -76,6 +76,9 @@ BEGIN
       SELECT (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(la.geom,%7$s)))))).geom
       FROM 
       all_lines la
+      UNION
+      SELECT distinct rings.geom  
+      from rings where ST_CoveredBy(geom,%2$L)
     ),
     tmp_data_this_cell_lines AS (
       SELECT 
@@ -263,24 +266,23 @@ $function$;
 --  'test_topo_ar5_t2.ar5_2019_komm_flate_job_list','test_topo_ar5_t2.ar5_2019_komm_flate_grid','0103000020A21000000100000005000000B01528D072332B401477E5B53C9F5040B01528D072332B40BEEA23EFDCAC504032B00F4ED7102C40BEEA23EFDCAC504032B00F4ED7102C401477E5B53C9F5040B01528D072332B401477E5B53C9F5040',1,1)
 --  
 
--- drop table if exists test_topo_ar5_t4.test_tmp_simplified_border_data ;
--- drop table if exists test_topo_ar5_t4.test_tmp_simplified_border_data_lines ;
--- drop table if exists test_topo_ar5_t4.test_tmp_simplified_border_data_point ;
--- drop table if exists test_topo_ar5_t4.test_tmp_simplified_border_data_lines_exp;
--- 
--- \timing
--- create table test_topo_ar5_t4.test_tmp_simplified_border_data as 
--- (select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
--- FROM topo_update.get_simplified_border_lines('org_ar5arsversjon.ar5_2019_komm_flate','geo',
--- '0103000020A21000000100000005000000EC132053A63F3640B256119E5F505140EC132053A63F3640063E8E10A06B51406EAE07D10A1D3740063E8E10A06B51406EAE07D10A1D3740B256119E5F505140EC132053A63F3640B256119E5F505140'::geometry
--- ,1e-06,'test_topo_ar5_t2.ar5_2019_komm_flate') g);
--- 
--- create table test_topo_ar5_t4.test_tmp_simplified_border_data_lines as select geo from test_tmp_simplified_border_data where outer_border_line = false;
--- alter table test_topo_ar5_t4.test_tmp_simplified_border_data_lines add column id serial;
--- 
--- create table test_topo_ar5_t4.test_tmp_simplified_border_data_lines_exp as select ST_Expand(geo,1e-06) from test_tmp_simplified_border_data where outer_border_line = false;
--- alter table test_topo_ar5_t4.test_tmp_simplified_border_data_lines_exp add column id serial;
--- 
--- 
--- create table test_topo_ar5_t4.test_tmp_simplified_border_data_point as select geo from test_tmp_simplified_border_data where outer_border_line = TRUE;
--- alter table test_topo_ar5_t4.test_tmp_simplified_border_data_point add column id serial;
+--  drop table if exists test_topo_ar5_t4.test_tmp_simplified_border_data ;
+--  drop table if exists test_topo_ar5_t4.test_tmp_simplified_border_data_lines ;
+--  drop table if exists test_topo_ar5_t4.test_tmp_simplified_border_data_point ;
+--  drop table if exists test_topo_ar5_t4.test_tmp_simplified_border_data_lines_exp;
+--  
+--  \timing
+--  create table test_topo_ar5_t4.test_tmp_simplified_border_data as 
+--  (select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
+--  FROM topo_update.get_simplified_border_lines('org_ar5arsversjon.ar5_2019_komm_flate','geo',
+--  '0103000020A21000000100000005000000EC132053A63F3640B256119E5F505140EC132053A63F3640063E8E10A06B51406EAE07D10A1D3740063E8E10A06B51406EAE07D10A1D3740B256119E5F505140EC132053A63F3640B256119E5F505140'::geometry
+--  ,1e-06,'test_topo_ar5_t4.ar5_2019_komm_flate') g);
+--  
+--  create table test_topo_ar5_t4.test_tmp_simplified_border_data_lines as select geo from test_topo_ar5_t4.test_tmp_simplified_border_data where outer_border_line = false;
+--  alter table test_topo_ar5_t4.test_tmp_simplified_border_data_lines add column id serial;
+--  
+--  create table test_topo_ar5_t4.test_tmp_simplified_border_data_lines_exp as select ST_Expand(geo,1e-06) from test_topo_ar5_t4.test_tmp_simplified_border_data where outer_border_line = false;
+--  alter table test_topo_ar5_t4.test_tmp_simplified_border_data_lines_exp add column id serial;
+--  
+--  
+--  create table test_topo_ar5_t4.test_tmp_simplified_border_data_point as select geo from test_topo_ar5_t4.test_tmp_simplified_border_data where outer_border_line = TRUE;

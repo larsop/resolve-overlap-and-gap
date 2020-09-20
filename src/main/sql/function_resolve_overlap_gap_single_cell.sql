@@ -277,14 +277,15 @@ BEGIN
       update %4$s u 
       set line_geo_lost = false
       FROM topo_updated tu
-      where tu.geo = u.geo and (SELECT bool_or(x IS NOT NULL) FROM unnest(tu.add_border_lines) x)' , 
+      where ST_DWithin(tu.geo,u.geo,%6$s) and (SELECT bool_or(x IS NOT NULL) FROM unnest(tu.add_border_lines) x)' , 
       border_topo_info.topology_name, 
       border_topo_info.snap_tolerance, 
       _table_name_result_prefix,
       _table_name_result_prefix||'_no_cut_line_failed',
-      _bb);
+      _bb,
+      _topology_snap_tolerance);
 
-      RAISE NOTICE 'Try to add failed lines %', command_string;
+      RAISE NOTICE 'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTry to add failed lines %', command_string;
       EXECUTE command_string;
       
     -- Heal egdes  

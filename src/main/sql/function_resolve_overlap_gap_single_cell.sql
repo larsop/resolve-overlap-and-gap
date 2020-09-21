@@ -41,7 +41,6 @@ DECLARE
   
   glue_snap_tolerance_fixed float = 0;
   
-  min_length_line float = (_clean_info).min_area_to_keep/1000;
   temp_table_name varchar;
   temp_table_id_column varchar;
   final_result_table_name varchar;
@@ -145,8 +144,8 @@ BEGIN
   -- RAISE NOTICE 'area to block:% ', area_to_block;
   border_topo_info.snap_tolerance := _topology_snap_tolerance;
   
-  RAISE NOTICE 'start work at timeofday:% for layer %, _topology_snap_tolerance %, with _cell_job_type % and min_length_line %s, (_clean_info).chaikins_max_degrees) %', 
-  Timeofday(), _topology_name || '_' || box_id, _topology_snap_tolerance, _cell_job_type, min_length_line, (_clean_info).chaikins_max_degrees;
+  RAISE NOTICE 'start work at timeofday:% for layer %, _topology_snap_tolerance %, with _cell_job_type % and (_clean_info).chaikins_max_degrees) %', 
+  Timeofday(), _topology_name || '_' || box_id, _topology_snap_tolerance, _cell_job_type, (_clean_info).chaikins_max_degrees;
   
       -- check if any 'SubtransControlLock' is there
         subtransControlLock_start = clock_timestamp();
@@ -319,29 +318,16 @@ BEGIN
 
     EXECUTE command_string into has_edges;
     
-        IF (has_edges) THEN
+    IF (has_edges) THEN
       has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;
-
-      IF (_utm = false) THEN
-       command_string := Format('create unlogged table %1$s as 
-       (SELECT (ST_Dump(ST_LineMerge(ST_Union(geom)))).geom 
-       from  %2$s.edge_data where ST_Length(geom,true) >= %3$s)',
-       has_edges_temp_table_name,
-       border_topo_info.topology_name,
-       min_length_line);
-      ELSE
-       command_string := Format('create unlogged table %1$s as 
-       (SELECT (ST_Dump(ST_LineMerge(ST_Union(geom)))).geom 
-       from  %2$s.edge_data where ST_Length(geom) >= %3$s)',
-       has_edges_temp_table_name,
-       border_topo_info.topology_name,
-       min_length_line);
-      END IF;
-
-      
+      command_string := Format('create unlogged table %1$s as 
+      (SELECT (ST_Dump(ST_LineMerge(ST_Union(geom)))).geom 
+      from  %2$s.edge_data )',
+      has_edges_temp_table_name,
+      border_topo_info.topology_name);
       EXECUTE command_string;
-           
     END IF;
+    
     execute Format('SET CONSTRAINTS ALL IMMEDIATE');
     PERFORM topology.DropTopology (border_topo_info.topology_name);
 

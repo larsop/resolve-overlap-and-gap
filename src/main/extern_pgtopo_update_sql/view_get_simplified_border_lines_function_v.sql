@@ -54,19 +54,19 @@ BEGIN
  	  FROM %1$s v
  	  where ST_Intersects(v.%3$s,%2$L)
  	),
- 	lines_intersect_cell_border as (
+ 	lines_intersect_cell as (
       SELECT distinct rings.geom  
-      from rings where ST_Intersects(geom,%6$L)
+      from rings
     ),
     touch_lines_intersects AS (
       SELECT distinct ST_ExteriorRing(v.%3$s) AS geom
-      FROM lines_intersect_cell_border l, 
+      FROM lines_intersect_cell l, 
       %1$s v
  	  WHERE ST_Intersects(v.%3$s,l.geom) and ST_Disjoint(v.%3$s,%2$L)
  	),
     all_lines AS (SELECT distinct r.geom as geom from 
      ( SELECT distinct (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(l1.geom,%7$s)))))).geom as geom 
-       from lines_intersect_cell_border l1 
+       from lines_intersect_cell l1 
        union 
        SELECT distinct (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(l2.geom,%7$s)))))).geom as geom 
        from touch_lines_intersects l2
@@ -76,9 +76,6 @@ BEGIN
       SELECT (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(la.geom,%7$s)))))).geom
       FROM 
       all_lines la
-      UNION
-      SELECT distinct rings.geom  
-      from rings where ST_CoveredBy(geom,%2$L)
     ),
     tmp_data_this_cell_lines AS (
       SELECT 
@@ -183,6 +180,7 @@ BEGIN
 END
 $function$;
 
+
 --drop table tmp_data_all_linesb54ff161031c2fb96c987afa0f0136c3;
 --
 --TRUNCATE test_topo_ar5_t2.ar5_2019_komm_flate_border_line_segments ;
@@ -230,25 +228,6 @@ $function$;
 
 
 
-
---drop table if exists test_tmp_simplified_border_data ;
---
---\timing
---create table test_tmp_simplified_border_data as 
---(select g.* , ST_NPoints(geo) as num_points, ST_IsClosed(geo) as is_closed  
---FROM topo_update.get_simplified_border_lines('org_jm.jm_ukomm_flate','geo',
-----'0103000020A21000000100000005000000228D33786B142640EEFDA9DA05FB4D40228D33786B142640DD971EAD84014E40392509B3D1472640DD971EAD84014E40392509B3D1472640EEFDA9DA05FB4D40228D33786B142640EEFDA9DA05FB4D40'::geometry
---'0103000020A21000000100000005000000B40BDACA07DE2240EEFDA9DA05FB4D40B40BDACA07DE2240CC31937F03084E40E23B8540D4442340CC31937F03084E40E23B8540D4442340EEFDA9DA05FB4D40B40BDACA07DE2240EEFDA9DA05FB4D40'::geometry
---,1e-05,'test_topo_jm.jm_ukomm_flate') g);
---
---drop table if exists test_tmp_simplified_border_data_lines ;
---drop table if exists test_tmp_simplified_border_data_point ;
---
---create table test_tmp_simplified_border_data_lines as select geo::geometry(LineString,4258) from test_tmp_simplified_border_data where outer_border_line = false;
---alter table test_tmp_simplified_border_data_lines add column id serial;
---
---create table test_tmp_simplified_border_data_point as select geo from test_tmp_simplified_border_data where outer_border_line = TRUE;
---alter table test_tmp_simplified_border_data_point add column id serial;
 --
 --CALL resolve_overlap_gap_single_cell(
 --  'org_jm.jm_ukomm_flate','geo','figurid','test_topo_jm.jm_ukomm_flate',
@@ -286,3 +265,5 @@ $function$;
 --  
 --  
 --  create table test_topo_ar5_t4.test_tmp_simplified_border_data_point as select geo from test_topo_ar5_t4.test_tmp_simplified_border_data where outer_border_line = TRUE;
+
+

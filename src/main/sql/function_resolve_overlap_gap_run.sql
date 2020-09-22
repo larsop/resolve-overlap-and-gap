@@ -160,21 +160,30 @@ BEGIN
     
    IF cell_job_type = 4 and loop_number = 1 THEN
       -- try fixed failed lines before make simple feature in single thread
+      EXECUTE command_string;
+
       command_string := Format('WITH topo_updated AS (
-      SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,true), geo 
-      from %4$s r 
-      where line_geo_lost = true group by geo
+      SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,TRUE), geo 
+        FROM (
+          SELECT distinct (ST_Dump(ST_Multi(ST_LineMerge(ST_union(r.geo))))).geom as geo 
+            FROM (
+              select r.geo from %4$s r where line_geo_lost = true
+            ) as r
+          ) as r
       )
       update %4$s u 
       set line_geo_lost = false
       FROM topo_updated tu
-      where tu.geo = u.geo and (SELECT bool_or(x IS NOT NULL) FROM unnest(tu.add_border_lines) x)' , 
-      (_topology_info).topology_name, (_topology_info).topology_snap_tolerance, table_name_result_prefix, table_name_result_prefix||'_no_cut_line_failed');
-      
-      RAISE NOTICE 'Try to add failed lines %', command_string;
-  
+      where ST_DWithin(tu.geo,u.geo,%2$s) and (SELECT bool_or(x IS NOT NULL) FROM unnest(tu.add_border_lines) x)' , 
+      (_topology_info).topology_name, 
+      (_topology_info).topology_snap_tolerance, 
+      table_name_result_prefix, 
+      table_name_result_prefix||'_no_cut_line_failed');
+
+      RAISE NOTICE 'Try to add failed lines with retry to master topo layer %', command_string;
       EXECUTE command_string;
 
+      
       COMMIT;
 
     END IF;

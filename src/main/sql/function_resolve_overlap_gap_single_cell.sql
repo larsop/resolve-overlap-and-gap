@@ -269,9 +269,13 @@ BEGIN
 
  
     command_string := Format('WITH topo_updated AS (
-      SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,true), geo 
-      from %4$s r 
-      where ST_CoveredBy(r.geo, %5$L) group by geo
+      SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,TRUE), geo 
+        FROM (
+          SELECT distinct (ST_Dump(ST_Multi(ST_LineMerge(ST_union(r.geo))))).geom as geo 
+            FROM (
+              select r.geo from %4$s r where ST_CoveredBy(r.geo, %5$L) 
+            ) as r
+          ) as r
       )
       update %4$s u 
       set line_geo_lost = false
@@ -284,9 +288,9 @@ BEGIN
       _bb,
       _topology_snap_tolerance);
 
-      RAISE NOTICE 'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTry to add failed lines %', command_string;
+      RAISE NOTICE 'Try to add failed lines with retry to temp topo layer %', command_string;
       EXECUTE command_string;
-      
+  
     -- Heal egdes  
 --    command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L,%3$L)', 
 --    border_topo_info.topology_name,_bb,outer_cell_boundary_lines);
@@ -334,16 +338,39 @@ BEGIN
     
     IF (has_edges) THEN
 
-       command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L,TRUE) FROM 
+       command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L,FALSE) FROM 
        (SELECT geom from %2$s) as r 
        ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom))',
        _topology_snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (_bb), _topology_name, _table_name_result_prefix);
        EXECUTE command_string into line_edges_added;
 
        command_string := Format('DROP TABLE IF EXISTS %s',has_edges_temp_table_name);
-      EXECUTE command_string;
+       EXECUTE command_string;
 
-       command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
+      command_string := Format('WITH topo_updated AS (
+      SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE), geo 
+        FROM (
+          SELECT distinct (ST_Dump(ST_Multi(ST_LineMerge(ST_union(r.geo))))).geom as geo 
+            FROM (
+              select r.geo from %4$s r where ST_CoveredBy(r.geo, %5$L) and line_geo_lost = true
+            ) as r
+          ) as r
+      )
+      update %4$s u 
+      set line_geo_lost = false
+      FROM topo_updated tu
+      where ST_DWithin(tu.geo,u.geo,%6$s) and (SELECT bool_or(x IS NOT NULL) FROM unnest(tu.add_border_lines) x)' , 
+      _topology_name, 
+      _topology_snap_tolerance, 
+      _table_name_result_prefix,
+      _table_name_result_prefix||'_no_cut_line_failed',
+      _bb,
+      _topology_snap_tolerance);
+
+      RAISE NOTICE 'Try to add failed lines with no retry to master topo layer %', command_string;
+      EXECUTE command_string;
+      
+      command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
       _topology_name, inner_cell_boundary_geom);
 
     END IF;

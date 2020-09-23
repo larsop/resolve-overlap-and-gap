@@ -1,4 +1,9 @@
-drop function if exists topo_update.add_border_lines (_topology_name character varying, _new_line_raw geometry, _snap_tolerance float, _table_name_result_prefix varchar);
+drop function if exists 
+topo_update.add_border_lines (_topology_name character varying, 
+_new_line_raw geometry, 
+_snap_tolerance float, 
+_table_name_result_prefix varchar,
+_do_retry_add boolean);
 
 CREATE OR REPLACE FUNCTION topo_update.add_border_lines (_topology_name character varying, 
 _new_line_raw geometry, 
@@ -56,22 +61,55 @@ BEGIN
     WHEN OTHERS THEN
     GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
     v_context = PG_EXCEPTION_CONTEXT;
-    RAISE NOTICE 'failed with in default case  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
+    RAISE NOTICE 'First error  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
 
     IF (_do_retry_add = false) THEN
-   
       RAISE NOTICE '_do_retry_add is false, just log  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
       EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) 
                       VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', 
                       no_cutline_filename, TRUE, 'Will not do retry ', v_state, v_msg, v_detail, v_hint, v_context, new_line);
-
-     RETURN edges_added;
+      RETURN edges_added;
     END IF;
 
     SELECT Position('deadlock detected' IN v_msg) INTO deadlock_detected;
-    
     IF (deadlock_detected > 0 ) THEN
-      RAISE EXCEPTION 'failed: state deadlock detected or _snap_tolerance = 0  : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
+      RAISE EXCEPTION 'failed: state deadlock detected : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
+    END IF;
+
+    SELECT Position('geometry crosses edge' IN v_msg) INTO crosses_edge;
+    IF (crosses_edge > 0) THEN
+      crosses_edge_num := Trim(Substring(v_msg FROM (crosses_edge + Char_length('geometry crosses edge'))))::Int;
+      RAISE NOTICE 'crosses_edge % state % message: % detail : % hint   : % context: %', crosses_edge_num, v_state, v_msg, v_detail, v_hint, v_context;
+      BEGIN
+        CREATE TEMP table temp_table_fix_topo_crosses_edge(line geometry);
+        command_string := Format('INSERT into temp_table_fix_topo_crosses_edge(line)  
+        select distinct (ST_Dump(ST_LineMerge(ST_Union(e.geom)))).geom as line
+        from (
+          select geom from %3$s.edge e where e.edge_id = %4$s
+          union
+          select %2$L as geom
+        ) as e', _snap_tolerance, _new_line_raw, _topology_name, crosses_edge_num);
+        
+        RAISE NOTICE 'command_string %', command_string;
+        EXECUTE command_string;
+
+        command_string := Format('select topology.ST_RemEdgeNewFace(%1$L, %2$s )'
+        , _topology_name, crosses_edge_num);
+        EXECUTE command_string;
+        
+        command_string := Format('SELECT ARRAY(SELECT topology.TopoGeo_addLinestring(%L,line,%s) from temp_table_fix_topo_crosses_edge)'
+        ,_topology_name , _snap_tolerance);
+        EXECUTE command_string;
+
+        EXECUTE command_string into edges_added;
+        RETURN edges_added;
+      EXCEPTION
+        WHEN OTHERS THEN
+          GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,
+          v_context = PG_EXCEPTION_CONTEXT;
+        RAISE NOTICE 'failed to handle crosses_edge   : % message: % detail : % hint   : % context: %', v_state, v_msg, v_detail, v_hint, v_context;
+        EXECUTE Format('INSERT INTO %s(line_geo_lost, error_info, d_state, d_msg, d_detail, d_hint, d_context, geo) VALUES(%L, %L, %L, %L, %L, %L, %L, %L)', no_cutline_filename, TRUE, 'failed to handle crosses_edge, topo_update.add_border_lines ', v_state, v_msg, v_detail, v_hint, v_context, new_line);
+      END;
     END IF;
 
     IF (_snap_tolerance = 0)
@@ -281,4 +319,7 @@ END;
 
 $$
 LANGUAGE plpgsql;
+
+
+
 

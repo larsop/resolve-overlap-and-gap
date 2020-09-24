@@ -160,6 +160,13 @@ BEGIN
     
    IF cell_job_type = 4 and loop_number = 1 THEN
       -- try fixed failed lines before make simple feature in single thread
+      -- this code is messy needs to fixed in anither way     
+      command_string := Format('UPDATE %1$s u 
+      SET line_geo_lost = false
+      FROM %1$s o
+      where ST_DWithin(u.geo,u.geo,%2$s) and u.line_geo_lost = false',
+      table_name_result_prefix||'_no_cut_line_failed',
+      (_topology_info).topology_snap_tolerance);
       EXECUTE command_string;
 
       command_string := Format('WITH topo_updated AS (

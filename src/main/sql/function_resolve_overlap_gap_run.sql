@@ -207,8 +207,7 @@ BEGIN
     last_run_stmts := 0;
     LOOP
 
-      EXIT WHEN (cell_job_type = 1 AND loop_number = 2)  or
-      cell_job_type = 3;
+      EXIT WHEN cell_job_type = 3;
 
       IF cell_job_type = 2 THEN
         command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%L,%s,%s,%s)', 

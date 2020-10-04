@@ -176,7 +176,7 @@ BEGIN
     
    
     
-  IF _cell_job_type = 1 THEN
+  IF _cell_job_type = 1 and _loop_number = 1 THEN
     -- get the siple feature data both the line_types and the inner lines.
     -- the boundery linnes are saved in a table for later usage
     
@@ -335,7 +335,33 @@ BEGIN
     execute Format('SET CONSTRAINTS ALL IMMEDIATE');
     PERFORM topology.DropTopology (border_topo_info.topology_name);
 
+    commit;
     
+    IF (has_edges) THEN
+
+       command_string := Format('SELECT topology.TopoGeo_addLinestring(%1$L,r.geom,%2$s) FROM 
+       (SELECT geom from %3$s) as r 
+       ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom))',
+       _topology_name,
+       _topology_snap_tolerance, 
+       has_edges_temp_table_name);
+       EXECUTE command_string;
+
+       command_string := Format('DROP TABLE IF EXISTS %s',has_edges_temp_table_name);
+       EXECUTE command_string;
+
+
+    END IF;
+
+    
+--- 
+  ELSIF _cell_job_type = 1 and _loop_number > 1 THEN
+   
+    has_edges_temp_table_name := _topology_name||'.edge_data_tmp_' || box_id;
+    command_string := Format('SELECT EXISTS(SELECT 1 from to_regclass(%L) where to_regclass is not null)',has_edges_temp_table_name);
+    EXECUTE command_string into has_edges;
+    RAISE NOTICE 'cell % cell_job_type %, has_edges %, _loop_number %', box_id, _cell_job_type, has_edges, _loop_number;
+ 
     IF (has_edges) THEN
 
        command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L,FALSE) FROM 
@@ -375,7 +401,6 @@ BEGIN
 
     END IF;
 
-    
     
  
   ELSIF _cell_job_type = 2 THEN
@@ -835,4 +860,3 @@ $$;
 --    '0103000020E9640000010000000500000000000000A0EA0A4162A964474BDD5A4100000000A0EA0A4142C6ED8430E25A4100000000B49E0B4142C6ED8430E25A4100000000B49E0B4162A964474BDD5A4100000000A0EA0A4162A964474BDD5A41'
 --  ,1,1);
   
-

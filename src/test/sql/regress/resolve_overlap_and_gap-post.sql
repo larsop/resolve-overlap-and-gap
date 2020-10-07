@@ -1,4 +1,5 @@
 drop schema test_data cascade;
+drop schema test_ar5_web cascade;
 
 DROP PROCEDURE IF EXISTS resolve_overlap_gap_run(
 _input resolve_overlap_data_input_type, 

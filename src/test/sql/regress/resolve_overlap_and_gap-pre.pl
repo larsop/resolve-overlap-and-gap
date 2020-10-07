@@ -87,6 +87,9 @@ for my $file (glob '../../../main/sql/func*') {
 # get SQL code for test data needed by the tests 
 copy_file_into('overlap_gap_input_t1.sql',$fh_out);
 
+# get SQL code for test data needed by the tests 
+copy_file_into('overlap_gap_input_t2.sql',$fh_out);
+
 close($fh_out);	 
 
 sub copy_file_into { 

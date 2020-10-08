@@ -111,13 +111,10 @@ BEGIN
   -- Call init method to create content based create and main topology schema
   
   IF start_at_job_type = 1 THEN 
-    command_string := Format('SELECT resolve_overlap_gap_init(%L,%s,%s,%s,%s,%s,%s,%s,%s)', 
+    command_string := Format('SELECT resolve_overlap_gap_init(%L,%s,%L,%s,%s,%s)', 
     table_name_result_prefix, 
-    Quote_literal((_input_data).polygon_table_name), 
-    Quote_literal((_input_data).polygon_table_pk_column),
-    Quote_literal((_input_data).polygon_table_geo_collumn), 
-    (_input_data).table_srid, 
     _max_rows_in_each_cell, 
+    _input_data,
     Quote_literal(overlapgap_grid), 
     Quote_literal((_topology_info).topology_name),
     (_topology_info).topology_snap_tolerance);

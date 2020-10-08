@@ -3,11 +3,8 @@
 
 CREATE OR REPLACE FUNCTION resolve_overlap_gap_init (
 _table_name_result_prefix varchar,
-_polygon_table_name varchar, -- The schema.table name with polygons to analyze for gaps and intersects
-_polygon_table_pk_column varchar, -- A unique primary column of the input table 
-_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
-_srid int, -- the srid for the given geo column on the table analyze
 _max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes
+_input_data resolve_overlap_data_input_type, 
 _overlapgap_grid varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
 _topology_schema_name varchar, -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,
 _topology_snap_tolerance double precision
@@ -35,6 +32,7 @@ DECLARE
   tmp_overlapgap_grid varchar;
   reduce_cell_by int;
   unique_id_type varchar;
+
 BEGIN
   -- ############################# START # Create Topology master working schema
   -- drop schema if exists
@@ -47,7 +45,7 @@ BEGIN
   -- drop this schema in case it exists
   EXECUTE Format('DROP SCHEMA IF EXISTS %s CASCADE', _topology_schema_name);
   -- create topology
-  EXECUTE Format('SELECT topology.createtopology(%s,%s,%s)', Quote_literal(_topology_schema_name), _srid, _topology_snap_tolerance);
+  EXECUTE Format('SELECT topology.createtopology(%s,%s,%s)', Quote_literal(_topology_schema_name), (_input_data).table_srid, _topology_snap_tolerance);
   -- Set unlogged to increase performance
  
   EXECUTE Format('GRANT USAGE ON SCHEMA %s TO PUBLIC', _topology_schema_name);
@@ -73,13 +71,13 @@ BEGIN
     EXECUTE Format('DROP TABLE IF EXISTS %s', _overlapgap_grid);
   END IF;
   -- create a content based grid table for input data
-  EXECUTE Format('CREATE TABLE %s( id serial, %s geometry(Geometry,%s))', _overlapgap_grid, _geo_collumn_name, _srid);
+  EXECUTE Format('CREATE TABLE %s( id serial, %s geometry(Geometry,%s))', _overlapgap_grid, (_input_data).polygon_table_geo_collumn, (_input_data).table_srid);
   command_string := Format('INSERT INTO %s(%s) 
  	SELECT q_grid.cell::Geometry(geometry,%s)  as %s 
  	from (
  	select(st_dump(
  	cbg_content_based_balanced_grid(array[ %s],%s))
- 	).geom as cell) as q_grid', _overlapgap_grid, _geo_collumn_name, _srid, _geo_collumn_name, Quote_literal(_polygon_table_name || ' ' || _geo_collumn_name)::Text, _max_rows_in_each_cell);
+ 	).geom as cell) as q_grid', _overlapgap_grid, (_input_data).polygon_table_geo_collumn, (_input_data).table_srid, (_input_data).polygon_table_geo_collumn, Quote_literal((_input_data).polygon_table_name || ' ' || (_input_data).polygon_table_geo_collumn)::Text, _max_rows_in_each_cell);
   -- execute the sql command
   EXECUTE command_string;
   -- count number of cells in grid
@@ -87,7 +85,7 @@ BEGIN
   -- execute the sql command
   EXECUTE command_string INTO num_cells_master_grid;
   -- Create Index
-  EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', _overlapgap_grid, _geo_collumn_name);
+  EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', _overlapgap_grid, (_input_data).polygon_table_geo_collumn);
   
   -- Create a second grid for each thread
   -- TODO move to init_job ??
@@ -122,15 +120,15 @@ BEGIN
     END IF;
    
     EXECUTE Format('CREATE TABLE %s( id serial, %s geometry(Geometry,%s))', 
-    overlapgap_grid_metagrid_name, _geo_collumn_name, _srid);
+    overlapgap_grid_metagrid_name, (_input_data).polygon_table_geo_collumn, (_input_data).table_srid);
     command_string := Format('INSERT INTO %s(%s) 
      SELECT q_grid.cell::Geometry(geometry,%s) as %s
      from (
      select(st_dump(
      cbg_content_based_balanced_grid(array[ %L],%s))
      ).geom as cell) as q_grid', 
-     overlapgap_grid_metagrid_name, _geo_collumn_name, _srid, _geo_collumn_name, 
-     tmp_overlapgap_grid || ' '|| _geo_collumn_name, try_with_grid_metagrid_size);
+     overlapgap_grid_metagrid_name, (_input_data).polygon_table_geo_collumn, (_input_data).table_srid, (_input_data).polygon_table_geo_collumn, 
+     tmp_overlapgap_grid || ' '|| (_input_data).polygon_table_geo_collumn, try_with_grid_metagrid_size);
     -- execute the sql command
     EXECUTE command_string;
     -- count number of cells in grid
@@ -143,26 +141,26 @@ BEGIN
       EXECUTE Format('DROP TABLE %s', overlapgap_grid_metagrid_name);
     ELSE
       EXECUTE Format('UPDATE %s set %s = ST_Buffer(%s,-%s)', 
-      overlapgap_grid_metagrid_name, _geo_collumn_name, _geo_collumn_name, _topology_snap_tolerance);
+      overlapgap_grid_metagrid_name, (_input_data).polygon_table_geo_collumn, (_input_data).polygon_table_geo_collumn, _topology_snap_tolerance);
       
       -- Create Index
-      EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', overlapgap_grid_metagrid_name, _geo_collumn_name);
+      EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', overlapgap_grid_metagrid_name, (_input_data).polygon_table_geo_collumn);
     
       -- Create a table of grid_metagrid_01 lines
       EXECUTE Format('CREATE TABLE %1$s( id serial, %2$s geometry(Geometry,%3$s))', 
       overlapgap_grid_metagrid_name||'_lines', 
-      _geo_collumn_name, 
-      _srid);
+      (_input_data).polygon_table_geo_collumn, 
+      (_input_data).table_srid);
       
       command_string := Format('INSERT INTO %1$s(%2$s) 
       SELECT distinct (ST_Dump(topo_update.get_single_lineparts(ST_Boundary(%2$s)))).geom as %2$s
       from %3$s', 
       overlapgap_grid_metagrid_name||'_lines', 
-      _geo_collumn_name, 
+      (_input_data).polygon_table_geo_collumn, 
       overlapgap_grid_metagrid_name);
       EXECUTE command_string;
       -- Create Index
-      EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', overlapgap_grid_metagrid_name||'_lines', _geo_collumn_name);
+      EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', overlapgap_grid_metagrid_name||'_lines', (_input_data).polygon_table_geo_collumn);
  
       next_grid_table_num := next_grid_table_num + 1;
       last_grid_table_size := overlapgap_grid_metagrid_name_num_cells;
@@ -176,11 +174,11 @@ BEGIN
     IF i = 1 THEN
       EXECUTE Format('ALTER TABLE %s ADD column inside_cell boolean default false', _overlapgap_grid);
       EXECUTE Format('UPDATE %s g SET inside_cell = true from %s t where ST_covers(t.%s,g.%s)', 
-      _overlapgap_grid,overlapgap_grid_metagrid_name,_geo_collumn_name,_geo_collumn_name,_geo_collumn_name);
+      _overlapgap_grid,overlapgap_grid_metagrid_name,(_input_data).polygon_table_geo_collumn,(_input_data).polygon_table_geo_collumn,(_input_data).polygon_table_geo_collumn);
     
       EXECUTE Format('ALTER TABLE %s ADD column grid_thread_cell int default 0', _overlapgap_grid);
       EXECUTE Format('UPDATE %s g SET grid_thread_cell = t.id from %s t where ST_Intersects(t.%s,g.%s)', 
-      _overlapgap_grid,overlapgap_grid_metagrid_name,_geo_collumn_name,_geo_collumn_name,_geo_collumn_name);
+      _overlapgap_grid,overlapgap_grid_metagrid_name,(_input_data).polygon_table_geo_collumn,(_input_data).polygon_table_geo_collumn,(_input_data).polygon_table_geo_collumn);
     END IF;
 
     EXIT WHEN overlapgap_grid_metagrid_name_num_cells < 4 or try_with_grid_metagrid_size < 4;
@@ -196,10 +194,10 @@ BEGIN
   EXECUTE Format('UPDATE %s g SET num_polygons = r.num_polygons FROM 
   (select count(t.*) as num_polygons, g.id from %s t, %s g where t.%s && g.%s group by g.id) as r
   where r.id = g.id', 
-  _overlapgap_grid,_polygon_table_name,_overlapgap_grid,_geo_collumn_name,_geo_collumn_name);
+  _overlapgap_grid,(_input_data).polygon_table_name,_overlapgap_grid,(_input_data).polygon_table_geo_collumn,(_input_data).polygon_table_geo_collumn);
 
       -- find centroid
-  EXECUTE Format('SELECT ST_Centroid(ST_Union(%s)) from %s', _geo_collumn_name, _overlapgap_grid) into layer_centroid;
+  EXECUTE Format('SELECT ST_Centroid(ST_Union(%s)) from %s', (_input_data).polygon_table_geo_collumn, _overlapgap_grid) into layer_centroid;
 
   EXECUTE Format('ALTER TABLE %s ADD column row_number int default 0', _overlapgap_grid);
 
@@ -209,7 +207,7 @@ BEGIN
   order by ST_distance(%s,%L) desc) 
   from %s) as r
   where r.id = g.id', 
-  _overlapgap_grid,_geo_collumn_name, layer_centroid,_overlapgap_grid);
+  _overlapgap_grid,(_input_data).polygon_table_geo_collumn, layer_centroid,_overlapgap_grid);
 
 
   
@@ -229,22 +227,22 @@ EXECUTE Format('CREATE TABLE %s (
   d_hint text,
   d_context text,
   geo Geometry(LineString, %s)
-)',_table_name_result_prefix||'_no_cut_line_failed',_srid);
+)',_table_name_result_prefix||'_no_cut_line_failed',(_input_data).table_srid);
 
 
 EXECUTE Format('CREATE UNLOGGED TABLE %s (
   id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), execute_time real, info text,
   geo Geometry(LineString, %s)
-)',_table_name_result_prefix||'_long_time_logl',_srid);
+)',_table_name_result_prefix||'_long_time_logl',(_input_data).table_srid);
 
 EXECUTE Format('CREATE UNLOGGED TABLE %s (
   id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), execute_time real, info text,
   sql text, geo Geometry(Polygon, %s)
-)',_table_name_result_prefix||'_long_time_log2',_srid);
+)',_table_name_result_prefix||'_long_time_log2',(_input_data).table_srid);
 
 EXECUTE Format('CREATE UNLOGGED TABLE %s (
   id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), added_to_master boolean default false, geo Geometry(LineString, %s), point_geo Geometry(Point, %s)
-)',_table_name_result_prefix||'_border_line_segments',_srid,_srid);
+)',_table_name_result_prefix||'_border_line_segments',(_input_data).table_srid,(_input_data).table_srid);
 
 EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', _table_name_result_prefix||'_border_line_segments', 'geo');
 
@@ -253,16 +251,16 @@ EXECUTE Format('CREATE INDEX ON %s(%s)', _table_name_result_prefix||'_border_lin
 
 EXECUTE Format('CREATE UNLOGGED TABLE %s (
   id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(),added_to_master boolean default false, geo Geometry(LineString, %s)
-)',_table_name_result_prefix||'_border_line_many_points',_srid,_srid);
+)',_table_name_result_prefix||'_border_line_many_points',(_input_data).table_srid,(_input_data).table_srid);
 
 -- Create the simple feature result table  as copy of the input table
-EXECUTE Format('CREATE TABLE %s AS TABLE %s with NO DATA',_table_name_result_prefix||'_result',_polygon_table_name);
+EXECUTE Format('CREATE TABLE %s AS TABLE %s with NO DATA',_table_name_result_prefix||'_result',(_input_data).polygon_table_name);
 
 -- Add an extra column to hold a list of other intersections surfaces
 
 
 
-EXECUTE Format('SELECT vsr_get_data_type(%L,%L)',_polygon_table_name,_polygon_table_pk_column) into unique_id_type;
+EXECUTE Format('SELECT vsr_get_data_type(%L,%L)',(_input_data).polygon_table_name,(_input_data).polygon_table_pk_column) into unique_id_type;
 
 
 
@@ -272,7 +270,7 @@ EXECUTE Format('ALTER TABLE %s ADD column _other_intersect_id_list %s[]',_table_
 EXECUTE Format('GRANT select ON TABLE %s TO PUBLIC',_table_name_result_prefix||'_result');
 
 -- TODO should have been done after data are created
-EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', _table_name_result_prefix||'_result',_geo_collumn_name);
+EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', _table_name_result_prefix||'_result',(_input_data).polygon_table_geo_collumn);
 
 
   RETURN num_cells_master_grid;

@@ -1,7 +1,7 @@
 CREATE OR REPLACE PROCEDURE resolve_overlap_gap_single_cell (
-input_table_name character varying, 
-input_table_geo_column_name character varying, 
-input_table_pk_column_name character varying, 
+_polygon_table_name character varying, 
+_polygon_table_geo_column character varying, 
+_polygon_table_pk_column character varying, 
 _table_name_result_prefix varchar, 
 _topology_name character varying, 
 _topology_snap_tolerance float, -- this is tolerance used as base when creating the the postgis topolayer
@@ -140,7 +140,7 @@ BEGIN
   -- get area to block and set
   -- I don't see why we need this code ??????????? why cant we just the _bb as it is so I test thi snow
   area_to_block := _bb;
-  -- area_to_block := resolve_overlap_gap_block_cell(input_table_name, input_table_geo_column_name, input_table_pk_column_name, _job_list_name, _bb);
+  -- area_to_block := resolve_overlap_gap_block_cell(_polygon_table_name, _polygon_table_geo_column, _polygon_table_pk_column, _job_list_name, _bb);
   -- RAISE NOTICE 'area to block:% ', area_to_block;
   border_topo_info.snap_tolerance := _topology_snap_tolerance;
   
@@ -182,7 +182,7 @@ BEGIN
     
     command_string := Format('create temp table %s as 
     (select g.geo, g.outer_border_line FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L) g)', 
-    tmp_simplified_border_lines_name, input_table_name, input_table_geo_column_name, _bb, _topology_snap_tolerance, _table_name_result_prefix);
+    tmp_simplified_border_lines_name, _polygon_table_name, _polygon_table_geo_column, _bb, _topology_snap_tolerance, _table_name_result_prefix);
     EXECUTE command_string ;
     
     command_string := Format('SELECT ST_SetSRID(ST_Multi(ST_CollectionExtract(ST_Union(geo),1)),%1$s)::Geometry(MultiPoint, %1$s) 
@@ -453,7 +453,7 @@ BEGIN
      ELSE
        -- In second loop block by input geo size
        command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
-       input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
+       _polygon_table_geo_column, _topology_snap_tolerance, _polygon_table_name, _bb);
        
      END IF;
 
@@ -517,7 +517,7 @@ BEGIN
     
     command_string := Format('CREATE TEMP table temp_left_over_borders as select geo FROM
     (select geo from topo_update.get_left_over_borders(%1$L,%2$L,%3$L,%4$L) as r) as r', 
-    overlapgap_grid, input_table_geo_column_name, _bb, _table_name_result_prefix,_topology_snap_tolerance*inner_cell_distance);
+    overlapgap_grid, _polygon_table_geo_column, _bb, _table_name_result_prefix,_topology_snap_tolerance*inner_cell_distance);
     EXECUTE command_string;
     
     GET DIAGNOSTICS v_cnt_left_over_borders = ROW_COUNT;
@@ -607,7 +607,7 @@ BEGIN
   ELSIF _cell_job_type = 6 THEN
   
     command_string := Format('SELECT ST_Expand(ST_Envelope(ST_collect(%1$s)),%2$s) from %3$s where ST_intersects(%1$s,%4$L);', 
-    input_table_geo_column_name, _topology_snap_tolerance, input_table_name, _bb);
+    _polygon_table_geo_column, _topology_snap_tolerance, _polygon_table_name, _bb);
     EXECUTE command_string INTO area_to_block;
     
     IF area_to_block is NULL or ST_Area(area_to_block) = 0.0 THEN
@@ -656,7 +656,7 @@ BEGIN
  		   SELECT distinct(json_object_keys) AS update_column
  		   FROM json_object_keys(to_json(json_populate_record(NULL::%s, %L::Json))) 
  		   where json_object_keys != %L and json_object_keys != %L and json_object_keys != %L  
- 		  ) as keys', ',', 'r.', ',', temp_table_name, '{}', temp_table_id_column, input_table_geo_column_name, '_other_intersect_id_list');
+ 		  ) as keys', ',', 'r.', ',', temp_table_name, '{}', temp_table_id_column, _polygon_table_geo_column, '_other_intersect_id_list');
     RAISE NOTICE '% ', command_string;
     EXECUTE command_string INTO update_fields, update_fields_source;
     
@@ -670,7 +670,7 @@ BEGIN
  	GROUP BY f.face_id
  	) as r where cell_id = %6$s 
     ) as r where ST_IsValid(r.%5$s)', 
-    _topology_name, _bb, temp_table_name, _table_name_result_prefix || '_job_list', input_table_geo_column_name, box_id,snap_tolerance_fixed);
+    _topology_name, _bb, temp_table_name, _table_name_result_prefix || '_job_list', _polygon_table_geo_column, box_id,snap_tolerance_fixed);
     RAISE NOTICE 'command_string %', command_string;
     EXECUTE command_string;
     -- update/add primary key and _other_intersect_id_list based on geo
@@ -700,7 +700,7 @@ BEGIN
  			order by %5$s, area_coverarge desc
  		) as r
  	) as r
- ) r where r.%5$s = t.%5$s', temp_table_name, input_table_name, input_table_pk_column_name, input_table_geo_column_name, temp_table_id_column);
+ ) r where r.%5$s = t.%5$s', temp_table_name, _polygon_table_name, _polygon_table_pk_column, _polygon_table_geo_column, temp_table_id_column);
  
  RAISE NOTICE 'upate attributes % ', command_string;
     
@@ -713,7 +713,7 @@ BEGIN
     command_string := Format('update %1$s t
  set (%4$s) = (%5$s) 
  from %2$s r
- where r.%3$s = t.%3$s', temp_table_name, input_table_name, input_table_pk_column_name, update_fields, update_fields_source);
+ where r.%3$s = t.%3$s', temp_table_name, _polygon_table_name, _polygon_table_pk_column, update_fields, update_fields_source);
     EXECUTE command_string;
     command_string := Format('insert into %1$s select * from %2$s', final_result_table_name, temp_table_name);
     EXECUTE command_string;

@@ -198,19 +198,11 @@ CALL resolve_overlap_gap_run(
 ,4258,false -- info about srid and utm or not
 ), -- TYPE resolve_overlap_data_input
 ('topo_ar5_sysdata_webclient_t1',0.00001), -- TYPE resolve_overlap_data_topology
-resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
-49,  -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
-30, -- is this is more than zero simply will called with
-10000, -- _max_average_vertex_length, in meter both for utm and deegrees, this used to avoid running ST_simplifyPreserveTopology for long lines lines with few points
-1, -- IF 0 NO CHAKINS WILL BE DONE A big value here make no sense because the number of points will increaes exponential )
-10000, --edge that are longer than this value will not be touched by _chaikins_min_degrees and _chaikins_max_degrees  
-120, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
-240, -- OR the angle has to be greather than this given value, This is used to avoid to touch all angles 
-40, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
-320 -- OR The angle has to be greather than this given value, This is used to avoid to touch all angles 
-),
+resolve_overlap_data_clean_type_func(), -- No parameters line simplifcations will be done
 5,4);
 
 
 SELECT 'ar5_check_added_faces', count(mbr) from topo_ar5_sysdata_webclient_t1.face;
 SELECT 'ar5_check_added_simple_feature_polygons', count(*) from topo_ar5_sysdata_webclient_t1.flate_t1_result;
+SELECT 'ar5_artype_simple_feature_polygons', qms_id_flate, artype,areal, round(ST_area(geo,true)) from topo_ar5_sysdata_webclient_t1.flate_t1_result order by qms_id_flate;
+

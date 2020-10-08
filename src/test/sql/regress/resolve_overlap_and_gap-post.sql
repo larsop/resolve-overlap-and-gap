@@ -3,9 +3,9 @@ drop schema test_ar5_web cascade;
 
 DROP PROCEDURE IF EXISTS resolve_overlap_gap_run(
 _input resolve_overlap_data_input_type, 
---(_input).table_to_resolve varchar, -- The table to resolv, imcluding schema name
---(_input).table_pk_column_name varchar, -- The primary of the input table
---(_input).table_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
+--(_input).polygon_table_name varchar, -- The table to resolv, imcluding schema name
+--(_input).polygon_table_pk_column varchar, -- The primary of the input table
+--(_input).polygon_table_geo_collumn varchar, -- the name of geometry column on the table to analyze
 --(_input).table_srid int, -- the srid for the given geo column on the table analyze
 --(_input).utm boolean, 
 
@@ -26,9 +26,9 @@ _max_rows_in_each_cell int
 
 DROP PROCEDURE IF EXISTS resolve_overlap_gap_run(
 _input resolve_overlap_data_input_type, 
---(_input).table_to_resolve varchar, -- The table to resolv, imcluding schema name
---(_input).table_pk_column_name varchar, -- The primary of the input table
---(_input).table_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
+--(_input).polygon_table_name varchar, -- The table to resolv, imcluding schema name
+--(_input).polygon_table_pk_column varchar, -- The primary of the input table
+--(_input).polygon_table_geo_collumn varchar, -- the name of geometry column on the table to analyze
 --(_input).table_srid int, -- the srid for the given geo column on the table analyze
 --(_input).utm boolean, 
 
@@ -50,9 +50,9 @@ _contiune_after_stat_exception boolean -- if set to false, it will do topology.V
 
 DROP PROCEDURE IF EXISTS resolve_overlap_gap_run(
 _input resolve_overlap_data_input_type, 
---(_input).table_to_resolve varchar, -- The table to resolv, imcluding schema name
---(_input).table_pk_column_name varchar, -- The primary of the input table
---(_input).table_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
+--(_input).polygon_table_name varchar, -- The table to resolv, imcluding schema name
+--(_input).polygon_table_pk_column varchar, -- The primary of the input table
+--(_input).polygon_table_geo_collumn varchar, -- the name of geometry column on the table to analyze
 --(_input).table_srid int, -- the srid for the given geo column on the table analyze
 --(_input).utm boolean, 
 
@@ -75,9 +75,9 @@ _validate_topoplogy_for_each_run boolean -- DEFAULT false -- if set to true, it 
 
 DROP PROCEDURE IF EXISTS resolve_overlap_gap_run(
 _input resolve_overlap_data_input_type, 
---(_input).table_to_resolve varchar, -- The table to resolv, imcluding schema name
---(_input).table_pk_column_name varchar, -- The primary of the input table
---(_input).table_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
+--(_input).polygon_table_name varchar, -- The table to resolv, imcluding schema name
+--(_input).polygon_table_pk_column varchar, -- The primary of the input table
+--(_input).polygon_table_geo_collumn varchar, -- the name of geometry column on the table to analyze
 --(_input).table_srid int, -- the srid for the given geo column on the table analyze
 --(_input).utm boolean, 
 
@@ -98,7 +98,7 @@ _debug_options resolve_overlap_data_debug_options_type
 
 DROP FUNCTION IF EXISTS resolve_overlap_gap_init(
 _table_name_result_prefix varchar,
-_table_to_resolve varchar, -- The schema.table name with polygons to analyze for gaps and intersects
+_polygon_table_name varchar, -- The schema.table name with polygons to analyze for gaps and intersects
 _geo_collumn_name varchar, -- the name of geometry column on the table to analyze
 _srid int, -- the srid for the given geo column on the table analyze
 _max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes
@@ -111,7 +111,7 @@ _snap_tolerance float
 DROP PROCEDURE IF EXISTS resolve_overlap_gap_single_cell (
 input_table_name character varying, 
 input_table_geo_column_name character varying, 
-input_table_pk_column_name character varying, 
+input_polygon_table_pk_column character varying, 
 _table_name_result_prefix varchar, 
 _topology_name character varying, 
 _topology_snap_tolerance float, -- this is tolerance used as base when creating the the postgis topolayer
@@ -129,7 +129,7 @@ _loop_number int
 );
 
 DROP FUNCTION IF EXISTS resolve_overlap_gap_job_list (
-table_to_resolve_ varchar, -- The table to resolve
+polygon_table_name_ varchar, -- The table to resolve
 geo_collumn_name_ varchar, -- the name of geometry column on the table to analyze
 _srid int, -- the srid for the given geo column on the table analyze
 _utm boolean, 
@@ -138,7 +138,7 @@ _table_name_result_prefix varchar,
 topology_name_ varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset. -- NB. Any exting data will related to topology_name will be deleted
 _topology_snap_tolerance float, -- the tolrence to be used when add data
 job_list_name_ varchar, -- the name of job_list table, this table is ued to track of done jobs
-input_table_pk_column_name_ varchar, -- the nam eof the promary collum
+input_polygon_table_pk_column_ varchar, -- the nam eof the promary collum
 _simplify_tolerance float, -- the tolerance to be used when creating topolayer
 do_chaikins_ boolean, -- simlyfy lines by using chaikins and simlify
 _min_area_to_keep float, -- surfaces with area less than this will merge with a neightbor
@@ -148,7 +148,7 @@ _cell_job_type int -- add lines 1 inside cell, 2 boderlines, 3 exract simple
 DROP FUNCTION IF EXISTS resolve_overlap_gap_block_cell(
 input_table_name varchar, 
 input_table_geo_column_name varchar, 
-input_table_pk_column_name varchar, 
+input_polygon_table_pk_column varchar, 
 _job_list_name varchar, 
 bb geometry
 );

@@ -24,3 +24,6 @@ utm_check_border_lines|5
 utm_check_added_faces|7
 utm_check_added_simple_feature_polygons|7
 utm|Topology 'test_topo_t3' dropped
+CALL
+ar5_check_added_faces|7
+ar5_check_added_simple_feature_polygons|7

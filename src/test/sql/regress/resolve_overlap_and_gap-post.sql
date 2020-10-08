@@ -1,5 +1,7 @@
 drop schema test_data cascade;
 drop schema test_ar5_web cascade;
+drop schema topo_ar5_sysdata_webclient_t1 cascade;
+
 
 DROP PROCEDURE IF EXISTS resolve_overlap_gap_run(
 _input resolve_overlap_data_input_type, 
@@ -99,6 +101,7 @@ _debug_options resolve_overlap_data_debug_options_type
 DROP FUNCTION IF EXISTS resolve_overlap_gap_init(
 _table_name_result_prefix varchar,
 _polygon_table_name varchar, -- The schema.table name with polygons to analyze for gaps and intersects
+_polygon_table_pk_column varchar, -- A unique primary column of the input table 
 _geo_collumn_name varchar, -- the name of geometry column on the table to analyze
 _srid int, -- the srid for the given geo column on the table analyze
 _max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes

@@ -4,6 +4,7 @@
 CREATE OR REPLACE FUNCTION resolve_overlap_gap_init (
 _table_name_result_prefix varchar,
 _polygon_table_name varchar, -- The schema.table name with polygons to analyze for gaps and intersects
+_polygon_table_pk_column varchar, -- A unique primary column of the input table 
 _geo_collumn_name varchar, -- the name of geometry column on the table to analyze
 _srid int, -- the srid for the given geo column on the table analyze
 _max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes
@@ -33,6 +34,7 @@ DECLARE
   next_grid_table_num int = 1;
   tmp_overlapgap_grid varchar;
   reduce_cell_by int;
+  unique_id_type varchar;
 BEGIN
   -- ############################# START # Create Topology master working schema
   -- drop schema if exists
@@ -257,7 +259,14 @@ EXECUTE Format('CREATE UNLOGGED TABLE %s (
 EXECUTE Format('CREATE TABLE %s AS TABLE %s with NO DATA',_table_name_result_prefix||'_result',_polygon_table_name);
 
 -- Add an extra column to hold a list of other intersections surfaces
-EXECUTE Format('ALTER TABLE %s ADD column _other_intersect_id_list int[]',_table_name_result_prefix||'_result');
+
+
+
+EXECUTE Format('SELECT vsr_get_data_type(%L,%L)',_polygon_table_name,_polygon_table_pk_column) into unique_id_type;
+
+
+
+EXECUTE Format('ALTER TABLE %s ADD column _other_intersect_id_list %s[]',_table_name_result_prefix||'_result',unique_id_type);
 
 -- Add an extra column to hold a list of other intersections surfaces
 EXECUTE Format('GRANT select ON TABLE %s TO PUBLIC',_table_name_result_prefix||'_result');

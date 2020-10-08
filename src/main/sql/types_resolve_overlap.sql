@@ -1,7 +1,20 @@
 CREATE TYPE resolve_overlap_data_input_type AS (
- polygon_table_name varchar, -- The table to resolv, imcluding schema name
- polygon_table_pk_column varchar, -- A unique primary column of the input table
- polygon_table_geo_collumn varchar, -- the name of geometry column on the table to analyze
+ line_table_name varchar, -- The table with simple feature lines, 
+ -- If this has a value then data from table will used to form all valid surfaces.
+ -- this may be empty, the polygon_table_geo_collumn must of type polygon to be abale to generate a polygon layer
+ 
+ line_table_pk_column varchar, -- A unique primary column of the line input table
+ line_table_geo_collumn varchar, -- The name of geometry column for the line strings
+
+
+ polygon_table_name varchar, -- The table with simple feature polygons or points attributtes to resolve, imcluding schema name
+ -- If we in this tables only have a point and no polygons, the we will need a set of tables the lines also
+
+ polygon_table_pk_column varchar, -- A unique primary column of the polygon input table
+
+ polygon_table_geo_collumn varchar, -- the name of geometry column on the table 
+ -- If the type is a point we also need a set of lines to be used as the border the polygons
+ 
  table_srid int, -- the srid for the given geo column on the table analyze
  utm boolean
 );

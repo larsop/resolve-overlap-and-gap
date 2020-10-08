@@ -1,7 +1,7 @@
 CREATE TYPE resolve_overlap_data_input_type AS (
- table_to_resolve varchar, -- The table to resolv, imcluding schema name
- table_pk_column_name varchar, -- The primary of the input table
- table_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
+ polygon_table_name varchar, -- The table to resolv, imcluding schema name
+ polygon_table_pk_column varchar, -- The primary of the input table
+ polygon_table_geo_collumn varchar, -- the name of geometry column on the table to analyze
  table_srid int, -- the srid for the given geo column on the table analyze
  utm boolean
 );

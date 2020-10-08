@@ -32,7 +32,7 @@ DROP FUNCTION IF EXISTS topo_update.view_split_distinct_func (input_table_name v
 
 DROP FUNCTION IF EXISTS topo_update.view_split_distinct_func (input_table_name varchar, input_table_geo_column_name varchar, bb geometry, inside_cell_data boolean, _job_list_name varchar);
 
-CREATE OR REPLACE FUNCTION topo_update.view_split_distinct_func (input_table_name varchar, input_table_geo_column_name varchar, input_table_pk_column_name varchar, bb geometry, inside_cell_data boolean, _job_list_name varchar)
+CREATE OR REPLACE FUNCTION topo_update.view_split_distinct_func (input_table_name varchar, input_table_geo_column_name varchar, input_polygon_table_pk_column varchar, bb geometry, inside_cell_data boolean, _job_list_name varchar)
   RETURNS TABLE (
     json text,
     geo Geometry(LineString, 25832),
@@ -118,7 +118,7 @@ BEGIN
        and ST_equals(gt.cell_geo,%2$L) 
       WHERE lg.geo is not null
  --     AND  (gt.border_lines is null OR ST_intersects(gt.border_lines,lg.geo) = false)
- )', grid_lines, bb, input_table_name, input_table_geo_column_name, input_table_pk_column_name, get_boundery_function, _job_list_name);
+ )', grid_lines, bb, input_table_name, input_table_geo_column_name, input_polygon_table_pk_column, get_boundery_function, _job_list_name);
     EXECUTE command_string;
     command_string := Format('update %s as gt
        set border_lines = (SELECT ST_Multi(ST_Union(nbl.geo)) from tmp_data_border_lines as nbl)
@@ -174,7 +174,7 @@ BEGIN
            series, sample 
          WHERE series.id = sample.id 
        ) AS lg 
- )', bb, input_table_name, input_table_geo_column_name, input_table_pk_column_name, get_boundery_function);
+ )', bb, input_table_name, input_table_geo_column_name, input_polygon_table_pk_column, get_boundery_function);
     EXECUTE command_string;
   END IF;
   RETURN QUERY

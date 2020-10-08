@@ -3,7 +3,7 @@
 
 CREATE OR REPLACE FUNCTION resolve_overlap_gap_init (
 _table_name_result_prefix varchar,
-_table_to_resolve varchar, -- The schema.table name with polygons to analyze for gaps and intersects
+_polygon_table_name varchar, -- The schema.table name with polygons to analyze for gaps and intersects
 _geo_collumn_name varchar, -- the name of geometry column on the table to analyze
 _srid int, -- the srid for the given geo column on the table analyze
 _max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes
@@ -77,7 +77,7 @@ BEGIN
  	from (
  	select(st_dump(
  	cbg_content_based_balanced_grid(array[ %s],%s))
- 	).geom as cell) as q_grid', _overlapgap_grid, _geo_collumn_name, _srid, _geo_collumn_name, Quote_literal(_table_to_resolve || ' ' || _geo_collumn_name)::Text, _max_rows_in_each_cell);
+ 	).geom as cell) as q_grid', _overlapgap_grid, _geo_collumn_name, _srid, _geo_collumn_name, Quote_literal(_polygon_table_name || ' ' || _geo_collumn_name)::Text, _max_rows_in_each_cell);
   -- execute the sql command
   EXECUTE command_string;
   -- count number of cells in grid
@@ -194,7 +194,7 @@ BEGIN
   EXECUTE Format('UPDATE %s g SET num_polygons = r.num_polygons FROM 
   (select count(t.*) as num_polygons, g.id from %s t, %s g where t.%s && g.%s group by g.id) as r
   where r.id = g.id', 
-  _overlapgap_grid,_table_to_resolve,_overlapgap_grid,_geo_collumn_name,_geo_collumn_name);
+  _overlapgap_grid,_polygon_table_name,_overlapgap_grid,_geo_collumn_name,_geo_collumn_name);
 
       -- find centroid
   EXECUTE Format('SELECT ST_Centroid(ST_Union(%s)) from %s', _geo_collumn_name, _overlapgap_grid) into layer_centroid;
@@ -254,7 +254,7 @@ EXECUTE Format('CREATE UNLOGGED TABLE %s (
 )',_table_name_result_prefix||'_border_line_many_points',_srid,_srid);
 
 -- Create the simple feature result table  as copy of the input table
-EXECUTE Format('CREATE TABLE %s AS TABLE %s with NO DATA',_table_name_result_prefix||'_result',_table_to_resolve);
+EXECUTE Format('CREATE TABLE %s AS TABLE %s with NO DATA',_table_name_result_prefix||'_result',_polygon_table_name);
 
 -- Add an extra column to hold a list of other intersections surfaces
 EXECUTE Format('ALTER TABLE %s ADD column _other_intersect_id_list int[]',_table_name_result_prefix||'_result');

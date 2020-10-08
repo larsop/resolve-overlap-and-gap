@@ -2,7 +2,7 @@
 CREATE OR REPLACE FUNCTION resolve_overlap_gap_block_cell(
 input_table_name varchar, 
 input_table_geo_column_name varchar, 
-input_table_pk_column_name varchar, 
+input_polygon_table_pk_column varchar, 
 _job_list_name varchar, 
 bb geometry
 )
@@ -46,7 +46,7 @@ BEGIN
            FROM 
              %2$s g
           WHERE g.%3$s && %1$L 
-         )', bb, input_table_name, input_table_geo_column_name, input_table_pk_column_name, get_boundery_function);
+         )', bb, input_table_name, input_table_geo_column_name, input_polygon_table_pk_column, get_boundery_function);
   ELSE
     command_string := Format('create temp table tmp_data_border_lines as 
  	 	( SELECT DISTINCT 
@@ -62,7 +62,7 @@ BEGIN
            FROM 
              %2$s g
           WHERE g.%3$s && %1$L
-         )', bb, input_table_name, input_table_geo_column_name, input_table_pk_column_name, get_boundery_function);
+         )', bb, input_table_name, input_table_geo_column_name, input_polygon_table_pk_column, get_boundery_function);
   END IF;
   --	RAISE NOTICE 'execute command_string; %', command_string;
   EXECUTE command_string;

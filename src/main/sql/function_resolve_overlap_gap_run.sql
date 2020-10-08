@@ -1,11 +1,11 @@
 -- This is the main funtion used resolve overlap and gap
 CREATE OR REPLACE PROCEDURE resolve_overlap_gap_run (
-_input_polygon_layer resolve_overlap_data_input_type, 
---(_input_polygon_layer).table_to_resolve varchar, -- The table to resolv, imcluding schema name
---(_input_polygon_layer).table_pk_column_name varchar, -- The primary of the input table
---(_input_polygon_layer).table_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
---(_input_polygon_layer).table_srid int, -- the srid for the given geo column on the table analyze
---(_input_polygon_layer).utm boolean, 
+_input_data resolve_overlap_data_input_type, 
+--(_input_data).polygon_table_name varchar, -- The table to resolv, imcluding schema name
+--(_input_data).polygon_table_pk_column varchar, -- The primary of the input table
+--(_input_data).polygon_table_geo_collumn varchar, -- the name of geometry column on the table to analyze
+--(_input_data).table_srid int, -- the srid for the given geo column on the table analyze
+--(_input_data).utm boolean, 
 
 _topology_info resolve_overlap_data_topology_type,
 ---(_topology_info).topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset and th efinal result
@@ -96,7 +96,7 @@ BEGIN
      loop_number = start_at_loop_nr;
   END IF;
   
-  table_name_result_prefix := (_topology_info).topology_name || Substring((_input_polygon_layer).table_to_resolve FROM (Position('.' IN (_input_polygon_layer).table_to_resolve)));
+  table_name_result_prefix := (_topology_info).topology_name || Substring((_input_data).polygon_table_name FROM (Position('.' IN (_input_data).polygon_table_name)));
   -- This is table name prefix including schema used for the result tables
   -- || '_overlap'; -- The schema.table name for the overlap/intersects found in each cell
   -- || '_gap'; -- The schema.table name for the gaps/holes found in each cell
@@ -112,7 +112,7 @@ BEGIN
   
   IF start_at_job_type = 1 THEN 
     command_string := Format('SELECT resolve_overlap_gap_init(%L,%s,%s,%s,%s,%s,%s,%s)', 
-    table_name_result_prefix, Quote_literal((_input_polygon_layer).table_to_resolve), Quote_literal((_input_polygon_layer).table_geo_collumn_name), (_input_polygon_layer).table_srid, _max_rows_in_each_cell, Quote_literal(overlapgap_grid), Quote_literal((_topology_info).topology_name), (_topology_info).topology_snap_tolerance);
+    table_name_result_prefix, Quote_literal((_input_data).polygon_table_name), Quote_literal((_input_data).polygon_table_geo_collumn), (_input_data).table_srid, _max_rows_in_each_cell, Quote_literal(overlapgap_grid), Quote_literal((_topology_info).topology_name), (_topology_info).topology_snap_tolerance);
   -- execute the string
     EXECUTE command_string INTO num_cells;
   END IF;
@@ -144,7 +144,7 @@ BEGIN
       table_name_result_prefix,
       table_name_result_prefix||'_border_line_segments',
       overlapgap_grid||'_metagrid_'||to_char(1, 'fm0000')||'_lines',
-      (_input_polygon_layer).table_geo_collumn_name);
+      (_input_data).polygon_table_geo_collumn);
       EXECUTE command_string;
       
 
@@ -197,7 +197,7 @@ BEGIN
 
     IF loop_number = 1 and cell_job_type != 2 THEN
       command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%L,%s,%s,%s)', 
-      (_input_polygon_layer).table_to_resolve, (_input_polygon_layer).table_geo_collumn_name, (_input_polygon_layer).table_srid, (_input_polygon_layer).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input_polygon_layer).table_pk_column_name, _clean_info, _max_parallel_jobs, cell_job_type,loop_number);
+      (_input_data).polygon_table_name, (_input_data).polygon_table_geo_collumn, (_input_data).table_srid, (_input_data).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input_data).polygon_table_pk_column, _clean_info, _max_parallel_jobs, cell_job_type,loop_number);
       EXECUTE command_string;
       COMMIT;
     END IF;
@@ -211,7 +211,7 @@ BEGIN
 
       IF cell_job_type = 2 THEN
         command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%L,%s,%s,%s)', 
-        (_input_polygon_layer).table_to_resolve, (_input_polygon_layer).table_geo_collumn_name, (_input_polygon_layer).table_srid, (_input_polygon_layer).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input_polygon_layer).table_pk_column_name, _clean_info, _max_parallel_jobs, cell_job_type,loop_number);
+        (_input_data).polygon_table_name, (_input_data).polygon_table_geo_collumn, (_input_data).table_srid, (_input_data).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input_data).polygon_table_pk_column, _clean_info, _max_parallel_jobs, cell_job_type,loop_number);
         EXECUTE command_string;
         COMMIT;
       END IF;
@@ -301,7 +301,7 @@ BEGIN
 
       IF (call_result = 0 AND last_run_stmts = Array_length(stmts, 1)) THEN
         RAISE EXCEPTION 'FFailed to run overlap and gap for % at loop_number % for the following statement list %', 
-        (_input_polygon_layer).table_to_resolve, loop_number, stmts;
+        (_input_data).polygon_table_name, loop_number, stmts;
       END IF;
 
       last_run_stmts := Array_length(stmts, 1); 
@@ -327,12 +327,12 @@ $$;
 -- This is the main funtion used resolve overlap and gap
 CREATE OR REPLACE PROCEDURE resolve_overlap_gap_run(
 
-_input_polygon_layer resolve_overlap_data_input_type, 
---(_input_polygon_layer).table_to_resolve varchar, -- The table to resolv, imcluding schema name
---(_input_polygon_layer).table_pk_column_name varchar, -- The primary of the input table
---(_input_polygon_layer).table_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
---(_input_polygon_layer).table_srid int, -- the srid for the given geo column on the table analyze
---(_input_polygon_layer).utm boolean, 
+_input_data resolve_overlap_data_input_type, 
+--(_input_data).polygon_table_name varchar, -- The table to resolv, imcluding schema name
+--(_input_data).polygon_table_pk_column varchar, -- The primary of the input table
+--(_input_data).polygon_table_geo_collumn varchar, -- the name of geometry column on the table to analyze
+--(_input_data).table_srid int, -- the srid for the given geo column on the table analyze
+--(_input_data).utm boolean, 
 
 _topology_info resolve_overlap_data_topology_type,
 ---(_topology_info).topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset and th efinal result
@@ -353,7 +353,7 @@ DECLARE
 debug_options resolve_overlap_data_debug_options_type;
 BEGIN
 
-CALL resolve_overlap_gap_run(_input_polygon_layer , 
+CALL resolve_overlap_gap_run(_input_data , 
 _topology_info, 
 _clean_info,
 _max_parallel_jobs,

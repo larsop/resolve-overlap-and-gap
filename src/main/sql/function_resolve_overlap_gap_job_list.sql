@@ -11,7 +11,6 @@ _table_name_result_prefix varchar,
 _topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset. -- NB. Any exting data will related to topology_name will be deleted
 _topology_snap_tolerance float, -- the tolrence to be used when add data
 _job_list_name varchar, -- the name of job_list table, this table is ued to track of done jobs
-_input_polygon_table_pk_column varchar, -- the nam eof the promary collum
 _clean_info resolve_overlap_data_clean_type, -- different parameters used if need to clean up your data
 --(_clean_info).simplify_tolerance float, -- is this is more than zero simply will called with
 --(_clean_info).do_chaikins boolean, -- here we will use chaikins togehter with simply to smooth lines
@@ -62,25 +61,21 @@ BEGIN
 
 
   sql_to_run_grid := Format('CALL resolve_overlap_gap_single_cell(
-  %s,%s,%s,%s,
-  %s,%s,%s,%s,
+  %L,%s,
+  %s,%s,
   %L,
   %s,%s,', 
-  Quote_literal((_input_data).polygon_table_name), 
-  Quote_literal((_input_data).polygon_table_geo_collumn), 
-  Quote_literal(_input_polygon_table_pk_column), 
+  _input_data, 
   Quote_literal(_table_name_result_prefix), 
   Quote_literal(_topology_name),
   _topology_snap_tolerance, 
-  (_input_data).table_srid, 
-  Quote_literal((_input_data).utm), 
   _clean_info,
   Quote_literal(_job_list_name), 
   Quote_literal(_overlapgap_grid));
   RAISE NOTICE 'sql_to_run_grid %', sql_to_run_grid;
 
   sql_to_block_cmd := Format('select resolve_overlap_gap_block_cell(%s,%s,%s,%s,', 
-  Quote_literal((_input_data).polygon_table_name), Quote_literal((_input_data).polygon_table_geo_collumn), Quote_literal(_input_polygon_table_pk_column), Quote_literal(_job_list_name));
+  Quote_literal((_input_data).polygon_table_name), Quote_literal((_input_data).polygon_table_geo_collumn), Quote_literal((_input_data).polygon_table_pk_column), Quote_literal(_job_list_name));
   
   
  

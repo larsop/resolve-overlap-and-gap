@@ -1,9 +1,11 @@
 -- This is the main funtion used resolve overlap and gap
 CREATE OR REPLACE FUNCTION resolve_overlap_gap_job_list (
-_polygon_table_name varchar, -- The table to resolve
-_geo_collumn_name varchar, -- the name of geometry column on the table to analyze
-_srid int, -- the srid for the given geo column on the table analyze
-_utm boolean, 
+_input_data resolve_overlap_data_input_type, 
+--(_input_data).polygon_table_name varchar, -- The table to resolv, imcluding schema name
+--(_input_data).polygon_table_pk_column varchar, -- The primary of the input table
+--(_input_data).polygon_table_geo_collumn varchar, -- the name of geometry column on the table to analyze
+--(_input_data).table_srid int, -- the srid for the given geo column on the table analyze
+--(_input_data).utm boolean, 
 _overlapgap_grid varchar, -- the name of the content based grid table
 _table_name_result_prefix varchar,
 _topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset. -- NB. Any exting data will related to topology_name will be deleted
@@ -46,7 +48,7 @@ BEGIN
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
   command_string := Format('CREATE unlogged table %s(id serial, start_time timestamp with time zone, inside_cell boolean, grid_thread_cell int, num_polygons int, row_number int, sql_to_block varchar, sql_to_run varchar, cell_geo geometry(geometry,%s),block_bb Geometry(geometry,%s), blocked_by_id int, worker_id int)',
-  _job_list_name,_srid,_srid);
+  _job_list_name,(_input_data).table_srid,(_input_data).table_srid);
   RAISE NOTICE 'command_string %', command_string;
   EXECUTE command_string;
   -- create a table for don jobs
@@ -64,52 +66,23 @@ BEGIN
   %s,%s,%s,%s,
   %L,
   %s,%s,', 
-  Quote_literal(_polygon_table_name), 
-  Quote_literal(_geo_collumn_name), 
+  Quote_literal((_input_data).polygon_table_name), 
+  Quote_literal((_input_data).polygon_table_geo_collumn), 
   Quote_literal(_input_polygon_table_pk_column), 
   Quote_literal(_table_name_result_prefix), 
   Quote_literal(_topology_name),
   _topology_snap_tolerance, 
-  _srid, 
-  Quote_literal(_utm), 
+  (_input_data).table_srid, 
+  Quote_literal((_input_data).utm), 
   _clean_info,
   Quote_literal(_job_list_name), 
   Quote_literal(_overlapgap_grid));
   RAISE NOTICE 'sql_to_run_grid %', sql_to_run_grid;
 
   sql_to_block_cmd := Format('select resolve_overlap_gap_block_cell(%s,%s,%s,%s,', 
-  Quote_literal(_polygon_table_name), Quote_literal(_geo_collumn_name), Quote_literal(_input_polygon_table_pk_column), Quote_literal(_job_list_name));
+  Quote_literal((_input_data).polygon_table_name), Quote_literal((_input_data).polygon_table_geo_collumn), Quote_literal(_input_polygon_table_pk_column), Quote_literal(_job_list_name));
   
   
-  -- make       
- -- select ST_asText( ST_Expand ( (ST_Dump( get_single_lineparts)).geom, 0000.1)) from  topo_update.get_single_lineparts(ST_ExteriorRing('0103000020E964000001000000050000000000000060E30641000000005ACC5A410000000060E30641000000008FD85A4100000000006A0841000000008FD85A4100000000006A0841000000005ACC5A410000000060E30641000000005ACC5A41'));      
-
---  select ST_asText( ST_Expand ( (ST_Dump( get_single_lineparts)).geom, 0000.1)) 
---  from  topo_update.get_single_lineparts(ST_ExteriorRing(_geo_collumn_name));      
-
-
-	 
--- select * from (
--- select 
---    r.inside_cell,
---    r.grid_thread_cell,
---    r.num_polygons,
---    r.row_number,
--- 
--- l.geom as geo , 
--- ROW_NUMBER() OVER(PARTITION BY l.geom order by r.num_polygons desc) as cell_number from
--- (
--- select distinct ST_Expand((ST_Dump(geo)).geom,0.0001) as geom from (
--- select topo_update.get_single_lineparts((ST_Dump(ST_Union(geo))).geom) as geo 
--- from (
---   select ST_ExteriorRing(geo) as geo from  test_topo_ar50_t3.ar50_utvikling_flate_grid
--- ) as r
--- ) as r
--- ) as l,
--- test_topo_ar50_t3.ar50_utvikling_flate_grid as r
--- where r.geo && l.geom
--- ) as r where cell_number= 1 order by num_polygons desc
--- ;
  
   -- add inside cell polygons
   -- TODO solve how to find r.geom
@@ -121,9 +94,9 @@ BEGIN
     r.grid_thread_cell,
     r.num_polygons,
     r.row_number,
-    %s||quote_literal(r.'||_geo_collumn_name||'::Varchar)||%s as sql_to_run, 
-    r.'||_geo_collumn_name||' as cell_geo, 
-    %s||quote_literal(r.'||_geo_collumn_name||'::Varchar)||%s as sql_to_block
+    %s||quote_literal(r.'||(_input_data).polygon_table_geo_collumn||'::Varchar)||%s as sql_to_run, 
+    r.'||(_input_data).polygon_table_geo_collumn||' as cell_geo, 
+    %s||quote_literal(r.'||(_input_data).polygon_table_geo_collumn||'::Varchar)||%s as sql_to_block
  	from (
     select 
     r.grid_thread_cell,
@@ -148,12 +121,12 @@ BEGIN
  	Quote_literal(sql_to_block_cmd), 
  	Quote_literal(');'),
  	
-    _geo_collumn_name,
+    (_input_data).polygon_table_geo_collumn,
     _topology_snap_tolerance * cell_boundary_tolerance_with_multi,
-    _geo_collumn_name,
+    (_input_data).polygon_table_geo_collumn,
     _overlapgap_grid,
  	_overlapgap_grid,
- 	_geo_collumn_name);
+ 	(_input_data).polygon_table_geo_collumn);
     EXECUTE command_string;
   
   ELSIF _cell_job_type = 2 THEN 
@@ -168,9 +141,9 @@ BEGIN
     0 grid_thread_cell,
     0 num_polygons,
     0 row_number,
-    %s||quote_literal(r.'||_geo_collumn_name||'::Varchar)||%s as sql_to_run, 
-    r.'||_geo_collumn_name||' as cell_geo, 
-    %s||quote_literal(r.'||_geo_collumn_name||'::Varchar)||%s as sql_to_block
+    %s||quote_literal(r.'||(_input_data).polygon_table_geo_collumn||'::Varchar)||%s as sql_to_run, 
+    r.'||(_input_data).polygon_table_geo_collumn||' as cell_geo, 
+    %s||quote_literal(r.'||(_input_data).polygon_table_geo_collumn||'::Varchar)||%s as sql_to_block
  	from %s r', 
  	_job_list_name, 
  	Quote_literal(sql_to_run_grid), 
@@ -190,9 +163,9 @@ BEGIN
     r.grid_thread_cell,
     r.num_polygons,
     r.row_number,
-    %s||quote_literal(r.'||_geo_collumn_name||'::Varchar)||%s as sql_to_run, 
-    r.'||_geo_collumn_name||' as cell_geo, 
-    %s||quote_literal(r.'||_geo_collumn_name||'::Varchar)||%s as sql_to_block
+    %s||quote_literal(r.'||(_input_data).polygon_table_geo_collumn||'::Varchar)||%s as sql_to_run, 
+    r.'||(_input_data).polygon_table_geo_collumn||' as cell_geo, 
+    %s||quote_literal(r.'||(_input_data).polygon_table_geo_collumn||'::Varchar)||%s as sql_to_block
  	from %s r', 
  	_job_list_name, 
  	Quote_literal(sql_to_run_grid), 
@@ -246,7 +219,7 @@ BEGIN
     where ST_Intersects(g.cell_geo,t.%3$s)', 
     _job_list_name,
     _overlapgap_grid||'_metagrid_'||to_char(1, 'fm0000'),
-    _geo_collumn_name, 
+    (_input_data).polygon_table_geo_collumn, 
     _overlapgap_grid||'_metagrid_'||to_char(1, 'fm0000')||'_lines');
   
   END IF;

@@ -201,8 +201,17 @@ BEGIN
     END IF;
 
     IF loop_number = 1 and cell_job_type != 2 THEN
-      command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%L,%s,%s,%s)', 
-      (_input_data).polygon_table_name, (_input_data).polygon_table_geo_collumn, (_input_data).table_srid, (_input_data).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input_data).polygon_table_pk_column, _clean_info, _max_parallel_jobs, cell_job_type,loop_number);
+      command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%L,%L,%s,%L,%L,%L,%s,%s,%s)', 
+      _input_data, 
+      overlapgap_grid, 
+      table_name_result_prefix, 
+      (_topology_info).topology_name,  
+      (_topology_info).topology_snap_tolerance, 
+      job_list_name, 
+      (_input_data).polygon_table_pk_column, 
+      _clean_info, 
+      _max_parallel_jobs, 
+      cell_job_type,loop_number);
       EXECUTE command_string;
       COMMIT;
     END IF;
@@ -215,8 +224,8 @@ BEGIN
       EXIT WHEN cell_job_type = 3;
 
       IF cell_job_type = 2 THEN
-        command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%s,%L,%L,%L,%L,%s,%L,%L,%L,%s,%s,%s)', 
-        (_input_data).polygon_table_name, (_input_data).polygon_table_geo_collumn, (_input_data).table_srid, (_input_data).utm, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input_data).polygon_table_pk_column, _clean_info, _max_parallel_jobs, cell_job_type,loop_number);
+        command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%L,%L,%s,%L,%L,%L,%s,%s,%s)', 
+        _input_data, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, (_input_data).polygon_table_pk_column, _clean_info, _max_parallel_jobs, cell_job_type,loop_number);
         EXECUTE command_string;
         COMMIT;
       END IF;

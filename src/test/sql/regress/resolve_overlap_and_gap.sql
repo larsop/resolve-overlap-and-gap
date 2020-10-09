@@ -193,7 +193,7 @@ f.geo) AND ST_Intersects(g.geo,f.geo);
 create unique index on test_ar5_web.grense_t1(qms_id_grense);
 
 CALL resolve_overlap_gap_run(
-(null,null,null, -- The simple line feature info with attributtes 
+('test_ar5_web.grense_t1','qms_id_grense','geo', -- The simple line feature info with attributtes 
 'test_ar5_web.flate_t1','qms_id_flate','geo' -- The simple polygons feature info with attributtes
 ,4258,false -- info about srid and utm or not
 ), -- TYPE resolve_overlap_data_input
@@ -202,7 +202,8 @@ resolve_overlap_data_clean_type_func(), -- No parameters line simplifcations wil
 5,4);
 
 
-SELECT 'ar5_check_added_faces', count(mbr) from topo_ar5_sysdata_webclient_t1.face;
 SELECT 'ar5_check_added_simple_feature_polygons', count(*) from topo_ar5_sysdata_webclient_t1.flate_t1_result;
 SELECT 'ar5_artype_simple_feature_polygons', qms_id_flate, artype,areal, round(ST_area(geo,true)) from topo_ar5_sysdata_webclient_t1.flate_t1_result order by qms_id_flate;
+SELECT 'ar5_num_faces', count(mbr) from topo_ar5_sysdata_webclient_t1.face;
+SELECT 'ar5_num_edge_data', count(*) from topo_ar5_sysdata_webclient_t1.edge_data;
 

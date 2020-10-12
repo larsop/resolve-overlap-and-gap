@@ -1,13 +1,12 @@
--- this is internal helper function
+	-- this is internal helper function
 -- this is a function that creates unlogged tables and the the grid neeed when later checking this table for overlap and gaps.
 
 CREATE OR REPLACE FUNCTION resolve_overlap_gap_init (
+_input_data resolve_overlap_data_input_type, 
+_topology_info resolve_overlap_data_topology_type,
 _table_name_result_prefix varchar,
 _max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes
-_input_data resolve_overlap_data_input_type, 
-_overlapgap_grid varchar, -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
-_topology_schema_name varchar, -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,
-_topology_snap_tolerance double precision
+_overlapgap_grid varchar -- The schema.table name of the grid that will be created and used to break data up in to managle pieces
 )
   RETURNS INTEGER
   AS $$
@@ -39,29 +38,29 @@ BEGIN
   IF (drop_result_tables_ = TRUE AND (
     SELECT Count(*)
     FROM topology.topology
-    WHERE name = _topology_schema_name) = 1) THEN
-    EXECUTE Format('SELECT topology.droptopology(%s)', Quote_literal(_topology_schema_name));
+    WHERE name = (_topology_info).topology_name) = 1) THEN
+    EXECUTE Format('SELECT topology.droptopology(%s)', Quote_literal((_topology_info).topology_name));
   END IF;
   -- drop this schema in case it exists
-  EXECUTE Format('DROP SCHEMA IF EXISTS %s CASCADE', _topology_schema_name);
+  EXECUTE Format('DROP SCHEMA IF EXISTS %s CASCADE', (_topology_info).topology_name);
   -- create topology
-  EXECUTE Format('SELECT topology.createtopology(%s,%s,%s)', Quote_literal(_topology_schema_name), (_input_data).table_srid, _topology_snap_tolerance);
+  EXECUTE Format('SELECT topology.createtopology(%s,%s,%s)', Quote_literal((_topology_info).topology_name), (_input_data).table_srid, (_topology_info).topology_snap_tolerance);
   -- Set unlogged to increase performance
  
-  EXECUTE Format('GRANT USAGE ON SCHEMA %s TO PUBLIC', _topology_schema_name);
+  EXECUTE Format('GRANT USAGE ON SCHEMA %s TO PUBLIC', (_topology_info).topology_name);
    
-  EXECUTE Format('ALTER TABLE %s.edge_data SET unlogged', _topology_schema_name);
-  EXECUTE Format('ALTER TABLE %s.node SET unlogged', _topology_schema_name);
-  EXECUTE Format('ALTER TABLE %s.face SET unlogged', _topology_schema_name);
-  EXECUTE Format('ALTER TABLE %s.relation SET unlogged', _topology_schema_name);
+  EXECUTE Format('ALTER TABLE %s.edge_data SET unlogged', (_topology_info).topology_name);
+  EXECUTE Format('ALTER TABLE %s.node SET unlogged', (_topology_info).topology_name);
+  EXECUTE Format('ALTER TABLE %s.face SET unlogged', (_topology_info).topology_name);
+  EXECUTE Format('ALTER TABLE %s.relation SET unlogged', (_topology_info).topology_name);
   -- Create indexes
   -- This Inxdes does not seem to help since  containing_face is null;
-  -- EXECUTE Format('CREATE INDEX ON %s.node(containing_face)', _topology_schema_name);
-  EXECUTE Format('CREATE INDEX ON %s.relation(layer_id)', _topology_schema_name);
-  EXECUTE Format('CREATE INDEX ON %s.relation(abs(element_id))', _topology_schema_name);
-  EXECUTE Format('CREATE INDEX ON %s.edge_data USING GIST (geom)', _topology_schema_name);
-  EXECUTE Format('CREATE INDEX ON %s.relation(element_id)', _topology_schema_name);
-  EXECUTE Format('CREATE INDEX ON %s.relation(topogeo_id)', _topology_schema_name);
+  -- EXECUTE Format('CREATE INDEX ON %s.node(containing_face)', (_topology_info).topology_name);
+  EXECUTE Format('CREATE INDEX ON %s.relation(layer_id)', (_topology_info).topology_name);
+  EXECUTE Format('CREATE INDEX ON %s.relation(abs(element_id))', (_topology_info).topology_name);
+  EXECUTE Format('CREATE INDEX ON %s.edge_data USING GIST (geom)', (_topology_info).topology_name);
+  EXECUTE Format('CREATE INDEX ON %s.relation(element_id)', (_topology_info).topology_name);
+  EXECUTE Format('CREATE INDEX ON %s.relation(topogeo_id)', (_topology_info).topology_name);
   -- ----------------------------- DONE - Create Topology master working schema
   -- TODO find out what to do with help tables, they are now created in src/main/extern_pgtopo_update_sql/help_tables_for_logging.sql
   -- TODO what to do with /Users/lop/dev/git/topologi/skog/src/main/sql/table_border_line_segments.sql
@@ -141,7 +140,7 @@ BEGIN
       EXECUTE Format('DROP TABLE %s', overlapgap_grid_metagrid_name);
     ELSE
       EXECUTE Format('UPDATE %s set %s = ST_Buffer(%s,-%s)', 
-      overlapgap_grid_metagrid_name, (_input_data).polygon_table_geo_collumn, (_input_data).polygon_table_geo_collumn, _topology_snap_tolerance);
+      overlapgap_grid_metagrid_name, (_input_data).polygon_table_geo_collumn, (_input_data).polygon_table_geo_collumn, (_topology_info).topology_snap_tolerance);
       
       -- Create Index
       EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', overlapgap_grid_metagrid_name, (_input_data).polygon_table_geo_collumn);

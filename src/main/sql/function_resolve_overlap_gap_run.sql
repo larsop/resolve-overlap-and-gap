@@ -111,13 +111,14 @@ BEGIN
   -- Call init method to create content based create and main topology schema
   
   IF start_at_job_type = 1 THEN 
-    command_string := Format('SELECT resolve_overlap_gap_init(%L,%s,%L,%s,%s,%s)', 
+    command_string := Format('SELECT resolve_overlap_gap_init(%L,%L,%L,%s,%s)', 
+    _input_data,
+    _topology_info,
     table_name_result_prefix, 
     _max_rows_in_each_cell, 
-    _input_data,
     Quote_literal(overlapgap_grid), 
-    Quote_literal((_topology_info).topology_name),
-    (_topology_info).topology_snap_tolerance);
+    _topology_info);
+
   -- execute the string
     EXECUTE command_string INTO num_cells;
   END IF;

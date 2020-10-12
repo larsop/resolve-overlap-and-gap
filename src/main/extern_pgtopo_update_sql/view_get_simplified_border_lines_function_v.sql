@@ -121,7 +121,7 @@ BEGIN
   EXECUTE command_string;
 
 
-    --_bb := _bb;
+  --_bb := _bb;
   command_string := Format('CREATE TEMP TABLE %1$s AS WITH
     tmp_data_this_cell_lines AS (
       SELECT 

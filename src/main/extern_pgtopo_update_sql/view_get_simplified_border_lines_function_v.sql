@@ -49,8 +49,8 @@ BEGIN
   
   RAISE NOTICE 'enter topo_update.get_simplified_border_lines with _bb %  ',  ST_AsText(_bb);
   
-  --_bb := _bb;
-  command_string := Format('CREATE TEMP TABLE %8$s AS WITH 
+  IF (_input_data).line_table_name IS null THEN
+    command_string := Format('CREATE TEMP TABLE %8$s AS WITH 
     lines_intersect_cell AS (
  	  SELECT distinct ST_ExteriorRing((ST_DumpRings((st_dump(%3$s)).geom)).geom) as geom
  	  FROM %1$s v
@@ -74,9 +74,55 @@ BEGIN
       SELECT (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(la.geom,%7$s)))))).geom
       FROM 
       all_lines la
-    ),
+    )
+    select geom from line_parts',
+    (_input_data).polygon_table_name, 
+ 	_bb, 
+ 	(_input_data).polygon_table_geo_collumn, 
+ 	_topology_snap_tolerance,
+ 	_table_name_result_prefix||'_grid', 
+ 	ST_ExteriorRing(_bb),
+ 	_topology_snap_tolerance/20, -- If snap to much here we may with not connected lines.
+ 	tmp_table_name||'temp'
+ 	);
+  ELSE
+    command_string := Format('CREATE TEMP TABLE %1$s AS WITH 
+    lines_intersect_cell AS (
+ 	  SELECT distinct %3$s as geom
+ 	  FROM %2$s v
+ 	  where ST_Intersects(v.%3$s,%4$L)
+ 	),
+    touch_lines_intersects AS (
+      SELECT distinct v.%3$s AS geom
+      FROM lines_intersect_cell l, 
+      %2$s v
+ 	  WHERE ST_Intersects(v.%3$s,l.geom) and ST_Disjoint(v.%3$s,%4$L)
+ 	),
+    all_lines AS (SELECT distinct r.geom as geom from 
+     ( SELECT geom from lines_intersect_cell 
+       union 
+       SELECT  geom from touch_lines_intersects
+     ) as r
+    )
+    select geom from all_lines',
+    tmp_table_name||'temp',
+    (_input_data).line_table_name, 
+ 	(_input_data).line_table_geo_collumn, 
+ 	_bb
+ 	);
+  END IF;
+ 	
+  EXECUTE command_string;
 
 
+  command_string := Format('create index on %2$s using gist(geom)', 
+  'idxtmp_data_all_lines_geom_temp'|| Md5(ST_AsBinary (_bb)),
+  tmp_table_name||'temp');
+  EXECUTE command_string;
+
+
+    --_bb := _bb;
+  command_string := Format('CREATE TEMP TABLE %1$s AS WITH
     tmp_data_this_cell_lines AS (
       SELECT 
       case WHEN ST_IsValid (r.geom) = FALSE THEN 
@@ -87,28 +133,21 @@ BEGIN
       FROM (
         SELECT min(g.id) as min_cell_id, l.geom 
         FROM
-        line_parts l,
-        %5$s g
-        where ST_Intersects(l.geom,g.%3$s)
+        %2$s l,
+        %3$s g
+        where ST_Intersects(l.geom,g.%4$s)
         group by l.geom
       ) AS r 
       WHERE ST_IsEmpty(r.geom) is false      
-   
  	)
     select geom, ST_NPoints(geom) AS npoints,min_cell_id from tmp_data_this_cell_lines
-    ',(_input_data).polygon_table_name, 
- 	_bb, 
- 	(_input_data).polygon_table_geo_collumn, 
- 	_topology_snap_tolerance,
- 	_table_name_result_prefix||'_grid', 
- 	ST_ExteriorRing(_bb),
- 	_topology_snap_tolerance/20, -- If snap to much here we may with not connected lines.
- 	tmp_table_name
+    ',tmp_table_name,
+    tmp_table_name||'temp',
+    _table_name_result_prefix||'_grid', 
+ 	(_input_data).polygon_table_geo_collumn 
  	);
   EXECUTE command_string;
 
-  
- 
   command_string := Format('create index on %2$s using gist(geom)', 
   'idxtmp_data_all_lines_geom' || Md5(ST_AsBinary (_bb)),
   tmp_table_name);

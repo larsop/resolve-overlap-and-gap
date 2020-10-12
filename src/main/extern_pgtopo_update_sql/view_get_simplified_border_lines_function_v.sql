@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION topo_update.get_simplified_border_lines (
+CREATE OR REPLACE PROCEDURE topo_update.get_simplified_border_lines (
 _input_data resolve_overlap_data_input_type, 
 --(_input_data).polygon_table_name varchar, -- The table to resolv, imcluding schema name
 --(_input_data).polygon_table_geo_collumn varchar, -- The primary of the input table
@@ -7,14 +7,12 @@ _input_data resolve_overlap_data_input_type,
 --(_input_data).utm boolean, 
 _bb geometry, 
 _topology_snap_tolerance float, 
-_table_name_result_prefix varchar -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,
+_table_name_result_prefix varchar, -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,
+INOUT fixed_point_set geometry,
+INOUT lines_to_add geometry[]
 )
-  RETURNS TABLE (
-    geo geometry,
-    outer_border_line boolean
-  )
-  LANGUAGE 'plpgsql'
-  AS $function$
+LANGUAGE plpgsql
+AS $$
 DECLARE
   command_string text;
   
@@ -158,29 +156,30 @@ BEGIN
   tmp_table_name);
 
   RAISE NOTICE 'done with %s' ,  tmp_table_name;
+  
+
+  command_string := Format('SELECT * FROM (
+    SELECT ST_Intersection(ST_Union(
+    ST_StartPoint(out.geom),
+    ST_EndPoint(out.geom)),%2$L) as geo
+    FROM
+    %1$s out where ST_Intersects(out.geom,%3$L)
+  ) AS f',
+  tmp_table_name, 
+  _bb,
+  boundary_geom);
+  EXECUTE command_string into fixed_point_set;
 
       
   -- return the result of inner geos to handled imediatly
-  
-  command_string := Format('SELECT * FROM (
-    SELECT l.geom as geo, false as outer_border_line FROM
-    %1$s l WHERE  ST_CoveredBy(l.geom,%2$L)
-    union 
-    SELECT ST_Intersection(ST_Union(
-    ST_StartPoint(out.geom),
-    ST_EndPoint(out.geom)),%3$L) as geo
-    , true as outer_border_line FROM
-    %1$s out where ST_Intersects(out.geom,%4$L)
-  ) AS f',
+  command_string := Format('SELECT ARRAY(
+  SELECT l.geom FROM %1$s l WHERE  ST_CoveredBy(l.geom,%2$L))',
   tmp_table_name, 
-  inner_boundary_geom,
-  _bb,
-  boundary_geom);
-  
-  
-  RETURN QUERY EXECUTE command_string;
+  inner_boundary_geom);
+  EXECUTE command_string into lines_to_add;
+
 END
-$function$;
+$$;
 
 
 --drop table tmp_data_all_linesb54ff161031c2fb96c987afa0f0136c3;

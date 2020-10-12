@@ -56,7 +56,8 @@ DECLARE
 
   has_edges boolean;
   has_edges_temp_table_name text;
-
+  lines_to_add geometry[];
+  
   v_state text;
   v_msg text;
   v_detail text;
@@ -181,16 +182,21 @@ BEGIN
     -- get the siple feature data both the line_types and the inner lines.
     -- the boundery linnes are saved in a table for later usage
     
-    command_string := Format('create temp table %s as 
-    (select g.geo, g.outer_border_line FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L) g)', 
-    tmp_simplified_border_lines_name, _input_data, _bb, _topology_snap_tolerance, _table_name_result_prefix);
+    command_string := Format('call topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L,%L)', 
+    _input_data, _bb, _topology_snap_tolerance, _table_name_result_prefix,
+    outer_cell_boundary_lines, lines_to_add);
+    EXECUTE command_string into outer_cell_boundary_lines, lines_to_add;
+
+    RAISE NOTICE 'lines_to_add size %', Array_length(lines_to_add, 1);
+        
+    command_string := Format('create temp table %s (geo geometry)', tmp_simplified_border_lines_name);
     EXECUTE command_string ;
     
-    command_string := Format('SELECT ST_SetSRID(ST_Multi(ST_CollectionExtract(ST_Union(geo),1)),%1$s)::Geometry(MultiPoint, %1$s) 
-    from %2$s g where outer_border_line = true',
-    (_input_data).table_srid, tmp_simplified_border_lines_name);
-    EXECUTE command_string into outer_cell_boundary_lines ;
+    command_string := Format('insert into %s(geo) (select * from unnest(%L::geometry[]))', 
+    tmp_simplified_border_lines_name,lines_to_add);
+    EXECUTE command_string ;
     
+
     IF ST_NumGeometries(outer_cell_boundary_lines) = 0 THEN
      outer_cell_boundary_lines  := null;
     END IF; 
@@ -250,7 +256,7 @@ BEGIN
     --command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::Text, %L) from tmp_simplified_border_lines g where line_type = 0 order by is_closed desc, num_points desc', border_topo_info);
     --RAISE NOTICE 'command_string %', command_string;
     command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geom,%2$s,%3$L,FALSE) 
-    FROM (select geo as geom from %4$s g where outer_border_line = false) as r 
+    FROM (select geo as geom from %4$s g) as r 
     ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom))',
     border_topo_info.topology_name, 
     border_topo_info.snap_tolerance, 

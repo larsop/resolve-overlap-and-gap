@@ -11,6 +11,8 @@ _topology_info resolve_overlap_data_topology_type,
 ---(_topology_info).topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset and th efinal result
 -- NB. Any exting data will related to topology_name will be deleted
 --(_topology_info).topology_snap_tolerance float, -- this is tolerance used as base when creating the the postgis topolayer
+--(_topology_info).create_topology_attrbute_tables boolean -- if this is true and we value for line_table_name we create attribute tables refferances to  
+-- this tables will have atrbuttes equal to the simple feauture tables for lines and feautures
 
 _clean_info resolve_overlap_data_clean_type, -- different parameters used if need to clean up your data
 --(_clean_info).simplify_tolerance float, -- is this is more than zero simply will called with

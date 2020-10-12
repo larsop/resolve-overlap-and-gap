@@ -256,20 +256,22 @@ EXECUTE Format('CREATE UNLOGGED TABLE %s (
 EXECUTE Format('CREATE TABLE %s AS TABLE %s with NO DATA',_table_name_result_prefix||'_result',(_input_data).polygon_table_name);
 
 -- Add an extra column to hold a list of other intersections surfaces
-
-
-
 EXECUTE Format('SELECT vsr_get_data_type(%L,%L)',(_input_data).polygon_table_name,(_input_data).polygon_table_pk_column) into unique_id_type;
-
-
-
 EXECUTE Format('ALTER TABLE %s ADD column _other_intersect_id_list %s[]',_table_name_result_prefix||'_result',unique_id_type);
-
--- Add an extra column to hold a list of other intersections surfaces
 EXECUTE Format('GRANT select ON TABLE %s TO PUBLIC',_table_name_result_prefix||'_result');
 
 -- TODO should have been done after data are created
 EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', _table_name_result_prefix||'_result',(_input_data).polygon_table_geo_collumn);
+
+
+IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
+  EXECUTE Format('CREATE TABLE %s AS TABLE %s with NO DATA',(_topology_info).topology_name||'.topo_line_attr',(_input_data).line_table_name);
+  EXECUTE Format('ALTER TABLE %s DROP column %s',(_topology_info).topology_name||'.topo_line_attr',(_input_data).line_table_geo_collumn);
+  
+  EXECUTE Format('SELECT topology.AddTopoGeometryColumn(%L, %L, %L, %L, %L)',
+  (_topology_info).topology_name, (_topology_info).topology_name,'topo_line_attr',(_input_data).line_table_geo_collumn,'LINESTRING');
+
+END IF;
 
 
   RETURN num_cells_master_grid;

@@ -182,8 +182,8 @@ BEGIN
     -- the boundery linnes are saved in a table for later usage
     
     command_string := Format('create temp table %s as 
-    (select g.geo, g.outer_border_line FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L) g)', 
-    tmp_simplified_border_lines_name, (_input_data).polygon_table_name, (_input_data).polygon_table_geo_collumn, _bb, _topology_snap_tolerance, _table_name_result_prefix);
+    (select g.geo, g.outer_border_line FROM topo_update.get_simplified_border_lines(%L,%L,%L,%L) g)', 
+    tmp_simplified_border_lines_name, _input_data, _bb, _topology_snap_tolerance, _table_name_result_prefix);
     EXECUTE command_string ;
     
     command_string := Format('SELECT ST_SetSRID(ST_Multi(ST_CollectionExtract(ST_Union(geo),1)),%1$s)::Geometry(MultiPoint, %1$s) 

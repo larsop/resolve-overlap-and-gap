@@ -1,6 +1,10 @@
 CREATE OR REPLACE FUNCTION topo_update.get_simplified_border_lines (
-_input_table_name varchar, 
-_input_table_geo_column_name varchar, 
+_input_data resolve_overlap_data_input_type, 
+--(_input_data).polygon_table_name varchar, -- The table to resolv, imcluding schema name
+--(_input_data).polygon_table_geo_collumn varchar, -- The primary of the input table
+--(_input_data).polygon_table_geo_collumn varchar, -- the name of geometry column on the table to analyze
+--(_input_data).table_srid int, -- the srid for the given geo column on the table analyze
+--(_input_data).utm boolean, 
 _bb geometry, 
 _topology_snap_tolerance float, 
 _table_name_result_prefix varchar -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,
@@ -33,7 +37,7 @@ BEGIN
 
   command_string := Format('select id from %1$s g WHERE g.%2$s = %3$L ',
   _table_name_result_prefix||'_grid', 
-  _input_table_geo_column_name, 
+  (_input_data).polygon_table_geo_collumn, 
   _bb);
   EXECUTE command_string into cell_id;
 
@@ -49,15 +53,11 @@ BEGIN
   
   --_bb := _bb;
   command_string := Format('CREATE TEMP TABLE %8$s AS WITH 
-    rings AS (
- 	  SELECT ST_ExteriorRing((ST_DumpRings((st_dump(%3$s)).geom)).geom) as geom
+    lines_intersect_cell AS (
+ 	  SELECT distinct ST_ExteriorRing((ST_DumpRings((st_dump(%3$s)).geom)).geom) as geom
  	  FROM %1$s v
  	  where ST_Intersects(v.%3$s,%2$L)
  	),
- 	lines_intersect_cell as (
-      SELECT distinct rings.geom  
-      from rings
-    ),
     touch_lines_intersects AS (
       SELECT distinct ST_ExteriorRing(v.%3$s) AS geom
       FROM lines_intersect_cell l, 
@@ -77,6 +77,8 @@ BEGIN
       FROM 
       all_lines la
     ),
+
+
     tmp_data_this_cell_lines AS (
       SELECT 
       case WHEN ST_IsValid (r.geom) = FALSE THEN 
@@ -96,9 +98,9 @@ BEGIN
    
  	)
     select geom, ST_NPoints(geom) AS npoints,min_cell_id from tmp_data_this_cell_lines
-    ',_input_table_name, 
+    ',(_input_data).polygon_table_name, 
  	_bb, 
- 	_input_table_geo_column_name, 
+ 	(_input_data).polygon_table_geo_collumn, 
  	_topology_snap_tolerance,
  	_table_name_result_prefix||'_grid', 
  	ST_ExteriorRing(_bb),

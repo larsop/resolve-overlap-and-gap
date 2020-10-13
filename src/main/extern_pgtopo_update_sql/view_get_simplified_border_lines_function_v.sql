@@ -9,7 +9,8 @@ _bb geometry,
 _topology_snap_tolerance float, 
 _table_name_result_prefix varchar, -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,
 INOUT fixed_point_set geometry,
-INOUT lines_to_add geometry[]
+INOUT lines_to_add geometry[],
+INOUT column_data_as_json_to_add json[]
 )
 LANGUAGE plpgsql
 AS $$
@@ -221,12 +222,13 @@ BEGIN
 
       
   -- return the result of inner geos to handled imediatly
-  command_string := Format('SELECT ARRAY(
-  SELECT l.geom 
-  FROM %1$s l WHERE  ST_CoveredBy(l.geom,%2$L))',
+  command_string := Format('SELECT 
+  ARRAY_agg(l.geom) as lines_to_add,
+  ARRAY_agg(l.column_data_as_json) as column_data_as_json_to_add
+  FROM %1$s l WHERE  ST_CoveredBy(l.geom,%2$L)',
   tmp_table_name, 
   inner_boundary_geom);
-  EXECUTE command_string into lines_to_add;
+  EXECUTE command_string into lines_to_add,column_data_as_json_to_add;
 
 END
 $$;

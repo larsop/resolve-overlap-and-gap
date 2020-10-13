@@ -57,7 +57,7 @@ DECLARE
   has_edges boolean;
   has_edges_temp_table_name text;
   lines_to_add geometry[];
-  
+  column_data_as_json_to_add json[];
   v_state text;
   v_msg text;
   v_detail text;
@@ -182,18 +182,20 @@ BEGIN
     -- get the siple feature data both the line_types and the inner lines.
     -- the boundery linnes are saved in a table for later usage
     
-    command_string := Format('call topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L,%L)', 
+    command_string := Format('call topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L,%L,%L)', 
     _input_data, _bb, _topology_snap_tolerance, _table_name_result_prefix,
-    outer_cell_boundary_lines, lines_to_add);
-    EXECUTE command_string into outer_cell_boundary_lines, lines_to_add;
+    outer_cell_boundary_lines, lines_to_add,column_data_as_json_to_add);
+    EXECUTE command_string into outer_cell_boundary_lines, lines_to_add,column_data_as_json_to_add;
 
     RAISE NOTICE 'lines_to_add size %', Array_length(lines_to_add, 1);
         
-    command_string := Format('create temp table %s (geo geometry)', tmp_simplified_border_lines_name);
+    command_string := Format('create temp table %s (geo geometry, column_data_as_json json)', tmp_simplified_border_lines_name);
     EXECUTE command_string ;
     
-    command_string := Format('insert into %s(geo) (select * from unnest(%L::geometry[]))', 
-    tmp_simplified_border_lines_name,lines_to_add);
+    command_string := Format('insert into %s(geo,column_data_as_json) (select * from unnest(%L::geometry[],%L::json[]))', 
+    tmp_simplified_border_lines_name,
+    lines_to_add,
+    column_data_as_json_to_add);
     EXECUTE command_string ;
     
 

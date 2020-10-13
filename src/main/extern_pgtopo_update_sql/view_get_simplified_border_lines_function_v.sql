@@ -75,17 +75,25 @@ BEGIN
       FROM 
       all_lines la
     )
-    select geom from line_parts',
+    select geom , %4$L as column_data_as_json from line_parts',
     (_input_data).polygon_table_name, 
  	_bb, 
  	(_input_data).polygon_table_geo_collumn, 
- 	_topology_snap_tolerance,
+ 	'{}', --empty attribute json
  	_table_name_result_prefix||'_grid', 
  	ST_ExteriorRing(_bb),
  	_topology_snap_tolerance/20, -- If snap to much here we may with not connected lines.
  	tmp_table_name||'temp'
  	);
   ELSE
+  
+--   select row_to_json(l) from (select c1 from test_data.overlap_gap_input_t1 l) as l;
+
+--   SELECT c.column_name FROM information_schema.columns c
+--   WHERE c.table_schema = 'test_data.' and c.table_name = 'test_data.overlap_gap_input_t1'
+--   and  c.column_name != 'geom'
+ 
+   
     command_string := Format('CREATE TEMP TABLE %1$s AS WITH 
     lines_intersect_cell AS (
  	  SELECT distinct %3$s as geom
@@ -104,11 +112,12 @@ BEGIN
        SELECT  geom from touch_lines_intersects
      ) as r
     )
-    select geom from all_lines',
+    select geom, %5$L as column_data_as_json  from all_lines',
     tmp_table_name||'temp',
     (_input_data).line_table_name, 
  	(_input_data).line_table_geo_collumn, 
- 	_bb
+ 	_bb,
+ 	'{}' --empty attribute json
  	);
   END IF;
  	
@@ -129,18 +138,19 @@ BEGIN
        ST_MakeValid(r.geom)
        ELSE r.geom
       END as geom,
+      column_data_as_json,
       min_cell_id
       FROM (
-        SELECT min(g.id) as min_cell_id, l.geom 
+        SELECT min(g.id) as min_cell_id, l.geom, l.column_data_as_json 
         FROM
         %2$s l,
         %3$s g
         where ST_Intersects(l.geom,g.%4$s)
-        group by l.geom
+        group by l.geom, l.column_data_as_json
       ) AS r 
       WHERE ST_IsEmpty(r.geom) is false      
  	)
-    select geom, ST_NPoints(geom) AS npoints,min_cell_id from tmp_data_this_cell_lines
+    select geom, column_data_as_json, ST_NPoints(geom) AS npoints,min_cell_id from tmp_data_this_cell_lines
     ',tmp_table_name,
     tmp_table_name||'temp',
     _table_name_result_prefix||'_grid', 
@@ -212,7 +222,8 @@ BEGIN
       
   -- return the result of inner geos to handled imediatly
   command_string := Format('SELECT ARRAY(
-  SELECT l.geom FROM %1$s l WHERE  ST_CoveredBy(l.geom,%2$L))',
+  SELECT l.geom 
+  FROM %1$s l WHERE  ST_CoveredBy(l.geom,%2$L))',
   tmp_table_name, 
   inner_boundary_geom);
   EXECUTE command_string into lines_to_add;

@@ -101,6 +101,8 @@ DECLARE
   num_min_since_last_analyze int;
 
   analyze_done_at timestamp WITH time zone default null;
+  
+  border_layer_id int;
  
 BEGIN
 	
@@ -368,6 +370,9 @@ BEGIN
 
     IF (has_edges) THEN
 
+    
+    -- TODO add test on (_topology_info).create_topology_attrbute_tables = true
+    IF (_input_data).line_table_name IS null THEN
        command_string := Format('SELECT topology.TopoGeo_addLinestring(%1$L,r.geom,%2$s) FROM 
        (SELECT geom from %3$s) as r 
        ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom))',
@@ -375,9 +380,39 @@ BEGIN
        _topology_snap_tolerance, 
        has_edges_temp_table_name);
        EXECUTE command_string;
+    ELSE
+    	command_string := FORMAT('SELECT layer_id 
+		FROM topology.layer l, topology.topology t 
+		WHERE t.name = %L AND
+		t.id = l.topology_id AND
+		l.schema_name = %L AND
+		l.table_name = %L AND
+		l.feature_column = %L',
+	    _topology_name,
+	    _topology_name,
+	    'topo_line_attr',
+	    (_input_data).line_table_geo_collumn);
+
+		EXECUTE command_string INTO border_layer_id;
+
+       command_string := Format('SELECT topology.toTopoGeom(r.geom, %1$L, %2$L , %3$L) FROM 
+       (SELECT geom from %4$s) as r 
+       ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom))',
+       _topology_name,
+       border_layer_id,
+       _topology_snap_tolerance,
+       has_edges_temp_table_name);
+	   EXECUTE command_string;
+
+    
+    END IF;
+
+       
+
 
        command_string := Format('DROP TABLE IF EXISTS %s',has_edges_temp_table_name);
        EXECUTE command_string;
+
 
 
     END IF;

@@ -206,6 +206,7 @@ SELECT 'ar5_check_added_simple_feature_polygons', count(*) from topo_ar5_sysdata
 SELECT 'ar5_artype_simple_feature_polygons', qms_id_flate, artype,areal, round(ST_area(geo,true)) from topo_ar5_sysdata_webclient_t1.flate_t1_result order by qms_id_flate, round(ST_area(geo,true));
 SELECT 'ar5_num_faces', count(mbr) from topo_ar5_sysdata_webclient_t1.face;
 SELECT 'ar5_num_edge_data', count(*) from topo_ar5_sysdata_webclient_t1.edge_data;
+SELECT 'ar5_num_relation', count(*) from topo_ar5_sysdata_webclient_t1.relation;
 SELECT 'ar5_check_added_topo_line_ref', count(*) from topo_ar5_sysdata_webclient_t1.topo_line_attr;
 
 

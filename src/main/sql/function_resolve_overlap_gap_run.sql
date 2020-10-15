@@ -69,7 +69,8 @@ DECLARE
   v_detail text;
   v_hint text;
   v_context text;
-
+  
+  
   start_time timestamp WITH time zone;
   
   -- Used for debug
@@ -111,6 +112,24 @@ BEGIN
   -- the name of job_list table, this table is ued to track of done jobs
   job_list_name := table_name_result_prefix || '_job_list';
   -- Call init method to create content based create and main topology schema
+  
+
+  
+  IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null 
+     and (_input_data).line_table_other_collumns_def is null THEN
+     
+	  EXECUTE Format('select 
+	  Array_to_string(array_agg(column_name||%L||data_type),%L) as column_def,
+	  Array_to_string(array_agg(column_name),%L) as column_name
+	  from INFORMATION_SCHEMA.COLUMNS where  table_schema = %L and table_name = %L and data_type != %L and column_name != %L',
+	  ' ',',',',',
+	  split_part((_input_data).line_table_name, '.', 1),
+	  split_part((_input_data).line_table_name, '.', 2),
+	  'USER-DEFINED',
+	  (_input_data).line_table_geo_collumn) INTO _input_data.line_table_other_collumns_def, _input_data.line_table_other_collumns_list;
+  END IF;
+
+  
   
   IF start_at_job_type = 1 THEN 
     command_string := Format('SELECT resolve_overlap_gap_init(%L,%L,%L,%s,%s)', 

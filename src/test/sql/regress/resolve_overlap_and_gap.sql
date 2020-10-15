@@ -14,7 +14,8 @@ CREATE table test_data.overlap_gap_input_t3 AS (SELECT distinct c1 as c1t3, c2 a
 CALL resolve_overlap_gap_run(
 (null,null,null, -- The simple line feature info with attributtes 
 'test_data.overlap_gap_input_t2','c1','geom' -- The simple polygons feature info with attributtes
-,4258,false -- info about srid and utm or not
+,4258,false, -- info about srid and utm or not
+null,null
 ), -- TYPE resolve_overlap_data_input
 ('test_topo_t2',0.00001,false), -- TYPE resolve_overlap_data_topology
   resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
@@ -60,7 +61,8 @@ SELECT 'degrees', topology.droptopology('test_topo_t2');
 CALL resolve_overlap_gap_run(
 (null,null,null, -- The simple line feature info with attributtes 
 'test_data.overlap_gap_input_t3','c1t3','geo' -- The simple polygons feature info with attributtes
-,25833,true -- info about srid and utm or not
+,25833,true, -- info about srid and utm or not
+null,null
 ), -- TYPE resolve_overlap_data_input
 ('test_topo_t3',1.0,false), -- TYPE resolve_overlap_data_topology
 resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
@@ -96,7 +98,8 @@ SELECT 'utm', topology.droptopology('test_topo_t3');
 CALL resolve_overlap_gap_run(
 (null,null,null, -- The simple line feature info with attributtes 
 'test_data.overlap_gap_input_t3','c1t3','geo' -- The simple polygons feature info with attributtes
-,25833,true -- info about srid and utm or not
+,25833,true, -- info about srid and utm or not
+null,null
 ), -- TYPE resolve_overlap_data_input
 ('test_topo_t3',1.0,false), -- TYPE resolve_overlap_data_topology
   resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
@@ -136,7 +139,8 @@ SELECT 'utm_check_added_simple_feature_polygons', count(*) from test_topo_t3.ove
 CALL resolve_overlap_gap_run(
 (null,null,null, -- The simple line feature info with attributtes 
 'test_data.overlap_gap_input_t3','c1t3','geo' -- The simple polygons feature info with attributtes
-,25833,true -- info about srid and utm or not
+,25833,true, -- info about srid and utm or not
+null,null
 ), -- TYPE resolve_overlap_data_input
 ('test_topo_t3',1.0,false), -- TYPE resolve_overlap_data_topology
   resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
@@ -195,7 +199,8 @@ create unique index on test_ar5_web.grense_t1(qms_id_grense);
 CALL resolve_overlap_gap_run(
 ('test_ar5_web.grense_t1','qms_id_grense','geo', -- The simple line feature info with attributtes 
 'test_ar5_web.flate_t1','qms_id_flate','geo' -- The simple polygons feature info with attributtes
-,4258,false -- info about srid and utm or not
+,4258,false, -- info about srid and utm or not
+null,null
 ), -- TYPE resolve_overlap_data_input
 ('topo_ar5_sysdata_webclient_t1',0.00001,true), -- TYPE resolve_overlap_data_topology
 resolve_overlap_data_clean_type_func(), -- No parameters line simplifcations will be done

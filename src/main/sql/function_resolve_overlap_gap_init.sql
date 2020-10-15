@@ -32,9 +32,6 @@ DECLARE
   reduce_cell_by int;
   unique_id_type varchar;
   
-  tmp_column_def varchar;
-  tmp_column_name varchar;
-  
 
 BEGIN
   -- ############################# START # Create Topology master working schema
@@ -270,23 +267,9 @@ EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', _table_name_result_prefix||
 
 IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
 
-  EXECUTE Format('select 
-  Array_to_string(array_agg(column_name||%L||data_type),%L) as column_def,
-  Array_to_string(array_agg(column_name),%L) as column_name
-  from INFORMATION_SCHEMA.COLUMNS where  table_schema = %L and table_name = %L and data_type != %L and column_name != %L',
-  ' ',',',',',
-  split_part((_input_data).line_table_name, '.', 1),
-  split_part((_input_data).line_table_name, '.', 2),
-  'USER-DEFINED',
-  (_input_data).line_table_geo_collumn) INTO tmp_column_def, tmp_column_name;
-
-
-  EXECUTE Format('CREATE TABLE %s(%s) ',(_topology_info).topology_name||'.topo_line_attr',tmp_column_def);
+  EXECUTE Format('CREATE TABLE %s(%s) ',(_topology_info).topology_name||'.topo_line_attr',(_input_data).line_table_other_collumns_def);
   EXECUTE Format('SELECT topology.AddTopoGeometryColumn(%L, %L, %L, %L, %L)',
   (_topology_info).topology_name, (_topology_info).topology_name,'topo_line_attr',(_input_data).line_table_geo_collumn,'LINESTRING');
-  
-  EXECUTE Format('CREATE TABLE %s AS TABLE %s with NO DATA',(_topology_info).topology_name||'.topo_line_attr_dummy',(_input_data).line_table_name);
-  EXECUTE Format('ALTER TABLE %s DROP column %s',(_topology_info).topology_name||'.topo_line_attr_dummy',(_input_data).line_table_geo_collumn);
 
 
 END IF;

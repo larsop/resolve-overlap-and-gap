@@ -400,53 +400,25 @@ BEGIN
        SELECT topology.toTopoGeom(r.geom, %1$L, %2$L , %3$L) as topogeometry, column_data_as_json  
        FROM %4$s as r 
        ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom)))
-       INSERT INTO %5$s(qms_id_grense,objtype,aravgrtype,maalemetode,noyaktighet,synbarhet,verifiseringsdato,datafangstdato,kartid,kjoringsident,arkartstd,opphav,informasjon,registreringsversjon_produkt,registreringsversjon_versjon,registreringsversjon_undertype,qms_navnerom,qms_versjonid,qms_oppdateringsdato,qms_prosesshistorie,qms_kopidata_omraadeid,qms_kopidata_originaldatavert,qms_kopidata_kopidato,sl_dummy_grense_id,geo)  
-       SELECT jsonb_populate_record(%7$s::anyelement,l.column_data_as_json ) , topogeometry as %6$s
-       FROM lines_addes l',
+       INSERT INTO %5$s(%7$s,%6$s)  
+       SELECT x.*, ee.topogeometry as %6$s FROM lines_addes ee, jsonb_to_record(ee.column_data_as_json) AS x(%8$s)',
        _topology_name,
        border_layer_id,
        _topology_snap_tolerance,
        has_edges_temp_table_name,
        _topology_name||'.topo_line_attr',
        (_input_data).line_table_geo_collumn,
-       (quote_nullable(NULL)||'::'||_topology_name||'.topo_line_attr_dummy')
-       );
-
-       command_string := Format('WITH lines_addes AS (
-       SELECT topology.toTopoGeom(r.geom, %1$L, %2$L , %3$L) as topogeometry, column_data_as_json  
-       FROM %4$s as r 
-       ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom)))
-       INSERT INTO %5$s(qms_id_grense,objtype,geo)  
-       SELECT x.*, ee.topogeometry as geo FROM lines_addes ee, jsonb_to_record(ee.column_data_as_json) AS x(qms_id_grense varchar,objtype varchar)',
-       _topology_name,
-       border_layer_id,
-       _topology_snap_tolerance,
-       has_edges_temp_table_name,
-       _topology_name||'.topo_line_attr',
-       (_input_data).line_table_geo_collumn,
-       (quote_nullable(NULL)||'::'||_topology_name||'.topo_line_attr_dummy')
+       (_input_data).line_table_other_collumns_list,
+       (_input_data).line_table_other_collumns_def
        );
 
        EXECUTE command_string;
 
     
     END IF;
-
---CREATE TABLE test(id serial,x INT default 1, y INT default 1 );
---insert into test values(1,2);
---insert into test values(2,3);
---CREATE TABLE test2(id serial, js jsonb );
---insert into test2(js) select to_jsonb(l) from test l;
---select * from test2;
---SELECT jsonb_populate_record(NULL::test2,js) FROM test2;
---SELECT x.*, ee.id FROM test2 ee, jsonb_to_record(js) AS x(x int, y int)--
---x | y | id 
------+---+----
--- 2 | 1 |  1
--- 3 | 1 |  2
-
-       command_string := Format('DROP TABLE IF EXISTS %s',has_edges_temp_table_name);
-       EXECUTE command_string;
+    
+    command_string := Format('DROP TABLE IF EXISTS %s',has_edges_temp_table_name);
+    EXECUTE command_string;
 
 
 

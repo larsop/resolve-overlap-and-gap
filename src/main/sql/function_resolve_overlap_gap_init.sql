@@ -244,6 +244,10 @@ EXECUTE Format('CREATE UNLOGGED TABLE %s (
   id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(), added_to_master boolean default false, geo Geometry(LineString, %s), point_geo Geometry(Point, %s)
 )',_table_name_result_prefix||'_border_line_segments',(_input_data).table_srid,(_input_data).table_srid);
 
+EXECUTE Format('ALTER TABLE %s ADD column column_data_as_json jsonb',_table_name_result_prefix||'_border_line_segments',unique_id_type);
+
+
+
 EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', _table_name_result_prefix||'_border_line_segments', 'geo');
 
 EXECUTE Format('CREATE INDEX ON %s(%s)', _table_name_result_prefix||'_border_line_segments', 'added_to_master');
@@ -252,6 +256,8 @@ EXECUTE Format('CREATE INDEX ON %s(%s)', _table_name_result_prefix||'_border_lin
 EXECUTE Format('CREATE UNLOGGED TABLE %s (
   id serial PRIMARY KEY NOT NULL, log_time timestamp DEFAULT Now(),added_to_master boolean default false, geo Geometry(LineString, %s)
 )',_table_name_result_prefix||'_border_line_many_points',(_input_data).table_srid,(_input_data).table_srid);
+EXECUTE Format('ALTER TABLE %s ADD column column_data_as_json jsonb',_table_name_result_prefix||'_border_line_many_points',unique_id_type);
+
 
 -- Create the simple feature result table  as copy of the input table
 EXECUTE Format('CREATE TABLE %s AS TABLE %s with NO DATA',_table_name_result_prefix||'_result',(_input_data).polygon_table_name);

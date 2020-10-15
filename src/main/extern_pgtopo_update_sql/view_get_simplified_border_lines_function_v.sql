@@ -76,7 +76,7 @@ BEGIN
       FROM 
       all_lines la
     )
-    select geom , %4$L as column_data_as_json from line_parts',
+    select geom , %4$L::jsonb as column_data_as_json from line_parts',
     (_input_data).polygon_table_name, 
  	_bb, 
  	(_input_data).polygon_table_geo_collumn, 
@@ -185,8 +185,8 @@ BEGIN
 
   -- insert lines with more than max point
   EXECUTE Format('WITH long_lines AS 
-    (DELETE FROM %5$s r where npoints >  %2$s and ST_Intersects(geom,%3$L) and min_cell_id = %4$s RETURNING geom) 
-    INSERT INTO %1$s (geo) SELECT distinct (ST_dump(geom)).geom as geo from long_lines',
+    (DELETE FROM %5$s r where npoints >  %2$s and ST_Intersects(geom,%3$L) and min_cell_id = %4$s RETURNING geom, column_data_as_json) 
+    INSERT INTO %1$s (geo, column_data_as_json) SELECT distinct (ST_dump(geom)).geom as geo, column_data_as_json from long_lines',
     _table_name_result_prefix||'_border_line_many_points',
     _max_point_in_line, 
     ST_ExteriorRing(_bb), 
@@ -197,8 +197,8 @@ BEGIN
  
   -- make line part for outer box, that contains the line parts will be added add the final stage when all the cell are done.
  
-  EXECUTE Format('INSERT INTO %s (geo, point_geo)
-  SELECT l.geom as geo, NULL AS point_geo
+  EXECUTE Format('INSERT INTO %s (geo, point_geo, column_data_as_json)
+  SELECT l.geom as geo, NULL AS point_geo, column_data_as_json
   FROM %4$s l where ST_Intersects(geom,%2$L) and min_cell_id = %3$s and ST_IsValid(l.geom) = true ',
   _table_name_result_prefix||'_border_line_segments', 
   boundary_geom,

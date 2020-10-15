@@ -109,8 +109,6 @@ DECLARE
   num_min_since_last_analyze int;
 
   analyze_done_at timestamp WITH time zone default null;
-  
-  border_layer_id int;
  
 BEGIN
 	
@@ -380,20 +378,7 @@ BEGIN
     
     -- TODO add test on (_topology_info).create_topology_attrbute_tables = true
     IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
-     	command_string := FORMAT('SELECT layer_id 
-		FROM topology.layer l, topology.topology t 
-		WHERE t.name = %L AND
-		t.id = l.topology_id AND
-		l.schema_name = %L AND
-		l.table_name = %L AND
-		l.feature_column = %L',
-	    (_topology_info).topology_name,
-	    (_topology_info).topology_name,
-	    'topo_line_attr',
-	    (_input_data).line_table_geo_collumn);
-		EXECUTE command_string INTO border_layer_id;
-		
-		
+     	
        command_string := Format('WITH lines_addes AS (
        SELECT topology.toTopoGeom(r.geom, %1$L, %2$L , %3$L) as topogeometry, column_data_as_json  
        FROM %4$s as r 
@@ -401,7 +386,7 @@ BEGIN
        INSERT INTO %5$s(%7$s,%6$s)  
        SELECT x.*, ee.topogeometry as %6$s FROM lines_addes ee, jsonb_to_record(ee.column_data_as_json) AS x(%8$s)',
        (_topology_info).topology_name,
-       border_layer_id,
+       (_topology_info).topology_attrbute_tables_border_layer_id,
        (_topology_info).topology_snap_tolerance,
        has_edges_temp_table_name,
        (_topology_info).topology_name||'.topo_line_attr',

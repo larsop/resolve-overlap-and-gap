@@ -33,8 +33,11 @@ CREATE TYPE resolve_overlap_data_topology_type AS (
   topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset and th efinal result
   -- NB. Any exting data will related to topology_name will be deleted
   topology_snap_tolerance float, -- this is tolerance used as base when creating the the postgis topolayer
-  create_topology_attrbute_tables boolean -- if this is true and we value for line_table_name we create attribute tables refferances to  
+  create_topology_attrbute_tables boolean, -- if this is true and we value for line_table_name we create attribute tables refferances to  
   -- this tables will have atrbuttes equal to the simple feauture tables for lines and feautures
+ 
+  -- this is computed startup
+  topology_attrbute_tables_border_layer_id int
 );
 
 

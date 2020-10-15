@@ -17,7 +17,7 @@ CALL resolve_overlap_gap_run(
 ,4258,false, -- info about srid and utm or not
 null,null
 ), -- TYPE resolve_overlap_data_input
-('test_topo_t2',0.00001,false), -- TYPE resolve_overlap_data_topology
+('test_topo_t2',0.00001,false,null), -- TYPE resolve_overlap_data_topology
   resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
   49,  -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
   0, -- is this is more than zero simply will called with
@@ -64,7 +64,7 @@ CALL resolve_overlap_gap_run(
 ,25833,true, -- info about srid and utm or not
 null,null
 ), -- TYPE resolve_overlap_data_input
-('test_topo_t3',1.0,false), -- TYPE resolve_overlap_data_topology
+('test_topo_t3',1.0,false,null), -- TYPE resolve_overlap_data_topology
 resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
 49,  -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
 30, -- is this is more than zero simply will called with
@@ -101,7 +101,7 @@ CALL resolve_overlap_gap_run(
 ,25833,true, -- info about srid and utm or not
 null,null
 ), -- TYPE resolve_overlap_data_input
-('test_topo_t3',1.0,false), -- TYPE resolve_overlap_data_topology
+('test_topo_t3',1.0,false,null), -- TYPE resolve_overlap_data_topology
   resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
   49,  -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
   0, -- is this is more than zero simply will called with
@@ -142,7 +142,7 @@ CALL resolve_overlap_gap_run(
 ,25833,true, -- info about srid and utm or not
 null,null
 ), -- TYPE resolve_overlap_data_input
-('test_topo_t3',1.0,false), -- TYPE resolve_overlap_data_topology
+('test_topo_t3',1.0,false,null), -- TYPE resolve_overlap_data_topology
   resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
   49,  -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
   0, -- is this is more than zero simply will called with
@@ -202,7 +202,7 @@ CALL resolve_overlap_gap_run(
 ,4258,false, -- info about srid and utm or not
 null,null
 ), -- TYPE resolve_overlap_data_input
-('topo_ar5_sysdata_webclient_t1',0.00001,true), -- TYPE resolve_overlap_data_topology
+('topo_ar5_sysdata_webclient_t1',0.00001,true,null), -- TYPE resolve_overlap_data_topology
 resolve_overlap_data_clean_type_func(), -- No parameters line simplifcations will be done
 5,4);
 

@@ -117,8 +117,7 @@ BEGIN
   
   IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null 
      and (_input_data).line_table_other_collumns_def is null THEN
-     
-	  EXECUTE Format('select 
+     EXECUTE Format('select 
 	  Array_to_string(array_agg(column_name||%L||data_type),%L) as column_def,
 	  Array_to_string(array_agg(column_name),%L) as column_name
 	  from INFORMATION_SCHEMA.COLUMNS where  table_schema = %L and table_name = %L and data_type != %L and column_name != %L',
@@ -127,6 +126,7 @@ BEGIN
 	  split_part((_input_data).line_table_name, '.', 2),
 	  'USER-DEFINED',
 	  (_input_data).line_table_geo_collumn) INTO _input_data.line_table_other_collumns_def, _input_data.line_table_other_collumns_list;
+	  
   END IF;
 
   
@@ -143,6 +143,27 @@ BEGIN
   -- execute the string
     EXECUTE command_string INTO num_cells;
   END IF;
+
+  
+  IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
+ 	command_string := FORMAT('SELECT layer_id 
+	FROM topology.layer l, topology.topology t 
+	WHERE t.name = %L AND
+	t.id = l.topology_id AND
+	l.schema_name = %L AND
+	l.table_name = %L AND
+	l.feature_column = %L',
+    (_topology_info).topology_name,
+    (_topology_info).topology_name,
+    'topo_line_attr',
+    (_input_data).line_table_geo_collumn);
+	EXECUTE command_string INTO _topology_info.topology_attrbute_tables_border_layer_id;
+		
+	RAISE NOTICE 'command_string % set _topology_info.topology_attrbute_tables_border_layer_id to %',command_string , (_topology_info).topology_attrbute_tables_border_layer_id;
+      
+  END IF;
+
+  
   
   FOR cell_job_type IN start_at_job_type..7 LOOP
 

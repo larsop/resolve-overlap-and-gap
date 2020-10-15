@@ -10,7 +10,7 @@ _topology_snap_tolerance float,
 _table_name_result_prefix varchar, -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,
 INOUT fixed_point_set geometry,
 INOUT lines_to_add geometry[],
-INOUT column_data_as_json_to_add json[]
+INOUT column_data_as_json_to_add jsonb[]
 )
 LANGUAGE plpgsql
 AS $$
@@ -97,23 +97,23 @@ BEGIN
    
     command_string := Format('CREATE TEMP TABLE %1$s AS WITH 
     lines_intersect_cell AS (
- 	  SELECT distinct %3$s as geom
+ 	  SELECT distinct %3$s as geom, to_jsonb(v)::jsonb - %3$s as column_data_as_json
  	  FROM %2$s v
  	  where ST_Intersects(v.%3$s,%4$L)
  	),
     touch_lines_intersects AS (
-      SELECT distinct v.%3$s AS geom
+      SELECT distinct v.%3$s AS geom, to_jsonb(v)::jsonb - %3$s as column_data_as_json
       FROM lines_intersect_cell l, 
       %2$s v
  	  WHERE ST_Intersects(v.%3$s,l.geom) and ST_Disjoint(v.%3$s,%4$L)
  	),
-    all_lines AS (SELECT distinct r.geom as geom from 
-     ( SELECT geom from lines_intersect_cell 
+    all_lines AS (SELECT distinct r.geom as geom, column_data_as_json from 
+     ( SELECT geom, column_data_as_json from lines_intersect_cell 
        union 
-       SELECT  geom from touch_lines_intersects
+       SELECT  geom, column_data_as_json from touch_lines_intersects
      ) as r
     )
-    select geom, %5$L as column_data_as_json  from all_lines',
+    select geom, column_data_as_json  from all_lines',
     tmp_table_name||'temp',
     (_input_data).line_table_name, 
  	(_input_data).line_table_geo_collumn, 

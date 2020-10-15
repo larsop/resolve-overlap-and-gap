@@ -57,7 +57,7 @@ DECLARE
   has_edges boolean;
   has_edges_temp_table_name text;
   lines_to_add geometry[];
-  column_data_as_json_to_add json[];
+  column_data_as_json_to_add jsonb[];
   v_state text;
   v_msg text;
   v_detail text;
@@ -191,10 +191,10 @@ BEGIN
 
     RAISE NOTICE 'lines_to_add size %', Array_length(lines_to_add, 1);
         
-    command_string := Format('create temp table %s (geo geometry, column_data_as_json json)', tmp_simplified_border_lines_name);
+    command_string := Format('create temp table %s (geo geometry, column_data_as_json jsonb)', tmp_simplified_border_lines_name);
     EXECUTE command_string ;
     
-    command_string := Format('insert into %s(geo,column_data_as_json) (select * from unnest(%L::geometry[],%L::json[]))', 
+    command_string := Format('insert into %s(geo,column_data_as_json) (select * from unnest(%L::geometry[],%L::jsonb[]))', 
     tmp_simplified_border_lines_name,
     lines_to_add,
     column_data_as_json_to_add);
@@ -262,7 +262,7 @@ BEGIN
 	    
 	    -- using the input tolreance for adding
 	    border_topo_info.snap_tolerance := snap_tolerance_fixed;
-	    --command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(json::Text, %L) from tmp_simplified_border_lines g where line_type = 0 order by is_closed desc, num_points desc', border_topo_info);
+	    --command_string := Format('SELECT topo_update.create_nocutline_edge_domain_obj_retry(jsonb::Text, %L) from tmp_simplified_border_lines g where line_type = 0 order by is_closed desc, num_points desc', border_topo_info);
 	    --RAISE NOTICE 'command_string %', command_string;
 	    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geom,%2$s,%3$L,FALSE) 
 	    FROM (select geo as geom from %4$s g) as r 
@@ -341,7 +341,7 @@ BEGIN
 	    IF (has_edges) THEN
 	      command_string := Format('create unlogged table %1$s as 
 	      (SELECT (ST_Dump(ST_LineMerge(ST_Union(geom)))).geom,
-          %3$L::json as column_data_as_json
+          %3$L::jsonb as column_data_as_json
 	      from  %2$s.edge_data )',
 	      has_edges_temp_table_name,
 	      border_topo_info.topology_name,
@@ -394,21 +394,56 @@ BEGIN
 	    (_input_data).line_table_geo_collumn);
 
 		EXECUTE command_string INTO border_layer_id;
-
-       command_string := Format('SELECT topology.toTopoGeom(r.geom, %1$L, %2$L , %3$L) FROM 
-       (SELECT geom from %4$s) as r 
-       ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom))',
+		
+		
+       command_string := Format('WITH lines_addes AS (
+       SELECT topology.toTopoGeom(r.geom, %1$L, %2$L , %3$L) as topogeometry, column_data_as_json  
+       FROM %4$s as r 
+       ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom)))
+       INSERT INTO %5$s(qms_id_grense,objtype,aravgrtype,maalemetode,noyaktighet,synbarhet,verifiseringsdato,datafangstdato,kartid,kjoringsident,arkartstd,opphav,informasjon,registreringsversjon_produkt,registreringsversjon_versjon,registreringsversjon_undertype,qms_navnerom,qms_versjonid,qms_oppdateringsdato,qms_prosesshistorie,qms_kopidata_omraadeid,qms_kopidata_originaldatavert,qms_kopidata_kopidato,sl_dummy_grense_id,geo)  
+       SELECT jsonb_populate_record(%7$s::anyelement,l.column_data_as_json ) , topogeometry as %6$s
+       FROM lines_addes l',
        _topology_name,
        border_layer_id,
        _topology_snap_tolerance,
-       has_edges_temp_table_name);
-	   EXECUTE command_string;
+       has_edges_temp_table_name,
+       _topology_name||'.topo_line_attr',
+       (_input_data).line_table_geo_collumn,
+       (quote_nullable(NULL)||'::'||_topology_name||'.topo_line_attr_dummy')
+       );
+
+       command_string := Format('WITH lines_addes AS (
+       SELECT topology.toTopoGeom(r.geom, %1$L, %2$L , %3$L) as topogeometry, column_data_as_json  
+       FROM %4$s as r 
+       ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom)))
+       INSERT INTO %5$s(qms_id_grense,objtype,geo)  
+       SELECT x.*, ee.topogeometry as geo FROM lines_addes ee, jsonb_to_record(ee.column_data_as_json) AS x(qms_id_grense varchar,objtype varchar)',
+       _topology_name,
+       border_layer_id,
+       _topology_snap_tolerance,
+       has_edges_temp_table_name,
+       _topology_name||'.topo_line_attr',
+       (_input_data).line_table_geo_collumn,
+       (quote_nullable(NULL)||'::'||_topology_name||'.topo_line_attr_dummy')
+       );
+
+       EXECUTE command_string;
 
     
     END IF;
 
-       
-
+--CREATE TABLE test(id serial,x INT default 1, y INT default 1 );
+--insert into test values(1,2);
+--insert into test values(2,3);
+--CREATE TABLE test2(id serial, js jsonb );
+--insert into test2(js) select to_jsonb(l) from test l;
+--select * from test2;
+--SELECT jsonb_populate_record(NULL::test2,js) FROM test2;
+--SELECT x.*, ee.id FROM test2 ee, jsonb_to_record(js) AS x(x int, y int)--
+--x | y | id 
+-----+---+----
+-- 2 | 1 |  1
+-- 3 | 1 |  2
 
        command_string := Format('DROP TABLE IF EXISTS %s',has_edges_temp_table_name);
        EXECUTE command_string;
@@ -417,7 +452,7 @@ BEGIN
 
     END IF;
 
-    
+ 
 --- 
   ELSIF _cell_job_type = 1 and _loop_number > 1 THEN
    

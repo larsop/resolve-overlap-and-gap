@@ -267,9 +267,12 @@ EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', _table_name_result_prefix||
 IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
   EXECUTE Format('CREATE TABLE %s AS TABLE %s with NO DATA',(_topology_info).topology_name||'.topo_line_attr',(_input_data).line_table_name);
   EXECUTE Format('ALTER TABLE %s DROP column %s',(_topology_info).topology_name||'.topo_line_attr',(_input_data).line_table_geo_collumn);
-  
   EXECUTE Format('SELECT topology.AddTopoGeometryColumn(%L, %L, %L, %L, %L)',
   (_topology_info).topology_name, (_topology_info).topology_name,'topo_line_attr',(_input_data).line_table_geo_collumn,'LINESTRING');
+  
+  EXECUTE Format('CREATE TABLE %s AS TABLE %s with NO DATA',(_topology_info).topology_name||'.topo_line_attr_dummy',(_input_data).line_table_name);
+  EXECUTE Format('ALTER TABLE %s DROP column %s',(_topology_info).topology_name||'.topo_line_attr_dummy',(_input_data).line_table_geo_collumn);
+
 
 END IF;
 

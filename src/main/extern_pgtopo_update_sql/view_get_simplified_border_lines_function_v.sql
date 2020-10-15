@@ -57,8 +57,37 @@ BEGIN
   
   RAISE NOTICE 'enter topo_update.get_simplified_border_lines with _bb %  ',  ST_AsText(_bb);
   
-  IF (_input_data).line_table_name IS null THEN
-    command_string := Format('CREATE TEMP TABLE %8$s AS WITH 
+  
+  IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
+    command_string := Format('CREATE TEMP TABLE %1$s AS WITH 
+    lines_intersect_cell AS (
+ 	  SELECT distinct %3$s as geom, to_jsonb(v)::jsonb - %3$s as column_data_as_json
+ 	  FROM %2$s v
+ 	  where ST_Intersects(v.%3$s,%4$L)
+ 	),
+    touch_lines_intersects AS (
+      SELECT distinct v.%3$s AS geom, to_jsonb(v)::jsonb - %3$s as column_data_as_json
+      FROM lines_intersect_cell l, 
+      %2$s v
+ 	  WHERE ST_Intersects(v.%3$s,l.geom) and ST_Disjoint(v.%3$s,%4$L)
+ 	),
+    all_lines AS (SELECT distinct r.geom as geom, column_data_as_json from 
+     ( SELECT geom, column_data_as_json from lines_intersect_cell 
+       union 
+       SELECT  geom, column_data_as_json from touch_lines_intersects
+     ) as r
+    )
+    select geom, column_data_as_json  from all_lines',
+    tmp_table_name||'temp',
+    (_input_data).line_table_name, 
+ 	(_input_data).line_table_geo_collumn, 
+ 	_bb,
+ 	'{}' --empty attribute json
+ 	);
+    
+  ELSE
+ 	
+ 	command_string := Format('CREATE TEMP TABLE %8$s AS WITH 
     lines_intersect_cell AS (
  	  SELECT distinct ST_ExteriorRing((ST_DumpRings((st_dump(%3$s)).geom)).geom) as geom
  	  FROM %1$s v
@@ -93,40 +122,7 @@ BEGIN
  	(_topology_info).topology_snap_tolerance/20, -- If snap to much here we may with not connected lines.
  	tmp_table_name||'temp'
  	);
-  ELSE
-  
---   select row_to_json(l) from (select c1 from test_data.overlap_gap_input_t1 l) as l;
 
---   SELECT c.column_name FROM information_schema.columns c
---   WHERE c.table_schema = 'test_data.' and c.table_name = 'test_data.overlap_gap_input_t1'
---   and  c.column_name != 'geom'
- 
-   
-    command_string := Format('CREATE TEMP TABLE %1$s AS WITH 
-    lines_intersect_cell AS (
- 	  SELECT distinct %3$s as geom, to_jsonb(v)::jsonb - %3$s as column_data_as_json
- 	  FROM %2$s v
- 	  where ST_Intersects(v.%3$s,%4$L)
- 	),
-    touch_lines_intersects AS (
-      SELECT distinct v.%3$s AS geom, to_jsonb(v)::jsonb - %3$s as column_data_as_json
-      FROM lines_intersect_cell l, 
-      %2$s v
- 	  WHERE ST_Intersects(v.%3$s,l.geom) and ST_Disjoint(v.%3$s,%4$L)
- 	),
-    all_lines AS (SELECT distinct r.geom as geom, column_data_as_json from 
-     ( SELECT geom, column_data_as_json from lines_intersect_cell 
-       union 
-       SELECT  geom, column_data_as_json from touch_lines_intersects
-     ) as r
-    )
-    select geom, column_data_as_json  from all_lines',
-    tmp_table_name||'temp',
-    (_input_data).line_table_name, 
- 	(_input_data).line_table_geo_collumn, 
- 	_bb,
- 	'{}' --empty attribute json
- 	);
   END IF;
  	
   EXECUTE command_string;

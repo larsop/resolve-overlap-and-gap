@@ -212,8 +212,19 @@ BEGIN
 
     -- If we use set input lines with attributes we assume that this lines are correct and genrated from a correct topology layer
     -- We need the keep this as edge as they are since we need attributtetes to assigne to each line.    
-    IF (_input_data).line_table_name IS null THEN
-
+    IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
+    	command_string := Format('SELECT EXISTS(SELECT 1 from  %1$s limit 1)',
+	    tmp_simplified_border_lines_name);
+	    EXECUTE command_string into has_edges;
+	    
+	    IF (has_edges) THEN
+	      command_string := Format('create unlogged table %1$s as 
+	      SELECT geo as geom, column_data_as_json from %2$s',
+	      has_edges_temp_table_name, 
+	      tmp_simplified_border_lines_name);
+	      EXECUTE command_string;
+	    END IF;
+    ELSE
 	    IF ST_NumGeometries(outer_cell_boundary_lines) = 0 THEN
 	     outer_cell_boundary_lines  := null;
 	    END IF; 
@@ -360,18 +371,6 @@ BEGIN
 	    execute Format('SET CONSTRAINTS ALL IMMEDIATE');
 	    PERFORM topology.DropTopology (border_topo_info.topology_name);
 	    -- STOP IF (_input_data).line_table_name IS null
-    ELSE
-    	command_string := Format('SELECT EXISTS(SELECT 1 from  %1$s limit 1)',
-	    tmp_simplified_border_lines_name);
-	    EXECUTE command_string into has_edges;
-	    
-	    IF (has_edges) THEN
-	      command_string := Format('create unlogged table %1$s as 
-	      SELECT geo as geom, column_data_as_json from %2$s',
-	      has_edges_temp_table_name, 
-	      tmp_simplified_border_lines_name);
-	      EXECUTE command_string;
-	    END IF;
     END IF;
 
     commit;
@@ -380,16 +379,8 @@ BEGIN
 
     
     -- TODO add test on (_topology_info).create_topology_attrbute_tables = true
-    IF (_input_data).line_table_name IS null THEN
-       command_string := Format('SELECT topology.TopoGeo_addLinestring(%1$L,r.geom,%2$s) FROM 
-       (SELECT geom from %3$s) as r 
-       ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom))',
-       (_topology_info).topology_name,
-       (_topology_info).topology_snap_tolerance, 
-       has_edges_temp_table_name);
-       EXECUTE command_string;
-    ELSE
-    	command_string := FORMAT('SELECT layer_id 
+    IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
+     	command_string := FORMAT('SELECT layer_id 
 		FROM topology.layer l, topology.topology t 
 		WHERE t.name = %L AND
 		t.id = l.topology_id AND
@@ -400,7 +391,6 @@ BEGIN
 	    (_topology_info).topology_name,
 	    'topo_line_attr',
 	    (_input_data).line_table_geo_collumn);
-
 		EXECUTE command_string INTO border_layer_id;
 		
 		
@@ -419,9 +409,15 @@ BEGIN
        (_input_data).line_table_other_collumns_list,
        (_input_data).line_table_other_collumns_def
        );
-
        EXECUTE command_string;
-
+    ELSE
+       command_string := Format('SELECT topology.TopoGeo_addLinestring(%1$L,r.geom,%2$s) FROM 
+       (SELECT geom from %3$s) as r 
+       ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom))',
+       (_topology_info).topology_name,
+       (_topology_info).topology_snap_tolerance, 
+       has_edges_temp_table_name);
+       EXECUTE command_string;
     
     END IF;
     

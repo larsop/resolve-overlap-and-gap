@@ -424,40 +424,62 @@ BEGIN
  
     IF (has_edges) THEN
 
-       command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L,FALSE) FROM 
-       (SELECT geom from %2$s) as r 
-       ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom))',
-       (_topology_info).topology_snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (_bb), (_topology_info).topology_name, _table_name_result_prefix);
-       EXECUTE command_string into line_edges_added;
+       IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
+     	
+	       command_string := Format('WITH lines_addes AS (
+	       SELECT topology.toTopoGeom(r.geom, %1$L, %2$L , %3$L) as topogeometry, column_data_as_json  
+	       FROM %4$s as r 
+	       ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom)))
+	       INSERT INTO %5$s(%7$s,%6$s)  
+	       SELECT x.*, ee.topogeometry as %6$s FROM lines_addes ee, jsonb_to_record(ee.column_data_as_json) AS x(%8$s)',
+	       (_topology_info).topology_name,
+	       (_topology_info).topology_attrbute_tables_border_layer_id,
+	       (_topology_info).topology_snap_tolerance,
+	       has_edges_temp_table_name,
+	       (_topology_info).topology_name||'.topo_line_attr',
+	       (_input_data).line_table_geo_collumn,
+	       (_input_data).line_table_other_collumns_list,
+	       (_input_data).line_table_other_collumns_def
+	       );
+	       EXECUTE command_string;
+       
+       ELSE
 
-       command_string := Format('DROP TABLE IF EXISTS %s',has_edges_temp_table_name);
-       EXECUTE command_string;
-
-      command_string := Format('WITH topo_updated AS (
-      SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE), geo 
-        FROM (
-          SELECT distinct (ST_Dump(ST_Multi(ST_LineMerge(ST_union(r.geo))))).geom as geo 
-            FROM (
-              select r.geo from %4$s r where ST_CoveredBy(r.geo, %5$L) and line_geo_lost = true
-            ) as r
-          ) as r
-      )
-      update %4$s u 
-      set line_geo_lost = false
-      FROM topo_updated tu
-      where ST_DWithin(tu.geo,u.geo,%6$s) and (SELECT bool_or(x IS NOT NULL) FROM unnest(tu.add_border_lines) x)' , 
-      (_topology_info).topology_name, 
-      (_topology_info).topology_snap_tolerance, 
-      _table_name_result_prefix,
-      _table_name_result_prefix||'_no_cut_line_failed',
-      _bb,
-      (_topology_info).topology_snap_tolerance);
-
-      RAISE NOTICE 'Try to add failed lines with no retry to master topo layer %', command_string;
-      EXECUTE command_string;
-      
-      command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
-      (_topology_info).topology_name, inner_cell_boundary_geom);
+	       command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L,FALSE) FROM 
+	       (SELECT geom from %2$s) as r 
+	       ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom))',
+	       (_topology_info).topology_snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (_bb), (_topology_info).topology_name, _table_name_result_prefix);
+	       EXECUTE command_string into line_edges_added;
+	
+	       command_string := Format('DROP TABLE IF EXISTS %s',has_edges_temp_table_name);
+	       EXECUTE command_string;
+	
+	      command_string := Format('WITH topo_updated AS (
+	      SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE), geo 
+	        FROM (
+	          SELECT distinct (ST_Dump(ST_Multi(ST_LineMerge(ST_union(r.geo))))).geom as geo 
+	            FROM (
+	              select r.geo from %4$s r where ST_CoveredBy(r.geo, %5$L) and line_geo_lost = true
+	            ) as r
+	          ) as r
+	      )
+	      update %4$s u 
+	      set line_geo_lost = false
+	      FROM topo_updated tu
+	      where ST_DWithin(tu.geo,u.geo,%6$s) and (SELECT bool_or(x IS NOT NULL) FROM unnest(tu.add_border_lines) x)' , 
+	      (_topology_info).topology_name, 
+	      (_topology_info).topology_snap_tolerance, 
+	      _table_name_result_prefix,
+	      _table_name_result_prefix||'_no_cut_line_failed',
+	      _bb,
+	      (_topology_info).topology_snap_tolerance);
+	
+	      RAISE NOTICE 'Try to add failed lines with no retry to master topo layer %', command_string;
+	      EXECUTE command_string;
+	      
+	      command_string := Format('SELECT topo_update.do_healedges_no_block(%1$L,%2$L)', 
+	      (_topology_info).topology_name, inner_cell_boundary_geom);
+      END IF;
 
     END IF;
 
@@ -465,38 +487,61 @@ BEGIN
  
   ELSIF _cell_job_type = 2 THEN
   -- Add border lines for small grids
-  
-    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,TRUE) from %4$s r 
-    where r.geo && %5$L and ST_CoveredBy(r.geo, %5$L) and r.added_to_master = false 
-    ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo))', 
-    (_topology_info).topology_name, 
-    (_topology_info).topology_snap_tolerance, 
-    _table_name_result_prefix,
-    _table_name_result_prefix||'_border_line_segments',
-    _bb);
-    EXECUTE command_string;
 
-    command_string := Format('update %1$s r set added_to_master = true
-    where r.geo && %2$L and ST_CoveredBy(r.geo, %2$L) and r.added_to_master = false', 
-    _table_name_result_prefix||'_border_line_segments',
-    _bb);
-    EXECUTE command_string;
-    
-    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,TRUE) from %4$s r 
-    where r.geo && %5$L and ST_CoveredBy(r.geo, %5$L) and r.added_to_master = false 
-    ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo))', 
-    (_topology_info).topology_name, 
-    (_topology_info).topology_snap_tolerance, 
-    _table_name_result_prefix,
-    _table_name_result_prefix||'_border_line_many_points',
-    _bb);
-    EXECUTE command_string;
+         IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
+     	
+	       command_string := Format('WITH lines_addes AS (
+	       SELECT topology.toTopoGeom(r.geo, %1$L, %2$L , %3$L) as topogeometry, column_data_as_json  
+	       FROM %4$s as r where r.geo && %9$L and ST_CoveredBy(r.geo, %9$L) and r.added_to_master = false
+	       ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo)))
+	       INSERT INTO %5$s(%7$s,%6$s)  
+	       SELECT x.*, ee.topogeometry as %6$s FROM lines_addes ee, jsonb_to_record(ee.column_data_as_json) AS x(%8$s)',
+	       (_topology_info).topology_name,
+	       (_topology_info).topology_attrbute_tables_border_layer_id,
+	       (_topology_info).topology_snap_tolerance,
+	       _table_name_result_prefix||'_border_line_segments',
+	       (_topology_info).topology_name||'.topo_line_attr',
+	       (_input_data).line_table_geo_collumn,
+	       (_input_data).line_table_other_collumns_list,
+	       (_input_data).line_table_other_collumns_def,
+	       _bb
+	       );
+	       EXECUTE command_string;
+       
+       ELSE
 
-    command_string := Format('update %1$s r set added_to_master = true
-    where r.geo && %2$L and ST_CoveredBy(r.geo, %2$L) and r.added_to_master = false', 
-    _table_name_result_prefix||'_border_line_many_points',
-    _bb);
-    EXECUTE command_string;
+		    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,TRUE) from %4$s r 
+		    where r.geo && %5$L and ST_CoveredBy(r.geo, %5$L) and r.added_to_master = false 
+		    ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo))', 
+		    (_topology_info).topology_name, 
+		    (_topology_info).topology_snap_tolerance, 
+		    _table_name_result_prefix,
+		    _table_name_result_prefix||'_border_line_segments',
+		    _bb);
+		    EXECUTE command_string;
+		
+		    command_string := Format('update %1$s r set added_to_master = true
+		    where r.geo && %2$L and ST_CoveredBy(r.geo, %2$L) and r.added_to_master = false', 
+		    _table_name_result_prefix||'_border_line_segments',
+		    _bb);
+		    EXECUTE command_string;
+		    
+		    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,TRUE) from %4$s r 
+		    where r.geo && %5$L and ST_CoveredBy(r.geo, %5$L) and r.added_to_master = false 
+		    ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo))', 
+		    (_topology_info).topology_name, 
+		    (_topology_info).topology_snap_tolerance, 
+		    _table_name_result_prefix,
+		    _table_name_result_prefix||'_border_line_many_points',
+		    _bb);
+		    EXECUTE command_string;
+		
+		    command_string := Format('update %1$s r set added_to_master = true
+		    where r.geo && %2$L and ST_CoveredBy(r.geo, %2$L) and r.added_to_master = false', 
+		    _table_name_result_prefix||'_border_line_many_points',
+		    _bb);
+		    EXECUTE command_string;
+	  END IF;
 
 
   ELSIF _cell_job_type = 3 THEN

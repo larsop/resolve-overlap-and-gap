@@ -170,36 +170,75 @@ BEGIN
     IF cell_job_type = 3 and loop_number = 1 THEN
       -- add very long lines feature in single thread
       -- Most parts of this will not be healed and smooting if we keep it this way
-      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE) from %4$s r where r.added_to_master = false', 
-      (_topology_info).topology_name, 
-      (_topology_info).topology_snap_tolerance, 
-      table_name_result_prefix,
-      table_name_result_prefix||'_border_line_many_points');
-      EXECUTE command_string;
-
-      command_string := Format('update %1$s set added_to_master = true
-      where added_to_master = false', 
-      table_name_result_prefix||'_border_line_many_points');
-      EXECUTE command_string;
-
-      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE) 
-      from 
-      %4$s r,
-      %5$s l
-      where ST_Intersects(l.%6$s,r.geo) and r.added_to_master = false',
-      (_topology_info).topology_name, 
-      (_topology_info).topology_snap_tolerance, 
-      table_name_result_prefix,
-      table_name_result_prefix||'_border_line_segments',
-      overlapgap_grid||'_metagrid_'||to_char(1, 'fm0000')||'_lines',
-      (_input_data).polygon_table_geo_collumn);
-      EXECUTE command_string;
       
+      IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
+     	
+	       command_string := Format('WITH lines_addes AS (
+	       SELECT topology.toTopoGeom(r.geo, %1$L, %2$L , %3$L) as topogeometry, column_data_as_json  
+	       FROM %4$s as r where r.added_to_master = false
+	       ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo)))
+	       INSERT INTO %5$s(%7$s,%6$s)  
+	       SELECT x.*, ee.topogeometry as %6$s FROM lines_addes ee, jsonb_to_record(ee.column_data_as_json) AS x(%8$s)',
+	       (_topology_info).topology_name,
+	       (_topology_info).topology_attrbute_tables_border_layer_id,
+	       (_topology_info).topology_snap_tolerance,
+	       table_name_result_prefix||'_border_line_many_points',
+	       (_topology_info).topology_name||'.topo_line_attr',
+	       (_input_data).line_table_geo_collumn,
+	       (_input_data).line_table_other_collumns_list,
+	       (_input_data).line_table_other_collumns_def
+	       );
+	       EXECUTE command_string;
 
-      command_string := Format('update %1$s set added_to_master = true
-      where added_to_master = false', 
-      table_name_result_prefix||'_border_line_segments');
-      EXECUTE command_string;
+	       command_string := Format('WITH lines_addes AS (
+	       SELECT topology.toTopoGeom(r.geo, %1$L, %2$L , %3$L) as topogeometry, column_data_as_json  
+	       FROM %4$s as r where r.added_to_master = false
+	       ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo)))
+	       INSERT INTO %5$s(%7$s,%6$s)  
+	       SELECT x.*, ee.topogeometry as %6$s FROM lines_addes ee, jsonb_to_record(ee.column_data_as_json) AS x(%8$s)',
+	       (_topology_info).topology_name,
+	       (_topology_info).topology_attrbute_tables_border_layer_id,
+	       (_topology_info).topology_snap_tolerance,
+	       table_name_result_prefix||'_border_line_segments',
+	       (_topology_info).topology_name||'.topo_line_attr',
+	       (_input_data).line_table_geo_collumn,
+	       (_input_data).line_table_other_collumns_list,
+	       (_input_data).line_table_other_collumns_def
+	       );
+	       EXECUTE command_string;
+
+       ELSE
+	      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE) from %4$s r where r.added_to_master = false', 
+	      (_topology_info).topology_name, 
+	      (_topology_info).topology_snap_tolerance, 
+	      table_name_result_prefix,
+	      table_name_result_prefix||'_border_line_many_points');
+	      EXECUTE command_string;
+	
+	      command_string := Format('update %1$s set added_to_master = true
+	      where added_to_master = false', 
+	      table_name_result_prefix||'_border_line_many_points');
+	      EXECUTE command_string;
+	
+	      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE) 
+	      from 
+	      %4$s r,
+	      %5$s l
+	      where ST_Intersects(l.%6$s,r.geo) and r.added_to_master = false',
+	      (_topology_info).topology_name, 
+	      (_topology_info).topology_snap_tolerance, 
+	      table_name_result_prefix,
+	      table_name_result_prefix||'_border_line_segments',
+	      overlapgap_grid||'_metagrid_'||to_char(1, 'fm0000')||'_lines',
+	      (_input_data).polygon_table_geo_collumn);
+	      EXECUTE command_string;
+	      
+	
+	      command_string := Format('update %1$s set added_to_master = true
+	      where added_to_master = false', 
+	      table_name_result_prefix||'_border_line_segments');
+	      EXECUTE command_string;
+    	END IF;
 
       COMMIT;
 

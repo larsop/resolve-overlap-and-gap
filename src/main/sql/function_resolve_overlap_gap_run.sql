@@ -223,12 +223,11 @@ BEGIN
     END IF;
 
     IF loop_number = 1 and cell_job_type != 2 THEN
-      command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%L,%L,%s,%L,%L,%s,%s,%s)', 
+      command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%L,%L,%L,%L,%s,%s,%s)', 
       _input_data, 
+      _topology_info,
       overlapgap_grid, 
       table_name_result_prefix, 
-      (_topology_info).topology_name,  
-      (_topology_info).topology_snap_tolerance, 
       job_list_name, 
       _clean_info, 
       _max_parallel_jobs, 
@@ -245,8 +244,8 @@ BEGIN
       EXIT WHEN cell_job_type = 3;
 
       IF cell_job_type = 2 THEN
-        command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%L,%L,%s,%L,%L,%s,%s,%s)', 
-        _input_data, overlapgap_grid, table_name_result_prefix, (_topology_info).topology_name,  (_topology_info).topology_snap_tolerance, job_list_name, _clean_info, _max_parallel_jobs, cell_job_type,loop_number);
+        command_string := Format('SELECT resolve_overlap_gap_job_list(%L,%L,%L,%L,%L,%L,%s,%s,%s)', 
+        _input_data, _topology_info, overlapgap_grid, table_name_result_prefix, job_list_name, _clean_info, _max_parallel_jobs, cell_job_type,loop_number);
         EXECUTE command_string;
         COMMIT;
       END IF;

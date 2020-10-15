@@ -6,10 +6,17 @@ _input_data resolve_overlap_data_input_type,
 --(_input_data).polygon_table_geo_collumn varchar, -- the name of geometry column on the table to analyze
 --(_input_data).table_srid int, -- the srid for the given geo column on the table analyze
 --(_input_data).utm boolean, 
+_topology_info resolve_overlap_data_topology_type,
+---(_topology_info).topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset and th efinal result
+-- NB. Any exting data will related to topology_name will be deleted
+--(_topology_info).topology_snap_tolerance float, -- this is tolerance used as base when creating the the postgis topolayer
+--(_topology_info).create_topology_attrbute_tables boolean -- if this is true and we value for line_table_name we create attribute tables refferances to  
+-- this tables will have atrbuttes equal to the simple feauture tables for lines and feautures
+
 _overlapgap_grid varchar, -- the name of the content based grid table
 _table_name_result_prefix varchar,
-_topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset. -- NB. Any exting data will related to topology_name will be deleted
-_topology_snap_tolerance float, -- the tolrence to be used when add data
+--(_topology_info).topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset. -- NB. Any exting data will related to topology_name will be deleted
+--(_topology_info).topology_snap_tolerance float, -- the tolrence to be used when add data
 _job_list_name varchar, -- the name of job_list table, this table is ued to track of done jobs
 _clean_info resolve_overlap_data_clean_type, -- different parameters used if need to clean up your data
 --(_clean_info).simplify_tolerance float, -- is this is more than zero simply will called with
@@ -33,7 +40,7 @@ DECLARE
   sql_to_run_grid varchar;
   
   -- This is used to sure that no lines can snap to each other between two cells
-  -- The size wil the this value multiplied by _topology_snap_tolerance;
+  -- The size wil the this value multiplied by (_topology_info).topology_snap_tolerance;
   -- TODO make this as parameter
   cell_boundary_tolerance_with_multi real = 12;
   
@@ -61,14 +68,12 @@ BEGIN
 
 
   sql_to_run_grid := Format('CALL resolve_overlap_gap_single_cell(
-  %L,%s,
-  %s,%s,
+  %L,%L,%s,
   %L,
   %s,%s,', 
   _input_data, 
+  _topology_info,
   Quote_literal(_table_name_result_prefix), 
-  Quote_literal(_topology_name),
-  _topology_snap_tolerance, 
   _clean_info,
   Quote_literal(_job_list_name), 
   Quote_literal(_overlapgap_grid));
@@ -117,7 +122,7 @@ BEGIN
  	Quote_literal(');'),
  	
     (_input_data).polygon_table_geo_collumn,
-    _topology_snap_tolerance * cell_boundary_tolerance_with_multi,
+    (_topology_info).topology_snap_tolerance * cell_boundary_tolerance_with_multi,
     (_input_data).polygon_table_geo_collumn,
     _overlapgap_grid,
  	_overlapgap_grid,

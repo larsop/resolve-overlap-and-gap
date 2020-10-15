@@ -5,8 +5,15 @@ _input_data resolve_overlap_data_input_type,
 --(_input_data).polygon_table_geo_collumn varchar, -- the name of geometry column on the table to analyze
 --(_input_data).table_srid int, -- the srid for the given geo column on the table analyze
 --(_input_data).utm boolean, 
+_topology_info resolve_overlap_data_topology_type,
+---(_topology_info).topology_name varchar, -- The topology schema name where we store store sufaces and lines from the simple feature dataset and th efinal result
+-- NB. Any exting data will related to topology_name will be deleted
+--(_topology_info).topology_snap_tolerance float, -- this is tolerance used as base when creating the the postgis topolayer
+--(_topology_info).create_topology_attrbute_tables boolean -- if this is true and we value for line_table_name we create attribute tables refferances to  
+-- this tables will have atrbuttes equal to the simple feauture tables for lines and feautures
+
 _bb geometry, 
-_topology_snap_tolerance float, 
+-- (_topology_info).topology_snap_tolerance float, 
 _table_name_result_prefix varchar, -- The topology schema name where we store store result sufaces and lines from the simple feature dataset,
 INOUT fixed_point_set geometry,
 INOUT lines_to_add geometry[],
@@ -18,7 +25,7 @@ DECLARE
   command_string text;
   
   -- This is used to sure that no lines can snap to each other between two cells
-  -- The size wil the this value multiplied by _topology_snap_tolerance;
+  -- The size wil the this value multiplied by (_topology_info).topology_snap_tolerance;
   -- TODO make this as parameter
  
   boundary_geom geometry;
@@ -41,7 +48,7 @@ BEGIN
   EXECUTE command_string into cell_id;
 
 
-  inner_boundary_geom := ST_Expand(_bb, (-2*_topology_snap_tolerance));
+  inner_boundary_geom := ST_Expand(_bb, (-2*(_topology_info).topology_snap_tolerance));
   
   boundary_geom := ST_MakePolygon ((
       SELECT ST_ExteriorRing (_bb) AS outer_ring), ARRAY (
@@ -83,7 +90,7 @@ BEGIN
  	'{}', --empty attribute json
  	_table_name_result_prefix||'_grid', 
  	ST_ExteriorRing(_bb),
- 	_topology_snap_tolerance/20, -- If snap to much here we may with not connected lines.
+ 	(_topology_info).topology_snap_tolerance/20, -- If snap to much here we may with not connected lines.
  	tmp_table_name||'temp'
  	);
   ELSE

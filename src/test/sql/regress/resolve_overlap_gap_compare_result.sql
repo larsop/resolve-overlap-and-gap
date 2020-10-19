@@ -102,7 +102,7 @@ command_string = Format('create table %s(id serial, description text, num_before
 execute command_string;
 
 -- Check simple feature table -----------
-
+-----------------------------------------
 command_string := Format('select count(o.*) FROM %s o',sf_table_in);
 EXECUTE command_string into num_before;
 command_string := Format('select count(o.*) FROM %s o where o.%s is not null',sf_table_out,(_input).polygon_table_pk_column);
@@ -119,6 +119,14 @@ command_string = Format('insert into %s(description, num_before, num_after) VALU
 'Total points in polygons with attribute values',num_before,num_after);
 execute command_string;
 
+command_string := Format('select count(o.*) FROM %s o',sf_table_in);
+EXECUTE command_string into num_before;
+command_string := Format('select count(o.*) FROM %s o',sf_table_out);
+EXECUTE command_string into num_after;
+command_string = Format('insert into %s(description, num_before, num_after) VALUES(%L,%L,%L)',sf_table_meta_res,
+'All polygons ',num_before,num_after);
+execute command_string;
+
 command_string := Format('select sum(ST_NPoints(o.%s)) FROM %s o',(_input).polygon_table_geo_collumn,sf_table_in);
 EXECUTE command_string into num_before;
 command_string := Format('select sum((ST_NPoints(o.%s))) FROM %s o',(_input).polygon_table_geo_collumn,sf_table_out,(_input).polygon_table_pk_column);
@@ -126,6 +134,7 @@ EXECUTE command_string into num_after;
 command_string = Format('insert into %s(description, num_before, num_after) VALUES(%L,%L,%L)',sf_table_meta_res,
 'Total points in all polygons',num_before,num_after);
 execute command_string;
+
 
 command_string := Format('select count(o.*) FROM %s o where o.%s is null',sf_table_out,(_input).polygon_table_pk_column);
 EXECUTE command_string into num_after;
@@ -147,40 +156,62 @@ command_string = Format('insert into %s(description, num_before, num_after) VALU
 'Polygons with area less than '||(_clean_info).min_area_to_keep||' m2. (minarea) ',num_before,num_after);
 execute command_string;
 
+-- Check Topology table -----------
+-----------------------------------------
+command_string := Format('select count(o.*) FROM %s o',(_topology_info).topology_name||'.edge_data');
+EXECUTE command_string into num_after;
+command_string = Format('insert into %s(description, num_before, num_after) VALUES(%L,%L,%L)',sf_table_meta_res,
+'Toplogy Num edges with attribute values ',null,num_after);
+execute command_string;
+
+command_string := Format('select sum((ST_NPoints(o.geom))) FROM %s o',(_topology_info).topology_name||'.edge_data');
+EXECUTE command_string into num_after;
+command_string = Format('insert into %s(description, num_before, num_after) VALUES(%L,%L,%L)',sf_table_meta_res,
+'Topology sPoints inedges with attribute values',null,num_after);
+execute command_string;
+
 -- Check overlaps result from overlap and gap-----------
 --------------------------------------------------------
 command_string := Format('select count(*) from 
-(select CASE WHEN %L = false THEN ST_Area(o.geom,TRUE) ELSE ST_Area(o.geom) END AS area FROM 
-  (SELECT (ST_Dump(geom)).geom from %s) as o 
-) as o',
-(_input).utm, 
-overlap_gap_before_prefix||'_overlap');
+(select * FROM 
+  (SELECT (ST_Dump(%s)).geom from %s) as o where ST_GeometryType(geom) in (%L,%L)
+) as o where (CASE WHEN %L = false THEN ST_Area(o.geom,TRUE) ELSE ST_Area(o.geom) END) > 0.0',
+(_input).polygon_table_geo_collumn,
+overlap_gap_before_prefix||'_overlap',
+'ST_Polygon','ST_MultiPolygon',
+(_input).utm);
 EXECUTE command_string into num_before;
 command_string := Format('select count(*) from 
-(select CASE WHEN %L = false THEN ST_Area(o.geom,TRUE) ELSE ST_Area(o.geom) END AS area FROM 
-  (SELECT (ST_Dump(geom)).geom from %s) as o 
-) as o',
-(_input).utm, 
-overlap_gap_after_prefix||'_overlap');
+(select * FROM 
+  (SELECT (ST_Dump(%s)).geom from %s) as o where ST_GeometryType(geom) in (%L,%L)
+) as o where (CASE WHEN %L = false THEN ST_Area(o.geom,TRUE) ELSE ST_Area(o.geom) END) > 0.0',
+(_input).polygon_table_geo_collumn,
+overlap_gap_after_prefix||'_overlap',
+'ST_Polygon','ST_MultiPolygon',
+(_input).utm);
 EXECUTE command_string into num_after;
 command_string = Format('insert into %s(description, num_before, num_after) VALUES(%L,%L,%L)',sf_table_meta_res,
-'Number of overlaps (maybe polygons,lines,points)',num_before,num_after);
+'Number of overlaps with area',num_before,num_after);
 execute command_string;
 
 
 command_string := Format('select Round(sum(area)::numeric,0) from 
 (select CASE WHEN %L = false THEN ST_Area(o.geom,TRUE) ELSE ST_Area(o.geom) END AS area FROM 
-  (SELECT (ST_Dump(geom)).geom from %s) as o 
+  (SELECT (ST_Dump(%s)).geom from %s) as o where  ST_GeometryType(geom) in (%L,%L)
 ) as o',
 (_input).utm, 
-overlap_gap_before_prefix||'_overlap');
+(_input).polygon_table_geo_collumn,
+overlap_gap_before_prefix||'_overlap',
+'ST_Polygon','ST_MultiPolygon');
 EXECUTE command_string into num_before;
 command_string := Format('select Round(sum(area)::numeric,0) from 
 (select CASE WHEN %L = false THEN ST_Area(o.geom,TRUE) ELSE ST_Area(o.geom) END AS area FROM 
-  (SELECT (ST_Dump(geom)).geom from %s) as o 
+  (SELECT (ST_Dump(%s)).geom from %s) as o where  ST_GeometryType(geom) in (%L,%L)
 ) as o',
-(_input).utm, 
-overlap_gap_after_prefix||'_overlap');
+(_input).utm,
+(_input).polygon_table_geo_collumn,
+overlap_gap_after_prefix||'_overlap',
+'ST_Polygon','ST_MultiPolygon');
 EXECUTE command_string into num_after;
 command_string = Format('insert into %s(description, num_before, num_after) VALUES(%L,%L,%L)',sf_table_meta_res,
 'Area m2. with overlap',num_before,num_after);
@@ -189,17 +220,17 @@ execute command_string;
 -- Check gaps result from overlap and gap-----------
 ----------------------------------------------------
 command_string := Format('select count(*) from 
-(select CASE WHEN %L = false THEN ST_Area(o.geom,TRUE) ELSE ST_Area(o.geom) END AS area FROM 
-  (SELECT (ST_Dump(geom)).geom from %s) as o 
+(select * FROM 
+  (SELECT (ST_Dump(%s)).geom from %s) as o 
 ) as o',
-(_input).utm, 
+(_input).polygon_table_geo_collumn,
 overlap_gap_before_prefix||'_gap');
 EXECUTE command_string into num_before;
 command_string := Format('select count(*) from 
-(select CASE WHEN %L = false THEN ST_Area(o.geom,TRUE) ELSE ST_Area(o.geom) END AS area FROM 
-  (SELECT (ST_Dump(geom)).geom from %s) as o 
+(select * FROM 
+  (SELECT (ST_Dump(%s)).geom from %s) as o 
 ) as o',
-(_input).utm, 
+(_input).polygon_table_geo_collumn,
 overlap_gap_after_prefix||'_gap');
 EXECUTE command_string into num_after;
 command_string = Format('insert into %s(description, num_before, num_after) VALUES(%L,%L,%L)',sf_table_meta_res,
@@ -209,21 +240,23 @@ execute command_string;
 
 command_string := Format('select Round(sum(area)::numeric,0) from 
 (select CASE WHEN %L = false THEN ST_Area(o.geom,TRUE) ELSE ST_Area(o.geom) END AS area FROM 
-  (SELECT (ST_Dump(geom)).geom from %s) as o 
+  (SELECT (ST_Dump(%s)).geom from %s) as o 
 ) as o',
 (_input).utm, 
+(_input).polygon_table_geo_collumn,
 overlap_gap_before_prefix||'_gap');
-EXECUTE command_string into num_before;
+--EXECUTE command_string into num_before;
 command_string := Format('select Round(sum(area)::numeric,0) from 
 (select CASE WHEN %L = false THEN ST_Area(o.geom,TRUE) ELSE ST_Area(o.geom) END AS area FROM 
-  (SELECT (ST_Dump(geom)).geom from %s) as o 
+  (SELECT (ST_Dump(%s)).geom from %s) as o 
 ) as o',
 (_input).utm, 
+(_input).polygon_table_geo_collumn,
 overlap_gap_after_prefix||'_gap');
-EXECUTE command_string into num_after;
+--EXECUTE command_string into num_after;
 command_string = Format('insert into %s(description, num_before, num_after) VALUES(%L,%L,%L)',sf_table_meta_res,
 'Area m2. with gaps',num_before,num_after);
-execute command_string;
+--execute command_string;
 
 
 

@@ -212,7 +212,7 @@ SELECT 'ar5_artype_simple_feature_polygons', qms_id_flate, artype,areal, round(S
 SELECT 'ar5_num_faces', count(mbr) from topo_ar5_sysdata_webclient_t1.face;
 SELECT 'ar5_num_edge_data', count(*) from topo_ar5_sysdata_webclient_t1.edge_data;
 SELECT 'ar5_num_relation', count(*) from topo_ar5_sysdata_webclient_t1.relation;
-SELECT 'ar5_check_added_topo_line_ref', count(*) from topo_ar5_sysdata_webclient_t1.topo_line_attr;
-SELECT 'ar5_artype_topo_line_attr',  qms_id_grense, opphav, round(ST_length(geo::Geometry,true)) from topo_ar5_sysdata_webclient_t1.topo_line_attr order by qms_id_grense;
+SELECT 'ar5_check_added_topo_line_ref', count(*) from topo_ar5_sysdata_webclient_t1.edge_attributes;
+SELECT 'ar5_artype_edge_attributes',  qms_id_grense, opphav, round(ST_length(geo::Geometry,true)) from topo_ar5_sysdata_webclient_t1.edge_attributes order by qms_id_grense;
 
 

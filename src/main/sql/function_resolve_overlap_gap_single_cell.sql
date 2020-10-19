@@ -389,7 +389,7 @@ BEGIN
        (_topology_info).topology_attrbute_tables_border_layer_id,
        (_topology_info).topology_snap_tolerance,
        has_edges_temp_table_name,
-       (_topology_info).topology_name||'.topo_line_attr',
+       (_topology_info).topology_name||'.edge_attributes',
        (_input_data).line_table_geo_collumn,
        (_input_data).line_table_other_collumns_list,
        (_input_data).line_table_other_collumns_def
@@ -436,7 +436,7 @@ BEGIN
 	       (_topology_info).topology_attrbute_tables_border_layer_id,
 	       (_topology_info).topology_snap_tolerance,
 	       has_edges_temp_table_name,
-	       (_topology_info).topology_name||'.topo_line_attr',
+	       (_topology_info).topology_name||'.edge_attributes',
 	       (_input_data).line_table_geo_collumn,
 	       (_input_data).line_table_other_collumns_list,
 	       (_input_data).line_table_other_collumns_def
@@ -500,7 +500,7 @@ BEGIN
 	       (_topology_info).topology_attrbute_tables_border_layer_id,
 	       (_topology_info).topology_snap_tolerance,
 	       _table_name_result_prefix||'_border_line_segments',
-	       (_topology_info).topology_name||'.topo_line_attr',
+	       (_topology_info).topology_name||'.edge_attributes',
 	       (_input_data).line_table_geo_collumn,
 	       (_input_data).line_table_other_collumns_list,
 	       (_input_data).line_table_other_collumns_def,

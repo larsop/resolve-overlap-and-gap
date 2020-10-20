@@ -129,6 +129,18 @@ BEGIN
 	  
   END IF;
 
+  IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).polygon_table_name is not null 
+     and (_input_data).polygon_table_other_collumns_def is null THEN
+     EXECUTE Format('select 
+	  Array_to_string(array_agg(column_name||%L||data_type),%L) as column_def,
+	  Array_to_string(array_agg(column_name),%L) as column_name
+	  from INFORMATION_SCHEMA.COLUMNS where  table_schema = %L and table_name = %L and data_type != %L and column_name != %L',
+	  ' ',',',',',
+	  split_part((_input_data).polygon_table_name, '.', 1),
+	  split_part((_input_data).polygon_table_name, '.', 2),
+	  'USER-DEFINED',
+	  (_input_data).polygon_table_geo_collumn) INTO _input_data.polygon_table_other_collumns_def, _input_data.polygon_table_other_collumns_list;
+  END IF;
   
   
   IF start_at_job_type = 1 THEN 

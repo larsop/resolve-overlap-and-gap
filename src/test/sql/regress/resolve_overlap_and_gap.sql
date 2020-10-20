@@ -15,7 +15,7 @@ CALL resolve_overlap_gap_run(
 (null,null,null, -- The simple line feature info with attributtes 
 'test_data.overlap_gap_input_t2','c1','geom' -- The simple polygons feature info with attributtes
 ,4258,false, -- info about srid and utm or not
-null,null
+null,null,null,null
 ), -- TYPE resolve_overlap_data_input
 ('test_topo_t2',0.00001,false,null), -- TYPE resolve_overlap_data_topology
   resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
@@ -62,7 +62,7 @@ CALL resolve_overlap_gap_run(
 (null,null,null, -- The simple line feature info with attributtes 
 'test_data.overlap_gap_input_t3','c1t3','geo' -- The simple polygons feature info with attributtes
 ,25833,true, -- info about srid and utm or not
-null,null
+null,null,null,null
 ), -- TYPE resolve_overlap_data_input
 ('test_topo_t3',1.0,false,null), -- TYPE resolve_overlap_data_topology
 resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
@@ -99,7 +99,7 @@ CALL resolve_overlap_gap_run(
 (null,null,null, -- The simple line feature info with attributtes 
 'test_data.overlap_gap_input_t3','c1t3','geo' -- The simple polygons feature info with attributtes
 ,25833,true, -- info about srid and utm or not
-null,null
+null,null,null,null
 ), -- TYPE resolve_overlap_data_input
 ('test_topo_t3',1.0,false,null), -- TYPE resolve_overlap_data_topology
   resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
@@ -140,7 +140,7 @@ CALL resolve_overlap_gap_run(
 (null,null,null, -- The simple line feature info with attributtes 
 'test_data.overlap_gap_input_t3','c1t3','geo' -- The simple polygons feature info with attributtes
 ,25833,true, -- info about srid and utm or not
-null,null
+null,null,null,null
 ), -- TYPE resolve_overlap_data_input
 ('test_topo_t3',1.0,false,null), -- TYPE resolve_overlap_data_topology
   resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
@@ -200,7 +200,7 @@ CALL resolve_overlap_gap_run(
 ('test_ar5_web.grense_t1','qms_id_grense','geo', -- The simple line feature info with attributtes 
 'test_ar5_web.flate_t1','qms_id_flate','geo' -- The simple polygons feature info with attributtes
 ,4258,false, -- info about srid and utm or not
-null,null
+null,null,null,null
 ), -- TYPE resolve_overlap_data_input
 ('topo_ar5_sysdata_webclient_t1',0.00001,true,null), -- TYPE resolve_overlap_data_topology
 resolve_overlap_data_clean_type_func(), -- No parameters line simplifcations will be done
@@ -214,5 +214,7 @@ SELECT 'ar5_num_edge_data', count(*) from topo_ar5_sysdata_webclient_t1.edge_dat
 SELECT 'ar5_num_relation', count(*) from topo_ar5_sysdata_webclient_t1.relation;
 SELECT 'ar5_check_added_topo_line_ref', count(*) from topo_ar5_sysdata_webclient_t1.edge_attributes;
 SELECT 'ar5_artype_edge_attributes',  qms_id_grense, opphav, round(ST_length(geo::Geometry,true)) from topo_ar5_sysdata_webclient_t1.edge_attributes order by qms_id_grense;
+SELECT 'ar5_check_added_topo_face_ref', count(*) from topo_ar5_sysdata_webclient_t1.face_attributes;
+SELECT 'ar5_artype_face_attributes',  qms_id_flate, opphav, round(ST_length(geo::Geometry,true)) from topo_ar5_sysdata_webclient_t1.face_attributes order by qms_id_flate;
 
 

@@ -18,13 +18,17 @@ CREATE TYPE resolve_overlap_data_input_type AS (
  table_srid int, -- the srid for the given geo column on the table analyze
  utm boolean,
  
- -- This value is computed by default, mayby check if that ius needed is his ass added by the user
+ -- This values are computed by default, mayby check if that ius needed is his ass added by the user
  -- should be on this format qms_id_grense character varying,objtype character varying,aravgrtype character varying,maalemetode character varying,noyaktighet integer,synbarhet character varying,verifiseringsdato date,datafangstdato date,kartid character varying,kjoringsident date,arkartstd character varying,opphav character varying,informasjon character varying,registreringsversjon_produkt character varying,registreringsversjon_versjon character varying,registreringsversjon_undertype character varying,qms_navnerom character varying,qms_versjonid character varying,qms_oppdateringsdato timestamp without time zone,qms_prosesshistorie character varying,qms_kopidata_omraadeid integer,qms_kopidata_originaldatavert character varying,qms_kopidata_kopidato timestamp without time zone,sl_dummy_grense_id integer
- line_table_other_collumns_def varchar, -- The name of geometry column for the line strings
-
+ line_table_other_collumns_def varchar,  
  -- should be on this format qms_id_grense,objtype,aravgrtype,maalemetode,noyaktighet,synbarhet,verifiseringsdato,datafangstdato,kartid,kjoringsident,arkartstd,opphav,informasjon,registreringsversjon_produkt,registreringsversjon_versjon,registreringsversjon_undertype,qms_navnerom,qms_versjonid,qms_oppdateringsdato,qms_prosesshistorie,qms_kopidata_omraadeid,qms_kopidata_originaldatavert,qms_kopidata_kopidato,sl_dummy_grense_id
- line_table_other_collumns_list varchar -- The name of geometry column for the line strings
+ line_table_other_collumns_list varchar, 
 
+ -- This values are computed by default, mayby check if that ius needed is his ass added by the user
+ -- should be on this format qms_id_grense character varying,objtype character varying,aravgrtype character varying,maalemetode character varying,noyaktighet integer,synbarhet character varying,verifiseringsdato date,datafangstdato date,kartid character varying,kjoringsident date,arkartstd character varying,opphav character varying,informasjon character varying,registreringsversjon_produkt character varying,registreringsversjon_versjon character varying,registreringsversjon_undertype character varying,qms_navnerom character varying,qms_versjonid character varying,qms_oppdateringsdato timestamp without time zone,qms_prosesshistorie character varying,qms_kopidata_omraadeid integer,qms_kopidata_originaldatavert character varying,qms_kopidata_kopidato timestamp without time zone,sl_dummy_grense_id integer
+ polygon_table_other_collumns_def varchar,  
+ -- should be on this format qms_id_grense,objtype,aravgrtype,maalemetode,noyaktighet,synbarhet,verifiseringsdato,datafangstdato,kartid,kjoringsident,arkartstd,opphav,informasjon,registreringsversjon_produkt,registreringsversjon_versjon,registreringsversjon_undertype,qms_navnerom,qms_versjonid,qms_oppdateringsdato,qms_prosesshistorie,qms_kopidata_omraadeid,qms_kopidata_originaldatavert,qms_kopidata_kopidato,sl_dummy_grense_id
+ polygon_table_other_collumns_list varchar
  
 );
 

@@ -211,7 +211,7 @@ BEGIN
   RAISE NOTICE 'done with %s' ,  tmp_table_name;
   
 
-  command_string := Format('SELECT * FROM (
+  command_string := Format('SELECT distinct (ST_Dump(geo)).geom as geo FROM (     
     SELECT ST_Intersection(ST_Union(
     ST_StartPoint(out.geom),
     ST_EndPoint(out.geom)),%2$L) as geo

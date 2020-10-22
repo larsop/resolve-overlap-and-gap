@@ -232,7 +232,7 @@ BEGIN
 	    IF (_clean_info).simplify_tolerance > 0  THEN
 	        command_string := Format('UPDATE %4$s l
 	        SET geo = ST_simplifyPreserveTopology(l.geo,%1$s)
-	        WHERE NOT ST_DWithin(%2$L,l.geo,%3$s)',
+	        WHERE NOT ST_DWithin(%2$L,l.geo,%3$s) OR %2$L IS NULL',
 	        (_clean_info).simplify_tolerance , 
 	        outer_cell_boundary_lines,
 	        snap_tolerance_fixed,
@@ -243,7 +243,7 @@ BEGIN
 	    IF (_clean_info).chaikins_nIterations > 0 THEN
 	        command_string := Format('UPDATE %6$s l
 	        SET geo = ST_simplifyPreserveTopology(topo_update.chaikinsAcuteAngle(l.geo,%1$L,%2$L), %3$s)
-	        WHERE NOT ST_DWithin(%4$L,l.geo,%5$s)',
+	        WHERE NOT ST_DWithin(%4$L,l.geo,%5$s) OR %4$L IS NULL',
 	        (_input_data).utm,
 	        _clean_info,
 	        (_topology_info).topology_snap_tolerance/2,

@@ -38,9 +38,16 @@ DECLARE
   
   tmp_table_name varchar = 'tmp_data_all_lines' || Md5(ST_AsBinary (_bb));
   
+  snap_to_grid_tolerance real;
+  
 BEGIN
 	
-
+  IF (_input_data).utm = false THEN
+    snap_to_grid_tolerance = (_topology_info).topology_snap_tolerance/20;
+  ELSE
+    snap_to_grid_tolerance = (_topology_info).topology_snap_tolerance/5;
+  END IF;
+  
   command_string := Format('select id from %1$s g WHERE g.%2$s = %3$L ',
   _table_name_result_prefix||'_grid', 
   (_input_data).polygon_table_geo_collumn, 
@@ -119,7 +126,7 @@ BEGIN
  	'{}', --empty attribute json
  	_table_name_result_prefix||'_grid', 
  	ST_ExteriorRing(_bb),
- 	(_topology_info).topology_snap_tolerance/20, -- If snap to much here we may with not connected lines.
+ 	snap_to_grid_tolerance, -- If snap to much here we may with not connected lines.
  	tmp_table_name||'temp'
  	);
 

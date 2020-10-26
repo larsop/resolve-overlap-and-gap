@@ -157,7 +157,8 @@ BEGIN
   END IF;
 
   
-  IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
+  IF (_topology_info).create_topology_attrbute_tables = true THEN 
+    IF (_input_data).line_table_name is not null THEN
  	command_string := FORMAT('SELECT layer_id 
 	FROM topology.layer l, topology.topology t 
 	WHERE t.name = %L AND
@@ -173,7 +174,26 @@ BEGIN
 		
 	RAISE NOTICE 'command_string % set _topology_info.topology_attrbute_tables_border_layer_id to %',command_string , (_topology_info).topology_attrbute_tables_border_layer_id;
       
-  END IF;
+    END IF;
+    IF (_input_data).line_table_name is not null THEN
+ 	command_string := FORMAT('SELECT layer_id 
+	FROM topology.layer l, topology.topology t 
+	WHERE t.name = %L AND
+	t.id = l.topology_id AND
+	l.schema_name = %L AND
+	l.table_name = %L AND
+	l.feature_column = %L',
+    (_topology_info).topology_name,
+    (_topology_info).topology_name,
+    'face_attributes',
+    (_input_data).line_table_geo_collumn);
+	EXECUTE command_string INTO _topology_info.topology_attrbute_tables_surface_layer_id;
+		
+	RAISE NOTICE 'command_string % set _topology_info.topology_attrbute_tables_border_layer_id to %',command_string , (_topology_info).topology_attrbute_tables_border_layer_id;
+      
+    END IF;
+  END IF;   
+    
 
   
   

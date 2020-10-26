@@ -41,7 +41,10 @@ CREATE TYPE resolve_overlap_data_topology_type AS (
   -- this tables will have atrbuttes equal to the simple feauture tables for lines and feautures
  
   -- this is computed startup
-  topology_attrbute_tables_border_layer_id int
+  topology_attrbute_tables_border_layer_id int,
+  -- this is computed startup
+  topology_attrbute_tables_surface_layer_id int
+
 );
 
 

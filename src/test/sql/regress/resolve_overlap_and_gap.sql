@@ -17,7 +17,7 @@ CALL resolve_overlap_gap_run(
 ,4258,false, -- info about srid and utm or not
 null,null,null,null
 ), -- TYPE resolve_overlap_data_input
-('test_topo_t2',0.00001,false,null), -- TYPE resolve_overlap_data_topology
+('test_topo_t2',0.00001,false,null,null), -- TYPE resolve_overlap_data_topology
   resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
   49,  -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
   0, -- is this is more than zero simply will called with
@@ -64,7 +64,7 @@ CALL resolve_overlap_gap_run(
 ,25833,true, -- info about srid and utm or not
 null,null,null,null
 ), -- TYPE resolve_overlap_data_input
-('test_topo_t3',1.0,false,null), -- TYPE resolve_overlap_data_topology
+('test_topo_t3',1.0,false,null,null), -- TYPE resolve_overlap_data_topology
 resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
 49,  -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
 30, -- is this is more than zero simply will called with
@@ -101,7 +101,7 @@ CALL resolve_overlap_gap_run(
 ,25833,true, -- info about srid and utm or not
 null,null,null,null
 ), -- TYPE resolve_overlap_data_input
-('test_topo_t3',1.0,false,null), -- TYPE resolve_overlap_data_topology
+('test_topo_t3',1.0,false,null,null), -- TYPE resolve_overlap_data_topology
   resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
   49,  -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
   0, -- is this is more than zero simply will called with
@@ -142,7 +142,7 @@ CALL resolve_overlap_gap_run(
 ,25833,true, -- info about srid and utm or not
 null,null,null,null
 ), -- TYPE resolve_overlap_data_input
-('test_topo_t3',1.0,false,null), -- TYPE resolve_overlap_data_topology
+('test_topo_t3',1.0,false,null,null), -- TYPE resolve_overlap_data_topology
   resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
   49,  -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
   0, -- is this is more than zero simply will called with
@@ -202,7 +202,7 @@ CALL resolve_overlap_gap_run(
 ,4258,false, -- info about srid and utm or not
 null,null,null,null
 ), -- TYPE resolve_overlap_data_input
-('topo_ar5_sysdata_webclient_t1',0.00001,true,null), -- TYPE resolve_overlap_data_topology
+('topo_ar5_sysdata_webclient_t1',0.00001,true,null,null), -- TYPE resolve_overlap_data_topology
 resolve_overlap_data_clean_type_func(), -- No parameters line simplifcations will be done
 5,4);
 
@@ -215,6 +215,6 @@ SELECT 'ar5_num_relation', count(*) from topo_ar5_sysdata_webclient_t1.relation;
 SELECT 'ar5_check_added_topo_line_ref', count(*) from topo_ar5_sysdata_webclient_t1.edge_attributes;
 SELECT 'ar5_artype_edge_attributes',  qms_id_grense, opphav, round(ST_length(geo::Geometry,true)) from topo_ar5_sysdata_webclient_t1.edge_attributes order by qms_id_grense;
 SELECT 'ar5_check_added_topo_face_ref', count(*) from topo_ar5_sysdata_webclient_t1.face_attributes;
-SELECT 'ar5_artype_face_attributes',  qms_id_flate, opphav, round(ST_length(geo::Geometry,true)) from topo_ar5_sysdata_webclient_t1.face_attributes order by qms_id_flate;
+SELECT 'ar5_artype_face_attributes',  qms_id_flate, opphav, round(ST_Area(geo::Geometry,true)) from topo_ar5_sysdata_webclient_t1.face_attributes order by qms_id_flate;
 
 

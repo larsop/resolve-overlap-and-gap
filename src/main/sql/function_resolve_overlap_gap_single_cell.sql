@@ -376,26 +376,6 @@ BEGIN
     IF (has_edges) THEN
 
     
-    -- TODO add test on (_topology_info).create_topology_attrbute_tables = true
-    IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
-     	
-       command_string := Format('WITH lines_addes AS (
-       SELECT topology.toTopoGeom(r.geom, %1$L, %2$L , %3$L) as topogeometry, column_data_as_json  
-       FROM %4$s as r 
-       ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom)))
-       INSERT INTO %5$s(%7$s,%6$s)  
-       SELECT x.*, ee.topogeometry as %6$s FROM lines_addes ee, jsonb_to_record(ee.column_data_as_json) AS x(%8$s)',
-       (_topology_info).topology_name,
-       (_topology_info).topology_attrbute_tables_border_layer_id,
-       (_topology_info).topology_snap_tolerance,
-       has_edges_temp_table_name,
-       (_topology_info).topology_name||'.edge_attributes',
-       (_input_data).line_table_geo_collumn,
-       (_input_data).line_table_other_collumns_list,
-       (_input_data).line_table_other_collumns_def
-       );
-       EXECUTE command_string;
-    ELSE
        command_string := Format('SELECT topology.TopoGeo_addLinestring(%1$L,r.geom,%2$s) FROM 
        (SELECT geom from %3$s) as r 
        ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom))',
@@ -404,7 +384,35 @@ BEGIN
        has_edges_temp_table_name);
        EXECUTE command_string;
     
-    END IF;
+       IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
+   
+         command_string := Format('WITH lines_addes AS (
+         SELECT DISTINCT ON(e.edge_id) e.edge_id, g.column_data_as_json
+         FROM 
+         %1$s as g, 
+         %2$s as e 
+         where ST_DWithin( e.geom, g.geom, %4$L) and
+         ST_DWithin( ST_StartPoint(e.geom), g.geom, %4$L) and
+         ST_DWithin( ST_EndPoint(e.geom), g.geom, %4$L)
+         )
+         INSERT INTO %5$s(%6$s,%3$s)  
+         SELECT x.*,
+         topology.CreateTopoGeom(%7$L,2,%8$L,ARRAY[ARRAY[ee.edge_id,2]]::topology.topoelementarray ) as %3$s
+         FROM lines_addes ee, 
+         jsonb_to_record(ee.column_data_as_json) AS x(%9$s)',
+         has_edges_temp_table_name,
+         (_topology_info).topology_name||'.edge_data',
+         (_input_data).line_table_geo_collumn,
+         (_topology_info).topology_snap_tolerance,
+         (_topology_info).topology_name||'.edge_attributes',
+         (_input_data).line_table_other_collumns_list,
+         (_topology_info).topology_name,
+         (_topology_info).topology_attrbute_tables_border_layer_id,
+         (_input_data).line_table_other_collumns_def
+         );
+     	 EXECUTE command_string;
+
+       END IF;
     
     command_string := Format('DROP TABLE IF EXISTS %s',has_edges_temp_table_name);
     EXECUTE command_string;

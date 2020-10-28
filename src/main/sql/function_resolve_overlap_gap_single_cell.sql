@@ -878,7 +878,7 @@ BEGIN
          FROM 
          %1$s as g, 
          %2$s as e 
-         where ST_Covers(e.mbr, g.%3$s)
+         where e.mbr is not null and e.mbr && g.%3$s and ST_Covers(ST_Expand(e.mbr,%4$s), g.%3$s)
          order by e.face_id, abs(ST_Area(ST_Envelope(g.%3$s))-ST_Area(e.mbr)) desc
          )
          INSERT INTO %5$s(%6$s,%3$s)  

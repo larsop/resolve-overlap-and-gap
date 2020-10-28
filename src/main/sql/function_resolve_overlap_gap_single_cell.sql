@@ -868,25 +868,36 @@ BEGIN
  from %2$s r
  where r.%3$s = t.%3$s', temp_table_name, (_input_data).polygon_table_name, (_input_data).polygon_table_pk_column, update_fields, update_fields_source);
     EXECUTE command_string;
+
+    
     
     IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).polygon_table_name is not null THEN
-    
-       command_string := Format('WITH polygons_addes AS (
-       SELECT topology.toTopoGeom(r.%6$s, %1$L, %2$L , %3$L) as topogeometry, to_jsonb(r)::jsonb - %6$s as column_data_as_json  
-       FROM %4$s as r 
-       ORDER BY ST_X(ST_Centroid(r.%6$s)), ST_Y(ST_Centroid(r.%6$s)))
-       INSERT INTO %5$s(%7$s,%6$s)  
-       SELECT x.*, ee.topogeometry as %6$s FROM polygons_addes ee, jsonb_to_record(ee.column_data_as_json) AS x(%8$s)',
-       (_topology_info).topology_name,
-       (_topology_info).topology_attrbute_tables_surface_layer_id,
-       (_topology_info).topology_snap_tolerance,
-       temp_table_name,
-       (_topology_info).topology_name||'.face_attributes',
-       (_input_data).polygon_table_geo_collumn,
-       (_input_data).polygon_table_other_collumns_list,
-       (_input_data).polygon_table_other_collumns_def
-       );
-       EXECUTE command_string;
+
+         command_string := Format('WITH lines_addes AS (
+         SELECT DISTINCT ON(e.face_id) e.face_id, to_jsonb(g)::jsonb - %3$s as column_data_as_json
+         FROM 
+         %1$s as g, 
+         %2$s as e 
+         where ST_Covers( e.mbr, g.%3$s)
+         )
+         INSERT INTO %5$s(%6$s,%3$s)  
+         SELECT x.*,
+         topology.CreateTopoGeom(%7$L,3,%8$L,ARRAY[ARRAY[ee.face_id,3]]::topology.topoelementarray ) as %3$s
+         FROM lines_addes ee, 
+         jsonb_to_record(ee.column_data_as_json) AS x(%9$s)',
+         temp_table_name,
+         (_topology_info).topology_name||'.face',
+         (_input_data).polygon_table_geo_collumn,
+         (_topology_info).topology_snap_tolerance,
+         (_topology_info).topology_name||'.face_attributes',
+         (_input_data).polygon_table_other_collumns_list,
+         (_topology_info).topology_name,
+         (_topology_info).topology_attrbute_tables_surface_layer_id,
+         (_input_data).polygon_table_other_collumns_def
+         );
+     	 EXECUTE command_string;
+       
+       
  
     ELSE
       command_string := Format('insert into %1$s select * from %2$s', final_result_table_name, temp_table_name);

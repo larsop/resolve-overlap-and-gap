@@ -445,6 +445,13 @@ BEGIN
     loop_number := 1;
 
   END LOOP;
+  
+
+   Execute Format('SELECT resolve_overlap_gap_post(%L,%L,%L)', 
+    _input_data,
+    _topology_info,
+    table_name_result_prefix);
+
 END
 $$;
 

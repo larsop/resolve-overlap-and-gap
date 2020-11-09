@@ -39,6 +39,13 @@ IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).pol
   EXECUTE Format('CREATE INDEX ON %s(%s) ',
   (_topology_info).topology_name||'.relation',
   'topogeo_id');
+ELSE
+
+  EXECUTE Format('ALTER TABLE %s SET logged',_table_name_result_prefix||'_result');
+  EXECUTE Format('GRANT select ON TABLE %s TO PUBLIC',_table_name_result_prefix||'_result');
+  -- TODO should have been done after data are created
+  EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', _table_name_result_prefix||'_result',(_input_data).polygon_table_geo_collumn);
+
 END IF;
 
 

@@ -258,18 +258,12 @@ EXECUTE Format('CREATE UNLOGGED TABLE %s (
 )',_table_name_result_prefix||'_border_line_many_points',(_input_data).table_srid,(_input_data).table_srid);
 EXECUTE Format('ALTER TABLE %s ADD column column_data_as_json jsonb',_table_name_result_prefix||'_border_line_many_points',unique_id_type);
 
-
 -- Create the simple feature result table  as copy of the input table
-EXECUTE Format('CREATE TABLE %s AS TABLE %s with NO DATA',_table_name_result_prefix||'_result',(_input_data).polygon_table_name);
+EXECUTE Format('CREATE UNLOGGED TABLE %s AS TABLE %s with NO DATA',_table_name_result_prefix||'_result',(_input_data).polygon_table_name);
 
--- Add an extra column to hold a list of other intersections surfaces
+  -- Add an extra column to hold a list of other intersections surfaces
 EXECUTE Format('SELECT vsr_get_data_type(%L,%L)',(_input_data).polygon_table_name,(_input_data).polygon_table_pk_column) into unique_id_type;
 EXECUTE Format('ALTER TABLE %s ADD column _other_intersect_id_list %s[]',_table_name_result_prefix||'_result',unique_id_type);
-EXECUTE Format('GRANT select ON TABLE %s TO PUBLIC',_table_name_result_prefix||'_result');
-
--- TODO should have been done after data are created
-EXECUTE Format('CREATE INDEX ON %s USING GIST (%s)', _table_name_result_prefix||'_result',(_input_data).polygon_table_geo_collumn);
-
 
 IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
   EXECUTE Format('CREATE UNLOGGED TABLE %s(%s) ',(_topology_info).topology_name||'.edge_attributes',(_input_data).line_table_other_collumns_def);
@@ -282,6 +276,9 @@ IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).pol
   EXECUTE Format('SELECT topology.AddTopoGeometryColumn(%L, %L, %L, %L, %L)',
   (_topology_info).topology_name, (_topology_info).topology_name,'face_attributes',(_input_data).polygon_table_geo_collumn,'POLYGON');
 END IF;
+
+
+
 
 
 

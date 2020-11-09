@@ -801,6 +801,9 @@ BEGIN
     EXECUTE Format('CREATE TEMP TABLE %s AS TABLE %s with NO DATA', temp_table_name, final_result_table_name);
     -- Add an extra column to hold a list of other intersections surfaces
     EXECUTE Format('ALTER TABLE %s ADD column %s serial', temp_table_name, temp_table_id_column);
+    
+    -- TODO How to find a unique column name ??
+    EXECUTE Format('ALTER TABLE %s ADD column face_id int', temp_table_name, temp_table_id_column);
     -- Update cl
     command_string := Format('select 
  	  	array_to_string(array_agg(quote_ident(update_column)),%L) AS update_fields,
@@ -808,14 +811,16 @@ BEGIN
  		  FROM (
  		   SELECT distinct(json_object_keys) AS update_column
  		   FROM json_object_keys(to_json(json_populate_record(NULL::%s, %L::Json))) 
- 		   where json_object_keys != %L and json_object_keys != %L and json_object_keys != %L  
- 		  ) as keys', ',', 'r.', ',', temp_table_name, '{}', temp_table_id_column, (_input_data).polygon_table_geo_collumn, '_other_intersect_id_list');
+ 		   where json_object_keys != %L and json_object_keys != %L and json_object_keys != %L and json_object_keys != %L  
+ 		  ) as keys', ',', 'r.', ',', 
+ 		  temp_table_name, '{}', 
+ 		  temp_table_id_column, (_input_data).polygon_table_geo_collumn, '_other_intersect_id_list', 'face_id');
     RAISE NOTICE '% ', command_string;
     EXECUTE command_string INTO update_fields, update_fields_source;
     
     -- Insert new geos based on all face id do not check on input table
-    command_string := Format('insert into %3$s(%5$s)
- 	select * from (select (ST_Dump(topo_update.get_face_geo(%1$L,face_id,%7$s))).geom as %5$s from (
+    command_string := Format('insert into %3$s(%5$s,face_id)
+ 	select * from (select (ST_Dump(topo_update.get_face_geo(%1$L,face_id,%7$s))).geom as %5$s, face_id from (
  	SELECT f.face_id, min(jl.id) as cell_id  FROM
  	%1$s.face f, 
  	%4$s jl 
@@ -874,12 +879,9 @@ BEGIN
     IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).polygon_table_name is not null THEN
 
          command_string := Format('WITH lines_addes AS (
-         SELECT DISTINCT ON(e.face_id) e.face_id, to_jsonb(g)::jsonb - %3$s as column_data_as_json
+         SELECT face_id, to_jsonb(g)::jsonb - %3$s as column_data_as_json
          FROM 
-         %1$s as g, 
-         %2$s as e 
-         where e.mbr is not null and e.mbr && g.%3$s and ST_Covers(ST_Expand(e.mbr,%4$s), g.%3$s)
-         order by e.face_id, abs(ST_Area(ST_Envelope(g.%3$s))-ST_Area(e.mbr)) desc
+         %1$s as g 
          )
          INSERT INTO %5$s(%6$s,%3$s)  
          SELECT x.*,
@@ -901,6 +903,8 @@ BEGIN
        
  
     ELSE
+      EXECUTE Format('ALTER TABLE %s drop column face_id', temp_table_name, temp_table_id_column);
+
       command_string := Format('insert into %1$s select * from %2$s', final_result_table_name, temp_table_name);
       EXECUTE command_string;
     END IF;

@@ -48,6 +48,8 @@ ELSE
 
 END IF;
 
+-- show sql to renmpve temp table
+
 
 END;
 $$

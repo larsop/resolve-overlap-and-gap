@@ -216,5 +216,4 @@ SELECT 'ar5_check_added_topo_line_ref', count(*) from topo_ar5_sysdata_webclient
 SELECT 'ar5_artype_edge_attributes',  qms_id_grense, opphav, round(ST_length(geo::Geometry,true)) from topo_ar5_sysdata_webclient_t1.edge_attributes order by qms_id_grense;
 SELECT 'ar5_check_added_topo_face_ref', count(*) from topo_ar5_sysdata_webclient_t1.face_attributes;
 SELECT 'ar5_artype_face_attributes',  qms_id_flate, opphav, round(ST_Area(geo::Geometry,true)) from topo_ar5_sysdata_webclient_t1.face_attributes order by qms_id_flate;
-
-
+\d topo_ar5_sysdata_webclient_t1.face_attributes

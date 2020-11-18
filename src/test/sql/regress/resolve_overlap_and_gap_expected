@@ -94,3 +94,32 @@ ar5_artype_face_attributes|acceca27-c879-4721-b6e7-ca7514c6768b|NIBIO|63034
 ar5_artype_face_attributes|||3705
 ar5_artype_face_attributes|||4276
 ar5_artype_face_attributes|||3000
+qms_id_flate|character varying|||
+objtype|character varying|||
+artype|character varying|||
+arskogbon|character varying|||
+artreslag|character varying|||
+argrunnf|character varying|||
+areal|numeric|||
+maalemetode|character varying|||
+noyaktighet|integer|||
+synbarhet|character varying|||
+verifiseringsdato|date|||
+datafangstdato|date|||
+kartid|character varying|||
+kjoringsident|date|||
+arkartstd|character varying|||
+opphav|character varying|||
+informasjon|character varying|||
+registreringsversjon_produkt|character varying|||
+registreringsversjon_versjon|character varying|||
+registreringsversjon_undertype|character varying|||
+qms_navnerom|character varying|||
+qms_versjonid|character varying|||
+qms_oppdateringsdato|timestamp without time zone|||
+qms_prosesshistorie|character varying|||
+qms_kopidata_omraadeid|integer|||
+qms_kopidata_originaldatavert|character varying|||
+qms_kopidata_kopidato|timestamp without time zone|||
+sl_dummy_flate_id|integer|||
+geo|topogeometry|||

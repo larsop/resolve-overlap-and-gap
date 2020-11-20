@@ -68,15 +68,19 @@ BEGIN
   IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
     command_string := Format('CREATE TEMP TABLE %1$s AS WITH 
     lines_intersect_cell AS (
- 	  SELECT distinct %3$s as geom, to_jsonb(v)::jsonb - %3$s as column_data_as_json
- 	  FROM %2$s v
- 	  where ST_Intersects(v.%3$s,%4$L)
+      SELECT * FROM (
+	 	  SELECT distinct %3$s as geom, to_jsonb(v)::jsonb - %3$s as column_data_as_json
+	 	  FROM %2$s v
+	 	  where ST_Intersects(v.%3$s,%4$L)
+      ) as v
+	  where ST_Intersects(v.geom,%4$L)
  	),
     touch_lines_intersects AS (
       SELECT distinct v.%3$s AS geom, to_jsonb(v)::jsonb - %3$s as column_data_as_json
       FROM lines_intersect_cell l, 
       %2$s v
- 	  WHERE ST_Intersects(v.%3$s,l.geom) and ST_Disjoint(v.%3$s,%4$L)
+ 	  WHERE ST_Intersects(v.%3$s,l.geom) and ST_Disjoint(v.%3$s,%4$L) and
+ 	  ST_Intersects(l.geom,%6$L)
  	),
     all_lines AS (SELECT distinct r.geom as geom, column_data_as_json from 
      ( SELECT geom, column_data_as_json from lines_intersect_cell 
@@ -89,22 +93,27 @@ BEGIN
     (_input_data).line_table_name, 
  	(_input_data).line_table_geo_collumn, 
  	_bb,
- 	'{}' --empty attribute json
+ 	'{}', --empty attribute json
+ 	ST_ExteriorRing(_bb)
  	);
     
   ELSE
  	
  	command_string := Format('CREATE TEMP TABLE %8$s AS WITH 
-    lines_intersect_cell AS (
- 	  SELECT distinct ST_ExteriorRing((ST_DumpRings((st_dump(%3$s)).geom)).geom) as geom
- 	  FROM %1$s v
- 	  where ST_Intersects(v.%3$s,%2$L)
+    lines_intersect_cell AS ( -- Get all polygons with holes as linestrings
+      SELECT * FROM (
+	 	  SELECT distinct ST_ExteriorRing((ST_DumpRings((st_dump(%3$s)).geom)).geom) as geom
+	 	  FROM %1$s v
+	 	  where ST_Intersects(v.%3$s,%2$L)
+      ) as v
+	  where ST_Intersects(v.geom,%2$L)
  	),
-    touch_lines_intersects AS (
+    touch_lines_intersects AS ( -- Get exterior rings that intersects 
       SELECT distinct ST_ExteriorRing(v.%3$s) AS geom
       FROM lines_intersect_cell l, 
       %1$s v
- 	  WHERE ST_Intersects(v.%3$s,l.geom) and ST_Disjoint(v.%3$s,%2$L)
+ 	  WHERE ST_Intersects(v.%3$s,l.geom) and ST_Disjoint(v.%3$s,%2$L) and
+ 	  ST_Intersects(l.geom,%6$L)
  	),
     all_lines AS (SELECT distinct r.geom as geom from 
      ( SELECT distinct (ST_Dump(ST_Multi(ST_LineMerge(ST_union(ST_SnapToGrid(l1.geom,%7$s)))))).geom as geom 

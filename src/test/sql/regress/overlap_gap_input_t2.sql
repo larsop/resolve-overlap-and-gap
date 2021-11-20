@@ -28,7 +28,7 @@ SET default_with_oids = false;
 --
 
 --
--- Name: grense; Type: TABLE; Schema: test_ar5_web; Owner: postgres
+-- Name: grense; Type: TABLE; Schema: test_ar5_web; 
 --
 
 CREATE TABLE test_ar5_web.grense (
@@ -60,10 +60,8 @@ CREATE TABLE test_ar5_web.grense (
 );
 
 
-ALTER TABLE test_ar5_web.grense OWNER TO postgres;
-
 --
--- Data for Name: grense; Type: TABLE DATA; Schema: test_ar5_web; Owner: postgres
+-- Data for Name: grense; Type: TABLE DATA; Schema: test_ar5_web; 
 --
 
 COPY test_ar5_web.grense (qms_id_grense, objtype, aravgrtype, maalemetode, noyaktighet, synbarhet, verifiseringsdato, datafangstdato, kartid, kjoringsident, arkartstd, opphav, informasjon, registreringsversjon_produkt, registreringsversjon_versjon, registreringsversjon_undertype, qms_navnerom, qms_versjonid, qms_oppdateringsdato, qms_prosesshistorie, qms_kopidata_omraadeid, qms_kopidata_originaldatavert, qms_kopidata_kopidato, geo, sl_dummy_grense_id) FROM stdin;
@@ -813,14 +811,14 @@ d251d448-0921-4df7-bc55-382e48a74755	\N	4206	32	200	0	1971-06-12	1971-06-12	\N	2
 
 
 --
--- Name: grense_geo_idx; Type: INDEX; Schema: test_ar5_web; Owner: postgres
+-- Name: grense_geo_idx; Type: INDEX; Schema: test_ar5_web; 
 --
 
 CREATE INDEX grense_geo_idx ON test_ar5_web.grense USING gist (geo);
 
 
 --
--- Name: grense_qms_id_grense_idx; Type: INDEX; Schema: test_ar5_web; Owner: postgres
+-- Name: grense_qms_id_grense_idx; Type: INDEX; Schema: test_ar5_web; 
 --
 
 CREATE INDEX grense_qms_id_grense_idx ON test_ar5_web.grense USING btree (qms_id_grense);
@@ -835,7 +833,7 @@ CREATE INDEX grense_qms_id_grense_idx ON test_ar5_web.grense USING btree (qms_id
 --
 
 --
--- Name: flate; Type: TABLE; Schema: test_ar5_web; Owner: postgres
+-- Name: flate; Type: TABLE; Schema: test_ar5_web; 
 --
 
 CREATE TABLE test_ar5_web.flate (
@@ -872,10 +870,8 @@ CREATE TABLE test_ar5_web.flate (
 );
 
 
-ALTER TABLE test_ar5_web.flate OWNER TO postgres;
-
 --
--- Data for Name: flate; Type: TABLE DATA; Schema: test_ar5_web; Owner: postgres
+-- Data for Name: flate; Type: TABLE DATA; Schema: test_ar5_web; 
 --
 
 COPY test_ar5_web.flate (qms_id_flate, objtype, artype, arskogbon, artreslag, argrunnf, areal, maalemetode, noyaktighet, synbarhet, verifiseringsdato, datafangstdato, kartid, kjoringsident, arkartstd, opphav, informasjon, registreringsversjon_produkt, registreringsversjon_versjon, registreringsversjon_undertype, qms_navnerom, qms_versjonid, qms_oppdateringsdato, qms_prosesshistorie, qms_kopidata_omraadeid, qms_kopidata_originaldatavert, qms_kopidata_kopidato, geo, representasjonspunkt, sl_dummy_flate_id) FROM stdin;
@@ -925,21 +921,21 @@ aec8ab66-90cf-4620-b22c-142854a38899	\N	60	11	39	45	4898.77832	32	1	0	1971-06-12
 
 
 --
--- Name: flate_artype_idx; Type: INDEX; Schema: test_ar5_web; Owner: postgres
+-- Name: flate_artype_idx; Type: INDEX; Schema: test_ar5_web; 
 --
 
 CREATE INDEX flate_artype_idx ON test_ar5_web.flate USING btree (artype);
 
 
 --
--- Name: flate_geo_idx; Type: INDEX; Schema: test_ar5_web; Owner: postgres
+-- Name: flate_geo_idx; Type: INDEX; Schema: test_ar5_web; 
 --
 
 CREATE INDEX flate_geo_idx ON test_ar5_web.flate USING gist (geo);
 
 
 --
--- Name: flate_qms_id_flate_idx; Type: INDEX; Schema: test_ar5_web; Owner: postgres
+-- Name: flate_qms_id_flate_idx; Type: INDEX; Schema: test_ar5_web; 
 --
 
 CREATE INDEX flate_qms_id_flate_idx ON test_ar5_web.flate USING btree (qms_id_flate);

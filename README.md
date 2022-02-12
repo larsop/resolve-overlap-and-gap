@@ -2,6 +2,13 @@
 # resolve-overlap-and-gap
 The plan here is use Postgis Topology to resolve overlaps and gaps for a simple feature layer. 
 
+For the input
+- It handles only geometry polygon 
+- It must be a single primary key
+- If we have surfaces of simple feature  and st_valid attributes on the surfaces will not be used.
+
+
+
 This function now depend on 
 - dblink (this replaced code from https://www.gnu.org/software/parallel)
 - Postgres 10 or higher

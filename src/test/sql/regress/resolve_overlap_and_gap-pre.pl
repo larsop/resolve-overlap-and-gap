@@ -84,6 +84,15 @@ for my $file (glob '../../../main/sql/func*') {
 	copy_file_into($file,$fh_out);
 }
 
+# make an install file 
+close($fh_out);	 
+open($fh_out_install, ">", 'resolve_overlap_and_gap-install.sql');
+copy_file_into('resolve_overlap_and_gap-pre.sql', $fh_out_install) or die("Could not copy $file into $fh_out_install");
+close($fh_out_install);	 
+
+# open file to append rest of data 
+
+open($fh_out, ">>", $tgt);
 # get SQL code for test data needed by the tests 
 copy_file_into('overlap_gap_input_t1.sql',$fh_out);
 

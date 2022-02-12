@@ -8,12 +8,24 @@ This function now depend on
 - https://github.com/larsop/postgres_execute_parallel
 - https://github.com/larsop/content_balanced_grid
 
-To test checkout code
+# To checkout code
 git clone --recursive https://github.com/larsop/resolve-overlap-and-gap.git
+
+# To test code
+cd resolve-overlap-and-gap
+make check 
+
+# To install code (must run make check first)
+psql postgres -c "CREATE DATABASE aeg_02 template=template0;"
+psql aeg_02 -c "create extension pg_stat_statements; create extension postgis; create extension postgis_topology; create extension dblink;"
+psql aeg_02 -f ./src/test/sql/regress/resolve_overlap_and_gap-install.sql
+
+
+
 
 [![Build Status](https://travis-ci.org/larsop/resolve-overlap-and-gap.svg?branch=master)](https://travis-ci.org/larsop/resolve-overlap-and-gap)
 
-The following is planed to implement
+The following is implemented
 - Load all lines into Postgis Topology
 - Smooth lines if requested
 - Collapse small/tiny surfaces if requested
@@ -21,8 +33,6 @@ The following is planed to implement
 - Create new a new simple Feature layer 
 - Add attributes and assign values 
 
-#Pre stage 01
-- Install the needed helper code 
-- Schemas topo_update, topo_rein added/used by https://github.com/NibioOpenSource/pgtopo_update_sql.git
+
 
 

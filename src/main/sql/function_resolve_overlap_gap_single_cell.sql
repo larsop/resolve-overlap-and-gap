@@ -811,10 +811,10 @@ BEGIN
  		  FROM (
  		   SELECT distinct(json_object_keys) AS update_column
  		   FROM json_object_keys(to_json(json_populate_record(NULL::%s, %L::Json))) 
- 		   where json_object_keys != %L and json_object_keys != %L and json_object_keys != %L and json_object_keys != %L  
+ 		   where json_object_keys != %L and json_object_keys != %L and json_object_keys != %L and json_object_keys != %L and json_object_keys != %L  
  		  ) as keys', ',', 'r.', ',', 
  		  temp_table_name, '{}', 
- 		  temp_table_id_column, (_input_data).polygon_table_geo_collumn, '_other_intersect_id_list', 'face_id');
+ 		  temp_table_id_column, (_input_data).polygon_table_geo_collumn, '_other_intersect_id_list', 'face_id','_input_geo_is_valid');
     RAISE NOTICE '% ', command_string;
     EXECUTE command_string INTO update_fields, update_fields_source;
     
@@ -833,7 +833,7 @@ BEGIN
     EXECUTE command_string;
     -- update/add primary key and _other_intersect_id_list based on geo
     command_string := Format('update %1$s t
- set (%3$s,_other_intersect_id_list) = (r.%3$s,r._other_intersect_id_list) 
+ set (%3$s,_other_intersect_id_list,_input_geo_is_valid) = (r.%3$s,r._other_intersect_id_list,true) 
  from (
  	SELECT r.*, r.intersect_id_list[2:] as _other_intersect_id_list , r.intersect_id_list[1] as %3$s  from (
  		select distinct %5$s, array_agg(%3$s) OVER (PARTITION BY %5$s) as intersect_id_list from (

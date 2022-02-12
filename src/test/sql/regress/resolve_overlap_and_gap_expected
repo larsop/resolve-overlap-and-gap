@@ -19,6 +19,13 @@ utm_check_border_lines|5
 utm_check_added_faces|2
 utm_check_added_simple_feature_polygons|0
 CALL
+utm_check_valid|633|t
+utm_check_valid|834|t
+utm_check_valid|834|t
+utm_check_valid|1231|t
+utm_check_valid|1231|t
+utm_check_valid|1233|t
+utm_check_valid||
 utm_check_failed_lines|0
 utm_check_border_lines|5
 utm_check_added_faces|7

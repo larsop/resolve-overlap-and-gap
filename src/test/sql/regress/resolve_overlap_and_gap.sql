@@ -135,6 +135,7 @@ SELECT 'utm_check_added_faces', count(mbr) from test_topo_t3.face;
 
 SELECT 'utm_check_added_simple_feature_polygons', count(*) from test_topo_t3.overlap_gap_input_t3_result;
 
+
 -- Call function to resolve overlap but stop a job_type 3 and loop number 2
 CALL resolve_overlap_gap_run(
 (null,null,null, -- The simple line feature info with attributtes 
@@ -165,6 +166,8 @@ null,null,null,null
   0 -- if set to more than 0 the job will stop  when this job type is reday to run and display a set sql to run
   ) 
 );
+
+SELECT 'utm_check_valid', c1t3, _input_geo_is_valid from test_topo_t3.overlap_gap_input_t3_result order by c1t3;
 
 SELECT 'utm_check_failed_lines', count(geo) from test_topo_t3.overlap_gap_input_t3_no_cut_line_failed;
 

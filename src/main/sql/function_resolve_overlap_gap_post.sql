@@ -41,6 +41,26 @@ IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).pol
   'topogeo_id');
 ELSE
 
+
+-- marks those rows that have relation to invalid polygons
+-- ST_Intersects(f.geo,t.geo) if try this we end up with ERROR:  XX000: GEOSIntersects: TopologyException: si
+
+EXECUTE Format('UPDATE %1$s t 
+SET _input_geo_is_valid = FALSE 
+FROM 
+%2$s f
+WHERE t.%3$s IS NULL AND
+f.%4$s && t.%4$s AND 
+ST_IsValid(f.%4$s) = FALSE'
+, _table_name_result_prefix||'_result',
+(_input_data).polygon_table_name,
+(_input_data).polygon_table_pk_column,
+(_input_data).polygon_table_geo_collumn
+);
+
+
+
+
   EXECUTE Format('ALTER TABLE %s SET logged',_table_name_result_prefix||'_result');
   EXECUTE Format('GRANT select ON TABLE %s TO PUBLIC',_table_name_result_prefix||'_result');
   -- TODO should have been done after data are created

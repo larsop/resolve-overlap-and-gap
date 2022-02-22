@@ -273,6 +273,8 @@ BEGIN
 	    EXECUTE Format('CREATE INDEX ON %s.relation(layer_id)', border_topo_info.topology_name);
 	    EXECUTE Format('CREATE INDEX ON %s.relation(abs(element_id))', border_topo_info.topology_name);
 	    EXECUTE Format('CREATE INDEX ON %s.edge_data USING GIST (geom)', border_topo_info.topology_name);
+	    EXECUTE Format('CREATE INDEX ON %s.edge_data(abs_next_left_edge)', border_topo_info.topology_name);
+	    EXECUTE Format('CREATE INDEX ON %s.edge_data(abs_next_right_edge)', border_topo_info.topology_name);
 	    EXECUTE Format('CREATE INDEX ON %s.relation(element_id)', border_topo_info.topology_name);
 	    EXECUTE Format('CREATE INDEX ON %s.relation(topogeo_id)', border_topo_info.topology_name);
 	
@@ -421,7 +423,7 @@ BEGIN
  
 --- 
   ELSIF _cell_job_type = 1 and _loop_number > 1 THEN
-   
+	-- Added failed lines inside bbox from first loop number      
     has_edges_temp_table_name := (_topology_info).topology_name||'.edge_data_tmp_' || box_id;
     command_string := Format('SELECT EXISTS(SELECT 1 from to_regclass(%L) where to_regclass is not null)',has_edges_temp_table_name);
     EXECUTE command_string into has_edges;

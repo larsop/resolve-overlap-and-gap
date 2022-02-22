@@ -60,6 +60,8 @@ BEGIN
   EXECUTE Format('CREATE INDEX ON %s.relation(layer_id)', (_topology_info).topology_name);
   EXECUTE Format('CREATE INDEX ON %s.relation(abs(element_id))', (_topology_info).topology_name);
   EXECUTE Format('CREATE INDEX ON %s.edge_data USING GIST (geom)', (_topology_info).topology_name);
+  EXECUTE Format('CREATE INDEX ON %s.edge_data(abs_next_left_edge)', (_topology_info).topology_name);
+  EXECUTE Format('CREATE INDEX ON %s.edge_data(abs_next_right_edge)', (_topology_info).topology_name);
   EXECUTE Format('CREATE INDEX ON %s.relation(element_id)', (_topology_info).topology_name);
   EXECUTE Format('CREATE INDEX ON %s.relation(topogeo_id)', (_topology_info).topology_name);
   -- ----------------------------- DONE - Create Topology master working schema

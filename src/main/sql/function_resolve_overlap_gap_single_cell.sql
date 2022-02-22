@@ -501,38 +501,34 @@ BEGIN
  
   ELSIF _cell_job_type = 2 THEN
   -- Add border lines for small grids
-		    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,TRUE) from %4$s r 
+  
+		    command_string := Format('WITH s1 AS (SELECT * FROM %4$s r 
 		    where r.geo && %5$L and ST_CoveredBy(r.geo, %5$L) and r.added_to_master = false 
-		    ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo))', 
+		    ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo))
+		    ), 
+		    update_step AS (update %4$s su set added_to_master = true FROM s1 WHERE s1.id = su.id ) 
+		    select topo_update.add_border_lines(%1$L,s1.geo,%2$s,%3$L,TRUE) from s1', 
 		    (_topology_info).topology_name, 
 		    (_topology_info).topology_snap_tolerance, 
 		    _table_name_result_prefix,
 		    _table_name_result_prefix||'_border_line_segments',
-		    _bb);
-		    EXECUTE command_string;
-		
-		    command_string := Format('update %1$s r set added_to_master = true
-		    where r.geo && %2$L and ST_CoveredBy(r.geo, %2$L) and r.added_to_master = false', 
-		    _table_name_result_prefix||'_border_line_segments',
-		    _bb);
-		    EXECUTE command_string;
-		    
-		    command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,TRUE) from %4$s r 
-		    where r.geo && %5$L and ST_CoveredBy(r.geo, %5$L) and r.added_to_master = false 
-		    ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo))', 
-		    (_topology_info).topology_name, 
-		    (_topology_info).topology_snap_tolerance, 
-		    _table_name_result_prefix,
-		    _table_name_result_prefix||'_border_line_many_points',
-		    _bb);
-		    EXECUTE command_string;
-		
-		    command_string := Format('update %1$s r set added_to_master = true
-		    where r.geo && %2$L and ST_CoveredBy(r.geo, %2$L) and r.added_to_master = false', 
-		    _table_name_result_prefix||'_border_line_many_points',
 		    _bb);
 		    EXECUTE command_string;
 
+--		    _table_name_result_prefix||'_border_line_many_points',
+		    command_string := Format('WITH s1 AS (SELECT * FROM %4$s r 
+		    where r.geo && %5$L and ST_CoveredBy(r.geo, %5$L) and r.added_to_master = false 
+		    ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo))
+		    ), 
+		    update_step AS (update %4$s su set added_to_master = true FROM s1 WHERE s1.id = su.id ) 
+		    select topo_update.add_border_lines(%1$L,s1.geo,%2$s,%3$L,TRUE) from s1', 
+		    (_topology_info).topology_name, 
+		    (_topology_info).topology_snap_tolerance, 
+		    _table_name_result_prefix,
+		    _table_name_result_prefix||'_border_line_many_points',
+		    _bb);
+		    EXECUTE command_string;
+		
          IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
 
          	 command_string := Format('WITH lines_addes AS (
@@ -595,7 +591,7 @@ BEGIN
 
 
   ELSIF _cell_job_type = 3 THEN
-  -- NOthing to do, done master
+
  
      
   ELSIF _cell_job_type = 4 THEN

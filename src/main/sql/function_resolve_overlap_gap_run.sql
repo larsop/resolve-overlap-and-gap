@@ -240,36 +240,35 @@ BEGIN
 	       EXECUTE command_string;
 
        ELSE
-	      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE) from %4$s r where r.added_to_master = false', 
-	      (_topology_info).topology_name, 
-	      (_topology_info).topology_snap_tolerance, 
-	      table_name_result_prefix,
-	      table_name_result_prefix||'_border_line_many_points');
-	      EXECUTE command_string;
-	
-	      command_string := Format('update %1$s set added_to_master = true
-	      where added_to_master = false', 
-	      table_name_result_prefix||'_border_line_many_points');
-	      EXECUTE command_string;
-	
-	      command_string := Format('SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE) 
-	      from 
-	      %4$s r,
-	      %5$s l
-	      where ST_Intersects(l.%6$s,r.geo) and r.added_to_master = false',
-	      (_topology_info).topology_name, 
-	      (_topology_info).topology_snap_tolerance, 
-	      table_name_result_prefix,
-	      table_name_result_prefix||'_border_line_segments',
-	      overlapgap_grid||'_metagrid_'||to_char(1, 'fm0000')||'_lines',
-	      (_input_data).polygon_table_geo_collumn);
-	      EXECUTE command_string;
+       
+       
+		    command_string := Format('WITH s1 AS (SELECT * FROM %4$s r 
+		    where r.added_to_master = false 
+		    ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo))
+		    ), 
+		    update_step AS (update %4$s su set added_to_master = true FROM s1 WHERE s1.id = su.id ) 
+		    select topo_update.add_border_lines(%1$L,s1.geo,%2$s,%3$L,TRUE) from s1', 
+		    (_topology_info).topology_name, 
+		    (_topology_info).topology_snap_tolerance, 
+		    table_name_result_prefix,
+		    table_name_result_prefix||'_border_line_segments');
+		    EXECUTE command_string;
+
+--		    _table_name_result_prefix||'_border_line_many_points',
+		    command_string := Format('WITH s1 AS (SELECT * FROM %4$s r 
+		    where r.added_to_master = false 
+		    ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo))
+		    ), 
+		    update_step AS (update %4$s su set added_to_master = true FROM s1 WHERE s1.id = su.id ) 
+		    select topo_update.add_border_lines(%1$L,s1.geo,%2$s,%3$L,TRUE) from s1', 
+		    (_topology_info).topology_name, 
+		    (_topology_info).topology_snap_tolerance, 
+		    table_name_result_prefix,
+		    table_name_result_prefix||'_border_line_many_points');
+		    EXECUTE command_string;
 	      
-	
-	      command_string := Format('update %1$s set added_to_master = true
-	      where added_to_master = false', 
-	      table_name_result_prefix||'_border_line_segments');
-	      EXECUTE command_string;
+	      
+	      
     	END IF;
 
       COMMIT;

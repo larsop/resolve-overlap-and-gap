@@ -157,13 +157,12 @@ command_string = Format('insert into %s(description, num_before, num_after) VALU
 execute command_string;
 
 
-command_string := Format('select count(*) FROM %s o where ST_IsValid(o.%s) = false',(_input).polygon_table_geo_collumn,sf_table_in);
-EXECUTE command_string into num_before;
-command_string := Format('select count(o.*) FROM %s o where o.%s is null and _input_geo_is_valid = false',sf_table_out,(_input).polygon_table_pk_column);
-EXECUTE command_string into num_after;
-command_string = Format('insert into %s(description, num_before, num_after) VALUES(%L,%L,%L)',sf_table_meta_res,
-'Result polygons with no attr. because of invalid input ',num_before,num_after);
-execute command_string;
+--command_string := Format('select count(*) FROM %s o where ST_IsValid(o.%s) = false',sf_table_in,(_input).polygon_table_geo_collumn);
+--EXECUTE command_string into num_before;
+--command_string := Format('select count(o.*) FROM %s o where o.%s is null and _input_geo_is_valid = false',sf_table_out,(_input).polygon_table_pk_column);
+--EXECUTE command_string into num_after;
+--command_string = Format('insert into %s(description, num_before, num_after) VALUES(%L,%L,%L)',sf_table_meta_res,'Result polygons with no attr. because of invalid input ',num_before,num_after);
+--execute command_string;
 
 
 -- Check Topology table -----------

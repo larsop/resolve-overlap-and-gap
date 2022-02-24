@@ -343,15 +343,18 @@ BEGIN
 	         
 	    -- Remome small polygons
 	    -- TODO make check that do not intersect any cell border lines
-	      face_table_name = border_topo_info.topology_name || '.face';
-	      start_time_delta_job := Clock_timestamp();
-	      RAISE NOTICE 'Start clean small polygons for face_table_name % at %', face_table_name, Clock_timestamp();
-	      -- remove small polygons in temp
-	      call topo_update.do_remove_small_areas_no_block (
-	      border_topo_info.topology_name, (_clean_info).min_area_to_keep, face_table_name, _bb,(_input_data).utm,outer_cell_boundary_lines);
 	    
-	      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
-	      RAISE NOTICE 'Done clean small polygons for face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
+	      face_table_name = border_topo_info.topology_name || '.face';
+	      
+	      -- remove small polygons in temp in (_clean_info).min_area_to_keep
+	      if (_clean_info).min_area_to_keep IS NOT NULL AND (_clean_info).min_area_to_keep > 0 THEN
+		      start_time_delta_job := Clock_timestamp();
+		      RAISE NOTICE 'Start clean small polygons for face_table_name % at %', face_table_name, Clock_timestamp();
+		      call topo_update.do_remove_small_areas_no_block (
+		      border_topo_info.topology_name, (_clean_info).min_area_to_keep, face_table_name, _bb,(_input_data).utm,outer_cell_boundary_lines);
+		      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
+		      RAISE NOTICE 'Done clean small polygons for face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
+		  END IF;
 	    
 	      --heal border edges removing small small polygins
 	      --Do we need to this??????, only if we do simplify later, no we do simplify before, if change the code to do simplify in the topplogy layer we may need to do this.

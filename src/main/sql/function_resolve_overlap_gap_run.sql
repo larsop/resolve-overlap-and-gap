@@ -15,9 +15,16 @@ _topology_info resolve_overlap_data_topology_type,
 -- this tables will have atrbuttes equal to the simple feauture tables for lines and feautures
 
 _clean_info resolve_overlap_data_clean_type, -- different parameters used if need to clean up your data
---(_clean_info).simplify_tolerance float, -- is this is more than zero simply will called with
---(_clean_info).do_chaikins boolean, -- here we will use chaikins togehter with simply to smooth lines
---(_clean_info).min_area_to_keep float, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
+
+--(_clean_info)._min_area_to_keep float default 0, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
+--(_clean_info)._simplify_tolerance float default 0, -- is this is more than zero simply will called with
+--(_clean_info)._simplify_max_average_vertex_length int default 0, -- in meter both for utm and deegrees, this used to avoid running ST_simplifyPreserveTopology for long lines lines with few points
+--(_clean_info)._chaikins_nIterations int default 0, -- IF 0 NO CHAKINS WILL BE DONE,  A big value here make no sense because the number of points will increaes exponential )
+--(_clean_info)._chaikins_max_length int default 0, --edge that are longer than this value will not be touched by _chaikins_min_degrees and _chaikins_max_degrees  
+--(_clean_info)._chaikins_min_degrees int default 0, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
+--(_clean_info)._chaikins_max_degrees int default 0, -- OR the angle has to be greather than this given value, This is used to avoid to touch all angles 
+--(_clean_info)._chaikins_min_steep_angle_degrees int default 0, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
+--(_clean_info)._chaikins_max_steep_angle_degrees int default 0-- OR The angle has to be greather than this given value, This is used to avoid to touch all angles 
 
 _max_parallel_jobs int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
 _max_rows_in_each_cell int, -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
@@ -472,9 +479,15 @@ _topology_info resolve_overlap_data_topology_type,
 --(_topology_info).topology_snap_tolerance float, -- this is tolerance used as base when creating the the postgis topolayer
 
 _clean_info resolve_overlap_data_clean_type, -- different parameters used if need to clean up your data
---(_clean_info).simplify_tolerance float, -- is this is more than zero simply will called with
---(_clean_info).do_chaikins boolean, -- here we will use chaikins togehter with simply to smooth lines
---(_clean_info).min_area_to_keep float, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
+--(_clean_info)._min_area_to_keep float default 0, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
+--(_clean_info)._simplify_tolerance float default 0, -- is this is more than zero simply will called with
+--(_clean_info)._simplify_max_average_vertex_length int default 0, -- in meter both for utm and deegrees, this used to avoid running ST_simplifyPreserveTopology for long lines lines with few points
+--(_clean_info)._chaikins_nIterations int default 0, -- IF 0 NO CHAKINS WILL BE DONE,  A big value here make no sense because the number of points will increaes exponential )
+--(_clean_info)._chaikins_max_length int default 0, --edge that are longer than this value will not be touched by _chaikins_min_degrees and _chaikins_max_degrees  
+--(_clean_info)._chaikins_min_degrees int default 0, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
+--(_clean_info)._chaikins_max_degrees int default 0, -- OR the angle has to be greather than this given value, This is used to avoid to touch all angles 
+--(_clean_info)._chaikins_min_steep_angle_degrees int default 0, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
+--(_clean_info)._chaikins_max_steep_angle_degrees int default 0-- OR The angle has to be greather than this given value, This is used to avoid to touch all angles 
 
 _max_parallel_jobs int, -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
 _max_rows_in_each_cell int

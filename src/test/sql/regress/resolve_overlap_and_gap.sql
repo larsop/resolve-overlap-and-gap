@@ -262,7 +262,7 @@ SELECT 'degrees_check_added_faces', count(mbr) from test_topo_ar5_test2.face;
 
 SELECT 'degrees_check_added_simple_feature_geo', count(*) from test_topo_ar5_test2.flate_t1_result where geo is not null;
 
-SELECT 'degrees_check_added_simple_feature_artype', count(*) from test_topo_ar5_test2.flate_t1_result where artype is not null;
+SELECT 'degrees_check_added_simple_feature_artype', count(*), round(sum(ST_Area(geo,true))) as area from test_topo_ar5_test2.flate_t1_result where artype is not null;
 
 SELECT 'degrees_check_added_simple_feature_artype_group by', r.* from (select count(*), round(sum(ST_Area(geo,true))) as area, artype from test_topo_ar5_test2.flate_t1_result where artype is not null group by artype) as r order by artype;
 

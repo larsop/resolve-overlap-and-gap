@@ -135,7 +135,7 @@ degrees_check_failed_lines|0
 degrees_check_border_lines|2
 degrees_check_added_faces|7
 degrees_check_added_simple_feature_geo|7
-degrees_check_added_simple_feature_artype|6
+degrees_check_added_simple_feature_artype|6|95363
 degrees_check_added_simple_feature_artype_group by|1|393|12
 degrees_check_added_simple_feature_artype_group by|2|75270|21
 degrees_check_added_simple_feature_artype_group by|2|16922|23

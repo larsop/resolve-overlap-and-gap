@@ -236,7 +236,7 @@ null,null,null,null
 ('test_topo_ar5_test2',0.00001,false,null,null), -- TYPE resolve_overlap_data_topology
   resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
   49,  -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
-  resolve_based_on_attribute_type_func('artype arskogbon',30,10000), -- resolve_based_on_attribute_type for attributes that have equal values
+  resolve_based_on_attribute_type_func('artype arskogbon',30,1000000), -- resolve_based_on_attribute_type for attributes that have equal values
   0, -- is this is more than zero simply will called with
   null, -- _max_average_vertex_length, in meter both for utm and deegrees, this used to avoid running ST_simplifyPreserveTopology for long lines lines with few points
   0, -- IF 0 NO CHAKINS WILL BE DONE A big value here make no sense because the number of points will increaes exponential )

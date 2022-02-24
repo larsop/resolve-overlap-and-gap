@@ -18,7 +18,15 @@ _table_name_result_prefix varchar,
 --(_topology_info).topology_snap_tolerance float, -- this is tolerance used as base when creating the the postgis topolayer
 
 _clean_info resolve_overlap_data_clean_type, -- different parameters used if need to clean up your data
+
 --(_clean_info)._min_area_to_keep float default 0, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
+
+
+--((_clean_info).resolve_based_on_attribute) 
+--((_clean_info).resolve_based_on_attribute).attribute_resolve_list text, -- A list of attributes to resolve on this format 'attr1 attr2 attr3
+--((_clean_info).resolve_based_on_attribute).attribute_min_common_border_length float, -- Min. length of common border before resolving 
+--((_clean_info).resolve_based_on_attribute).attribute_max_common_area_size float -- Max area of objects to resolve   
+
 --(_clean_info)._simplify_tolerance float default 0, -- is this is more than zero simply will called with
 --(_clean_info)._simplify_max_average_vertex_length int default 0, -- in meter both for utm and deegrees, this used to avoid running ST_simplifyPreserveTopology for long lines lines with few points
 --(_clean_info)._chaikins_nIterations int default 0, -- IF 0 NO CHAKINS WILL BE DONE,  A big value here make no sense because the number of points will increaes exponential )
@@ -354,6 +362,17 @@ BEGIN
 		      border_topo_info.topology_name, (_clean_info).min_area_to_keep, face_table_name, _bb,(_input_data).utm,outer_cell_boundary_lines);
 		      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
 		      RAISE NOTICE 'Done clean small polygons for face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
+		  END IF;
+	    
+	      -- remove small polygons in temp in (_clean_info).min_area_to_keep
+	      if ((_clean_info).resolve_based_on_attribute).attribute_resolve_list IS NOT NULL THEN
+		      start_time_delta_job := Clock_timestamp();
+		      RAISE NOTICE 'Start resolve polygons based on attribute type for face_table_name % at %', face_table_name, Clock_timestamp();
+		      -- TODO call add new code to call
+		      -- call topo_update.do_remove_small_areas_no_block (
+		      -- border_topo_info.topology_name, ((_clean_info).resolve_based_on_attribute).attribute_max_common_area_size, face_table_name, _bb,(_input_data).utm,outer_cell_boundary_lines);
+		      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
+		      RAISE NOTICE 'Done resolve polygons based on attribute type for face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
 		  END IF;
 	    
 	      --heal border edges removing small small polygins

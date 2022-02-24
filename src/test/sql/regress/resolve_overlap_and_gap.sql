@@ -268,6 +268,8 @@ SELECT 'degrees_check_added_simple_feature_artype_group by', r.* from (select co
 
 SELECT 'degrees_check_added_simple_feature_arskogbon', count(*) from test_topo_ar5_test2.flate_t1_result where arskogbon is not null;
 
+--SELECT 'degrees_check_added_simple_feature_artype face_attributes', count(*) from test_topo_ar5_test2.face_attributes where artype is not null;
+
 -- Records from this function would mean an invalid topology was created
 SELECT 'validation', * FROM topology.ValidateTopology('test_topo_ar5_test2');
 

@@ -19,10 +19,16 @@ IF (_topology_info).create_topology_attrbute_tables = true OR (_topology_info).c
   EXECUTE Format('ALTER TABLE %s.face SET logged', (_topology_info).topology_name);
   EXECUTE Format('ALTER TABLE %s.node SET logged', (_topology_info).topology_name);
   EXECUTE Format('ALTER TABLE %s.edge_data SET logged', (_topology_info).topology_name);
-  
+END IF;
+
+
+
+IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
   EXECUTE Format('ALTER TABLE %s SET logged',(_topology_info).topology_name||'.edge_attributes');
+END IF;
+
+IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).polygon_table_name is not null THEN
   EXECUTE Format('ALTER TABLE %s SET logged',(_topology_info).topology_name||'.face_attributes');
-  
 END IF;
 
 IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN

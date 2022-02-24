@@ -163,6 +163,8 @@ DROP TYPE IF EXISTS resolve_overlap_data_topology_type cascade;
 
 DROP TYPE IF EXISTS resolve_overlap_data_clean_type cascade;
 
+DROP TYPE IF EXISTS resolve_based_on_attribute_type cascade;
+
 
 -- Drop helper function from other packages 
 -- ###############################################

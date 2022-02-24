@@ -47,17 +47,52 @@ CREATE TYPE resolve_overlap_data_topology_type AS (
 
 );
 
+-----------------------------------------------------------------------------------------------
+-- resolve_based_on_attribute_type for attributes that have equal values ------------------------------
+-----------------------------------------------------------------------------------------------
+CREATE TYPE resolve_based_on_attribute_type AS (
+attribute_resolve_list text, -- A list of attributes to resolve on this format 'attr1 attr2 attr3
+attribute_min_common_border_length float, -- Min. length of common border before resolving 
+attribute_max_common_area_size float -- Max area of objects to resolve   
+);
 
+CREATE OR REPLACE FUNCTION resolve_based_on_attribute_type_func(
+_attribute_resolve_list text default null, -- A list of attributes to resolve  
+_attribute_min_common_border_length float default 0, -- Min. length of common border before resolving 
+_attribute_max_common_area_size float default 0 -- Max area of objects to resolve   
+)
+RETURNS resolve_based_on_attribute_type
+  AS $$
+DECLARE
+  ct resolve_based_on_attribute_type;
+BEGIN
+  ct = (
+    _attribute_resolve_list,
+    _attribute_min_common_border_length,
+    _attribute_max_common_area_size
+    );
+  
+  return ct;
+END;
+$$
+LANGUAGE plpgsql;
+
+
+-----------------------------------------------------------------------------------------------
+-- resolve_overlap_data_clean_type ------------------------------------------------------------
+-----------------------------------------------------------------------------------------------
 CREATE TYPE resolve_overlap_data_clean_type AS (
   -- TODO move own type
   min_area_to_keep float, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter. 
+
+  resolve_based_on_attribute resolve_based_on_attribute_type, -- resolve_based_on_attribute_type for attributes that have equal values 
+  
   simplify_tolerance float, -- is this is more than zero ST_simplifyPreserveTopology will called with this tolerance
   simplify_max_average_vertex_length int, -- in meter both for utm and deegrees, this used to avoid running ST_simplifyPreserveTopology for long lines lines with few points
 
   -- here we will use chaikins togehter with simply to smooth lines
   -- The basic idea idea is to use smooth out sharp edges in another way than  
   chaikins_nIterations int, -- -- IF 0 NO CHAKINS WILL BE DONE,  A big value here make no sense because the number of points will increaes exponential )
-  
   chaikins_max_length int, --edge that are longer than this value will not be touched for chaikins_min_degrees or chaikins_max_degrees
   chaikins_min_degrees int, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
   chaikins_max_degrees int, -- OR rhe angle has to be greather than this given value, This is used to avoid to touch all angles 
@@ -70,6 +105,9 @@ CREATE TYPE resolve_overlap_data_clean_type AS (
 
 CREATE OR REPLACE FUNCTION resolve_overlap_data_clean_type_func(
 _min_area_to_keep float default 0, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
+
+_resolve_based_on_attribute resolve_based_on_attribute_type default null, -- resolve_based_on_attribute_type for attributes that have equal values 
+
 _simplify_tolerance float default 0, -- is this is more than zero simply will called with
 _simplify_max_average_vertex_length int default 0, -- in meter both for utm and deegrees, this used to avoid running ST_simplifyPreserveTopology for long lines lines with few points
 _chaikins_nIterations int default 0, -- IF 0 NO CHAKINS WILL BE DONE,  A big value here make no sense because the number of points will increaes exponential )
@@ -86,6 +124,7 @@ DECLARE
 BEGIN
   ct = (
     _min_area_to_keep,
+    _resolve_based_on_attribute,
     _simplify_tolerance,
     _simplify_max_average_vertex_length,
     _chaikins_nIterations,
@@ -101,6 +140,9 @@ BEGIN
 END;
 $$
 LANGUAGE plpgsql;
+
+
+
 
 CREATE TYPE resolve_overlap_data_debug_options_type AS (
 contiune_after_stat_exception boolean, -- if set to false, it will do topology.ValidateTopology and stop to if the this call returns any rows 

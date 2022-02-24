@@ -369,8 +369,8 @@ BEGIN
 		      start_time_delta_job := Clock_timestamp();
 		      RAISE NOTICE 'Start resolve polygons based on attribute type for face_table_name % at %', face_table_name, Clock_timestamp();
 		      -- TODO call add new code to call
-		      -- call topo_update.do_remove_small_areas_no_block (
-		      -- border_topo_info.topology_name, ((_clean_info).resolve_based_on_attribute).attribute_max_common_area_size, face_table_name, _bb,(_input_data).utm,outer_cell_boundary_lines);
+		      call topo_update.do_merge_based_on_attribute_type_no_block (
+		      border_topo_info.topology_name, ((_clean_info).resolve_based_on_attribute).attribute_max_common_area_size, face_table_name, _bb,(_input_data).utm,outer_cell_boundary_lines);
 		      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
 		      RAISE NOTICE 'Done resolve polygons based on attribute type for face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
 		  END IF;

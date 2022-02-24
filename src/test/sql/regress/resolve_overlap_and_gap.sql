@@ -236,7 +236,7 @@ null,null,null,null
 ('test_topo_ar5_test2',0.00001,false,null,null), -- TYPE resolve_overlap_data_topology
   resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
   49,  -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
-  resolve_based_on_attribute_type_func('artype arskogbon',30,1000000), -- resolve_based_on_attribute_type for attributes that have equal values
+  resolve_based_on_attribute_type_func('artype arskogbon',30,10), -- resolve_based_on_attribute_type for attributes that have equal values
   0, -- is this is more than zero simply will called with
   null, -- _max_average_vertex_length, in meter both for utm and deegrees, this used to avoid running ST_simplifyPreserveTopology for long lines lines with few points
   0, -- IF 0 NO CHAKINS WILL BE DONE A big value here make no sense because the number of points will increaes exponential )
@@ -264,7 +264,7 @@ SELECT 'degrees_check_added_simple_feature_geo', count(*) from test_topo_ar5_tes
 
 SELECT 'degrees_check_added_simple_feature_artype', count(*) from test_topo_ar5_test2.flate_t1_result where artype is not null;
 
-SELECT 'degrees_check_added_simple_feature_artype_group by', r.* from (select count(*), artype from test_topo_ar5_test2.flate_t1_result where artype is not null group by artype) as r order by artype;
+SELECT 'degrees_check_added_simple_feature_artype_group by', r.* from (select count(*), round(sum(ST_Area(geo,true))) as area, artype from test_topo_ar5_test2.flate_t1_result where artype is not null group by artype) as r order by artype;
 
 SELECT 'degrees_check_added_simple_feature_arskogbon', count(*) from test_topo_ar5_test2.flate_t1_result where arskogbon is not null;
 

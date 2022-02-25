@@ -1,5 +1,10 @@
 CREATE OR REPLACE PROCEDURE resolve_overlap_gap_single_cell (
 _input_data resolve_overlap_data_input_type, 
+--(_input_data).line_table_name varchar, -- The table with simple feature lines, 
+	-- If this has a value then data from table will used to form all valid surfaces.
+	-- this may be empty, the polygon_table_geo_collumn must of type polygon to be abale to generate a polygon layer
+--(_input_data).line_table_pk_column varchar, -- A unique primary column of the line input table
+--(_input_data).line_table_geo_collumn varchar, -- The name of geometry column for the line strings
 --(_input_data).polygon_table_name varchar, -- The table to resolv, imcluding schema name
 --(_input_data).polygon_table_pk_column varchar, -- The primary of the input table
 --(_input_data).polygon_table_geo_collumn varchar, -- the name of geometry column on the table to analyze
@@ -20,7 +25,6 @@ _table_name_result_prefix varchar,
 _clean_info resolve_overlap_data_clean_type, -- different parameters used if need to clean up your data
 
 --(_clean_info)._min_area_to_keep float default 0, -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
-
 
 --((_clean_info).resolve_based_on_attribute) 
 --((_clean_info).resolve_based_on_attribute).attribute_resolve_list text, -- A list of attributes to resolve on this format 'attr1 attr2 attr3
@@ -355,22 +359,33 @@ BEGIN
 	      face_table_name = border_topo_info.topology_name || '.face';
 	      
 	      -- remove small polygons in temp in (_clean_info).min_area_to_keep
-	      if (_clean_info).min_area_to_keep IS NOT NULL AND (_clean_info).min_area_to_keep > 0 THEN
+	      IF (_clean_info).min_area_to_keep IS NOT NULL AND (_clean_info).min_area_to_keep > 0 THEN
 		      start_time_delta_job := Clock_timestamp();
 		      RAISE NOTICE 'Start clean small polygons for face_table_name % at %', face_table_name, Clock_timestamp();
-		      call topo_update.do_remove_small_areas_no_block (
-		      border_topo_info.topology_name, (_clean_info).min_area_to_keep, face_table_name, _bb,(_input_data).utm,outer_cell_boundary_lines);
+		      CALL topo_update.do_remove_small_areas_no_block (
+		      border_topo_info.topology_name, 
+		      (_clean_info).min_area_to_keep, 
+		      face_table_name, 
+		      _bb,
+		      (_input_data).utm,
+		      outer_cell_boundary_lines);
 		      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
 		      RAISE NOTICE 'Done clean small polygons for face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
 		  END IF;
 	    
 	      -- remove small polygons in temp in (_clean_info).min_area_to_keep
-	      if ((_clean_info).resolve_based_on_attribute).attribute_resolve_list IS NOT NULL THEN
+	      IF ((_clean_info).resolve_based_on_attribute).attribute_resolve_list IS NOT NULL THEN
 		      start_time_delta_job := Clock_timestamp();
 		      RAISE NOTICE 'Start resolve polygons based on attribute type for face_table_name % at %', face_table_name, Clock_timestamp();
 		      -- TODO call add new code to call
-		      call topo_update.do_merge_based_on_attribute_type_no_block (
-		      border_topo_info.topology_name, ((_clean_info).resolve_based_on_attribute).attribute_max_common_area_size, face_table_name, _bb,(_input_data).utm,outer_cell_boundary_lines);
+		      CALL topo_update.do_merge_based_on_attribute_type_no_block (
+		      _input_data,
+		      _clean_info,
+		      border_topo_info.topology_name, 
+		      (_topology_info).topology_snap_tolerance,  
+		      face_table_name, 
+		      _bb,
+		      outer_cell_boundary_lines);
 		      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
 		      RAISE NOTICE 'Done resolve polygons based on attribute type for face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
 		  END IF;
@@ -765,14 +780,22 @@ BEGIN
     
        -- remove 
     face_table_name = (_topology_info).topology_name || '.face';
-    start_time_delta_job := Clock_timestamp();
-    RAISE NOTICE 'Start clean small polygons for border plygons face_table_name % at %', face_table_name, Clock_timestamp();
-    -- remove small polygons in temp
-    -- TODO 6 sould be based on other values
-    call topo_update.do_remove_small_areas_no_block ((_topology_info).topology_name, (_clean_info).min_area_to_keep, face_table_name, ST_Expand(_bb,((_topology_info).topology_snap_tolerance * -6)),
-      (_input_data).utm);
-    used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
-    RAISE NOTICE 'clean small polygons for after adding to main face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
+
+	  -- remove small polygons in temp in (_clean_info).min_area_to_keep
+	  IF (_clean_info).min_area_to_keep IS NOT NULL AND (_clean_info).min_area_to_keep > 0 THEN
+	    start_time_delta_job := Clock_timestamp();
+	    RAISE NOTICE 'Start clean small polygons for border plygons face_table_name % at %', face_table_name, Clock_timestamp();
+	    -- remove small polygons in temp
+	    CALL topo_update.do_remove_small_areas_no_block (
+		    (_topology_info).topology_name, 
+		    (_clean_info).min_area_to_keep, 
+		    face_table_name, 
+		    ST_Expand(_bb,((_topology_info).topology_snap_tolerance * -6)),
+		    (_input_data).utm);
+	    used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
+	    RAISE NOTICE 'clean small polygons for after adding to main face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
+	  END IF;
+	
 
     --drop table temp_left_over_borders;
     

@@ -784,7 +784,7 @@ BEGIN
 	  -- remove small polygons in temp in (_clean_info).min_area_to_keep
 	  IF (_clean_info).min_area_to_keep IS NOT NULL AND (_clean_info).min_area_to_keep > 0 THEN
 	    start_time_delta_job := Clock_timestamp();
-	    RAISE NOTICE 'Start clean small polygons for border plygons face_table_name % at %', face_table_name, Clock_timestamp();
+	    RAISE NOTICE 'Start 2 clean small polygons for border plygons face_table_name % at %', face_table_name, Clock_timestamp();
 	    -- remove small polygons in temp
 	    CALL topo_update.do_remove_small_areas_no_block (
 		    (_topology_info).topology_name, 
@@ -793,9 +793,24 @@ BEGIN
 		    ST_Expand(_bb,((_topology_info).topology_snap_tolerance * -6)),
 		    (_input_data).utm);
 	    used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
-	    RAISE NOTICE 'clean small polygons for after adding to main face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
+	    RAISE NOTICE 'clean 2 small polygons for after adding to main face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
 	  END IF;
-	
+
+	  IF ((_clean_info).resolve_based_on_attribute).attribute_resolve_list IS NOT NULL THEN
+	      start_time_delta_job := Clock_timestamp();
+	      RAISE NOTICE 'Start 2 resolve polygons based on attribute type for face_table_name % at %', face_table_name, Clock_timestamp();
+	      -- TODO call add new code to call
+		      CALL topo_update.do_merge_based_on_attribute_type_no_block (
+		      _input_data,
+		      _clean_info,
+		      (_topology_info).topology_name, 
+		      (_topology_info).topology_snap_tolerance,  
+		      face_table_name, 
+		      ST_Expand(_bb,((_topology_info).topology_snap_tolerance * -6))
+		      );
+	      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
+	      RAISE NOTICE 'Done 2 resolve polygons based on attribute type for face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
+	  END IF;
 
     --drop table temp_left_over_borders;
     
@@ -830,14 +845,39 @@ BEGIN
 
     -- remove 
     face_table_name = (_topology_info).topology_name || '.face';
-    start_time_delta_job := Clock_timestamp();
-    RAISE NOTICE 'Start clean small polygons for cell plygons face_table_name % at %', face_table_name, Clock_timestamp();
-    -- remove small polygons in temp
-    -- TODO 6 sould be based on other values
-    call topo_update.do_remove_small_areas_no_block ((_topology_info).topology_name, (_clean_info).min_area_to_keep, face_table_name, ST_Expand(_bb,((_topology_info).topology_snap_tolerance * -6)),
-      (_input_data).utm);
-    used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
-    RAISE NOTICE 'clean small polygons for after adding to main face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
+
+	  -- remove small polygons in temp in (_clean_info).min_area_to_keep
+	  IF (_clean_info).min_area_to_keep IS NOT NULL AND (_clean_info).min_area_to_keep > 0 THEN
+	    start_time_delta_job := Clock_timestamp();
+	    RAISE NOTICE 'Start 3 clean small polygons for border plygons face_table_name % at %', face_table_name, Clock_timestamp();
+	    -- remove small polygons in temp
+    	call topo_update.do_remove_small_areas_no_block (
+    	(_topology_info).topology_name, 
+    	(_clean_info).min_area_to_keep, 
+    	face_table_name, 
+    	ST_Expand(_bb,((_topology_info).topology_snap_tolerance * -6)),
+    	(_input_data).utm
+    	);
+	    used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
+	    RAISE NOTICE 'clean 3 small polygons for after adding to main face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
+	  END IF;
+
+	  IF ((_clean_info).resolve_based_on_attribute).attribute_resolve_list IS NOT NULL THEN
+	      start_time_delta_job := Clock_timestamp();
+	      RAISE NOTICE 'Start 3 resolve polygons based on attribute type for face_table_name % at %', face_table_name, Clock_timestamp();
+	      -- TODO call add new code to call
+		      CALL topo_update.do_merge_based_on_attribute_type_no_block (
+		      _input_data,
+		      _clean_info,
+		      (_topology_info).topology_name, 
+		      (_topology_info).topology_snap_tolerance,  
+		      face_table_name, 
+		      ST_Expand(_bb,((_topology_info).topology_snap_tolerance * -6))
+		      );
+	      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
+	      RAISE NOTICE 'Done 3 resolve polygons based on attribute type for face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
+	  END IF;
+
 
 
   ELSIF _cell_job_type = 7 THEN

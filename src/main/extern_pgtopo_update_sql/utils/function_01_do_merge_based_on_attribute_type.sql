@@ -24,6 +24,10 @@ DECLARE
   face_ids_to_remove integer[]; 
   face_id_tmp integer;
   remove_edge integer;
+  edge_geo Geometry;
+  lf_tmp integer;
+  rf_tmp integer;
+  
 BEGIN
 
   command_string_find := Format('SELECT ARRAY(SELECT g.face_id
@@ -50,20 +54,31 @@ BEGIN
   where g.topo_area < %2$s and g.topo_area is not null )', Quote_literal(_atopology), _min_area, _table_name, _bb, min_mbr_area, _utm, _outer_cell_boundary_lines);
  	 
   LOOP
-    -- RAISE NOTICE 'execute command_string; %', command_string;
+    RAISE NOTICE 'execute command_string; %', command_string_find;
     face_ids_to_remove := null;
     
     EXECUTE command_string_find INTO face_ids_to_remove;
     num_rows = 0;
     
-   RAISE NOTICE 'Found % smale area from % using min_mbr_area %', (Array_length(face_ids_to_remove, 1)), _table_name, min_mbr_area;
+    RAISE NOTICE 'Found % smalle area from % using min_mbr_area %', (Array_length(face_ids_to_remove, 1)), _table_name, min_mbr_area;
 
     IF face_ids_to_remove IS NOT NULL AND (Array_length(face_ids_to_remove, 1)) IS NOT NULL THEN 
        FOREACH face_id_tmp IN ARRAY face_ids_to_remove 
          LOOP
+            command_string := Format('select geom, left_face, right_face FROM (                                                     
+            SELECT edge_id, ST_length(geom)  as edge_length, geom, left_face, right_face from %1$s.edge_data 
+            WHERE left_face != 0 AND right_face != 0 AND  
+            ((%2$L = left_face AND left_face != right_face) or (%2$L = right_face AND left_face != right_face)) 
+            order by edge_length desc
+            ) as r limit 1', _atopology, face_id_tmp);
+            EXECUTE command_string INTO edge_geo,lf_tmp,rf_tmp; 
+            
+            RAISE NOTICE 'lf_tmp % rf_tmp % edge_geo % ',lf_tmp,rf_tmp, edge_geo;
+            
             command_string := Format('select edge_id FROM (                                                     
             SELECT edge_id, ST_length(geom)  as edge_length from %1$s.edge_data 
-            where ((%2$L = left_face) or (%2$L = right_face)) 
+            WHERE left_face != 0 AND right_face != 0 AND  
+            ((%2$L = left_face AND left_face != right_face) or (%2$L = right_face AND left_face != right_face)) 
             order by edge_length desc
             ) as r limit 1', _atopology, face_id_tmp);
             EXECUTE command_string INTO remove_edge;
@@ -73,10 +88,10 @@ BEGIN
 
                 PERFORM ST_RemEdgeNewFace (_atopology, remove_edge);
                 num_rows := num_rows + 1;
-              --RAISE NOTICE 'For tiny face_id % has egde_id % been removed', _face_id, remove_edge;
+                RAISE NOTICE 'For merge face face_id % has egde_id % been removed',face_id_tmp, remove_edge;
                 EXCEPTION
                 WHEN OTHERS THEN
-                  RAISE NOTICE 'ERROR failed to remove tiny face % for % ', face_id_tmp, _atopology;
+                  RAISE NOTICE 'ERROR failed to merge tiny face % for % ', face_id_tmp, _atopology;
               END;
             END IF;
  

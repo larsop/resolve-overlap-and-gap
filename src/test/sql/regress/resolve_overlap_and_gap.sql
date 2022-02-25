@@ -1,7 +1,6 @@
 -- To avoid error since binary geo seems to vary from local systen and Travis 
 SET client_min_messages TO ERROR;
 
-
 CREATE EXTENSION dblink; -- needed by  execute_parallel
 
 -- Create data test case degrees
@@ -236,7 +235,7 @@ null,null,null,null
 ('test_topo_ar5_test2',0.00001,false,null,null), -- TYPE resolve_overlap_data_topology
   resolve_overlap_data_clean_type_func(  -- TYPE resolve_overlap_data_clean
   49,  -- if this a polygon  is below this limit it will merge into a neighbour polygon. The area is sqare meter.
-  resolve_based_on_attribute_type_func('artype arskogbon',30,10), -- resolve_based_on_attribute_type for attributes that have equal values
+  resolve_based_on_attribute_type_func('artype arskogbon',10,100000000), -- resolve_based_on_attribute_type for attributes that have equal values
   0, -- is this is more than zero simply will called with
   null, -- _max_average_vertex_length, in meter both for utm and deegrees, this used to avoid running ST_simplifyPreserveTopology for long lines lines with few points
   0, -- IF 0 NO CHAKINS WILL BE DONE A big value here make no sense because the number of points will increaes exponential )
@@ -268,9 +267,14 @@ SELECT 'degrees_check_added_simple_feature_artype_group by', r.* from (select co
 
 SELECT 'degrees_check_added_simple_feature_arskogbon', count(*) from test_topo_ar5_test2.flate_t1_result where arskogbon is not null;
 
+
+--select ST_Collect(geo) from test_ar5_web.flate_t1;
+--select ST_Collect(geo) from test_topo_ar5_test2.flate_t1_result;
+
 --SELECT 'degrees_check_added_simple_feature_artype face_attributes', count(*) from test_topo_ar5_test2.face_attributes where artype is not null;
 
 -- Records from this function would mean an invalid topology was created
 SELECT 'validation', * FROM topology.ValidateTopology('test_topo_ar5_test2');
 
 SELECT 'drop test_topo_ar5_test2', topology.droptopology('test_topo_ar5_test2');
+

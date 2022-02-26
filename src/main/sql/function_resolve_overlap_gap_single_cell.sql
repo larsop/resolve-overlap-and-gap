@@ -207,8 +207,8 @@ BEGIN
    
     
   IF _cell_job_type = 1 and _loop_number = 1 THEN
-    -- get the siple feature data both the line_types and the inner lines.
-    -- the boundery linnes are saved in a table for later usage
+    -- get the simple feature data both the line_types and the inner lines.
+    -- the boundery lines are saved in a separate table for later usage
     
     command_string := Format('call topo_update.get_simplified_border_lines(%L,%L,%L,%L,%L,%L,%L)', 
     _input_data, _topology_info, _bb, _table_name_result_prefix,
@@ -228,9 +228,10 @@ BEGIN
 
     has_edges_temp_table_name := (_topology_info).topology_name||'.edge_data_tmp_' || box_id;
 
-    -- If we use set input lines with attributes we assume that this lines are correct and genrated from a correct topology layer
-    -- We need the keep this as edge as they are since we need attributtetes to assigne to each line.    
     IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
+        -- If we use set input lines with attributes we assume that this lines are correct and genrated from a correct topology layer
+    	-- So we do not need to through a temp topology
+    	-- We need the keep this as edge as they are since we need attributtetes to assigne to each line.    
     	command_string := Format('SELECT EXISTS(SELECT 1 from  %1$s limit 1)',
 	    tmp_simplified_border_lines_name);
 	    EXECUTE command_string into has_edges;
@@ -243,11 +244,10 @@ BEGIN
 	      EXECUTE command_string;
 	    END IF;
     ELSE
+    	-- Start ---- create a temp Topology to work safely in parallel 
 	    IF ST_NumGeometries(outer_cell_boundary_lines) = 0 THEN
 	     outer_cell_boundary_lines  := null;
 	    END IF; 
-	    
-	
 	    
 	    IF (_clean_info).simplify_tolerance > 0  THEN
 	        command_string := Format('UPDATE %4$s l
@@ -272,7 +272,6 @@ BEGIN
 	        tmp_simplified_border_lines_name);
 	        EXECUTE command_string;
 	    END IF;
-	
 	    
 	    border_topo_info.topology_name := (_topology_info).topology_name || '_' || box_id;
 	    RAISE NOTICE 'use border_topo_info.topology_name %', border_topo_info.topology_name;
@@ -415,9 +414,10 @@ BEGIN
 	    
 	    execute Format('SET CONSTRAINTS ALL IMMEDIATE');
 	    PERFORM topology.DropTopology (border_topo_info.topology_name);
-	    -- STOP IF (_input_data).line_table_name IS null
+    	-- Done ---- create a temp Topology to work safely in parallel 
     END IF;
 
+	-- commit all work done
     commit;
 
     IF (has_edges) THEN
@@ -429,7 +429,8 @@ BEGIN
        (_topology_info).topology_snap_tolerance, 
        has_edges_temp_table_name);
        EXECUTE command_string;
-    
+
+	   -- Create Topo-Object to attach attributes if we attributes with input lines    
        IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
    
          command_string := Format('WITH lines_addes AS (
@@ -468,18 +469,24 @@ BEGIN
  
 --- 
   ELSIF _cell_job_type = 1 and _loop_number > 1 THEN
-	-- Added failed lines inside bbox from first loop number      
+	-- Added lines inside bbox from first loop number into  main Topology     
     has_edges_temp_table_name := (_topology_info).topology_name||'.edge_data_tmp_' || box_id;
     command_string := Format('SELECT EXISTS(SELECT 1 from to_regclass(%L) where to_regclass is not null)',has_edges_temp_table_name);
     EXECUTE command_string into has_edges;
     RAISE NOTICE 'cell % cell_job_type %, has_edges %, _loop_number %', box_id, _cell_job_type, has_edges, _loop_number;
  
     IF (has_edges) THEN
-	       command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L,FALSE) FROM 
-	       (SELECT geom from %2$s) as r 
-	       ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom))',
-	       (_topology_info).topology_snap_tolerance, has_edges_temp_table_name, ST_ExteriorRing (_bb), (_topology_info).topology_name, _table_name_result_prefix);
-	       EXECUTE command_string into line_edges_added;
+       command_string := Format('SELECT topo_update.add_border_lines(%4$L,r.geom,%1$s,%5$L,FALSE) FROM 
+       (SELECT geom from %2$s) as r 
+       ORDER BY ST_X(ST_Centroid(r.geom)), ST_Y(ST_Centroid(r.geom))',
+	       (_topology_info).topology_snap_tolerance, 
+	       has_edges_temp_table_name, 
+	       ST_ExteriorRing (_bb), 
+	       (_topology_info).topology_name, 
+	       _table_name_result_prefix
+	   );
+	   
+       EXECUTE command_string into line_edges_added;
 	
 	      command_string := Format('WITH topo_updated AS (
 	      SELECT topo_update.add_border_lines(%1$L,r.geo,%2$s,%3$L,FALSE), geo 
@@ -545,92 +552,94 @@ BEGIN
     
  
   ELSIF _cell_job_type = 2 THEN
-  -- Add border lines for small grids
-  
-		    command_string := Format('WITH s1 AS (SELECT * FROM %4$s r 
-		    where r.geo && %5$L and ST_CoveredBy(r.geo, %5$L) and r.added_to_master = false 
-		    ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo))
-		    ), 
-		    update_step AS (update %4$s su set added_to_master = true FROM s1 WHERE s1.id = su.id ) 
-		    select topo_update.add_border_lines(%1$L,s1.geo,%2$s,%3$L,TRUE) from s1', 
-		    (_topology_info).topology_name, 
-		    (_topology_info).topology_snap_tolerance, 
-		    _table_name_result_prefix,
-		    _table_name_result_prefix||'_border_line_segments',
-		    _bb);
-		    EXECUTE command_string;
+  	-- Add border lines for crossing grids for short lines from *_border_line_segments
+    command_string := Format('WITH s1 AS (SELECT * FROM %4$s r 
+    where r.geo && %5$L and ST_CoveredBy(r.geo, %5$L) and r.added_to_master = false 
+    ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo))
+    ), 
+    update_step AS (update %4$s su set added_to_master = true FROM s1 WHERE s1.id = su.id ) 
+    select topo_update.add_border_lines(%1$L,s1.geo,%2$s,%3$L,TRUE) from s1', 
+	    (_topology_info).topology_name, 
+	    (_topology_info).topology_snap_tolerance, 
+	    _table_name_result_prefix,
+	    _table_name_result_prefix||'_border_line_segments',
+	    _bb
+    );
+    EXECUTE command_string;
 
---		    _table_name_result_prefix||'_border_line_many_points',
-		    command_string := Format('WITH s1 AS (SELECT * FROM %4$s r 
-		    where r.geo && %5$L and ST_CoveredBy(r.geo, %5$L) and r.added_to_master = false 
-		    ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo))
-		    ), 
-		    update_step AS (update %4$s su set added_to_master = true FROM s1 WHERE s1.id = su.id ) 
-		    select topo_update.add_border_lines(%1$L,s1.geo,%2$s,%3$L,TRUE) from s1', 
-		    (_topology_info).topology_name, 
-		    (_topology_info).topology_snap_tolerance, 
-		    _table_name_result_prefix,
-		    _table_name_result_prefix||'_border_line_many_points',
-		    _bb);
-		    EXECUTE command_string;
+	-- Add border lines for crossing grids for long lines from *_border_line_many_points
+    command_string := Format('WITH s1 AS (SELECT * FROM %4$s r 
+    where r.geo && %5$L and ST_CoveredBy(r.geo, %5$L) and r.added_to_master = false 
+    ORDER BY ST_X(ST_Centroid(r.geo)), ST_Y(ST_Centroid(r.geo))
+    ), 
+    update_step AS (update %4$s su set added_to_master = true FROM s1 WHERE s1.id = su.id ) 
+    select topo_update.add_border_lines(%1$L,s1.geo,%2$s,%3$L,TRUE) from s1', 
+	    (_topology_info).topology_name, 
+	    (_topology_info).topology_snap_tolerance, 
+	    _table_name_result_prefix,
+	    _table_name_result_prefix||'_border_line_many_points',
+	    _bb
+    );
+    EXECUTE command_string;
 		
-         IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
+     IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
+     -- TODO Here is a BUG this where added_to_master is set to true abouve added_to_master
 
-         	 command_string := Format('WITH lines_addes AS (
-	         SELECT DISTINCT ON(e.edge_id) e.edge_id, g.column_data_as_json
-	         FROM 
-	         %1$s as g, 
-	         %2$s as e 
-	         where ST_CoveredBy(g.geo, %10$L) and g.added_to_master = false and
-             ST_DWithin( e.geom, g.geo, %4$L) and
-	         ST_DWithin( ST_StartPoint(e.geom), g.geo, %4$L) and
-	         ST_DWithin( ST_EndPoint(e.geom), g.geo, %4$L)
-	         )
-	         INSERT INTO %5$s(%6$s,%3$s)  
-	         SELECT x.*,
-	         topology.CreateTopoGeom(%7$L,2,%8$L,ARRAY[ARRAY[ee.edge_id,2]]::topology.topoelementarray ) as %3$s
-	         FROM lines_addes ee, 
-	         jsonb_to_record(ee.column_data_as_json) AS x(%9$s)',
-	         _table_name_result_prefix||'_border_line_segments',
-	         (_topology_info).topology_name||'.edge_data',
-	         (_input_data).line_table_geo_collumn,
-	         (_topology_info).topology_snap_tolerance,
-	         (_topology_info).topology_name||'.edge_attributes',
-	         (_input_data).line_table_other_collumns_list,
-	         (_topology_info).topology_name,
-	         (_topology_info).topology_attrbute_tables_border_layer_id,
-	         (_input_data).line_table_other_collumns_def,
-	         _bb
-	         );
-	     	 EXECUTE command_string;
-	     	 
-	     	 command_string := Format('WITH lines_addes AS (
-	         SELECT DISTINCT ON(e.edge_id) e.edge_id, g.column_data_as_json
-	         FROM 
-	         %1$s as g, 
-	         %2$s as e 
-	         where ST_CoveredBy(g.geo, %10$L) and g.added_to_master = false and
-             ST_DWithin( e.geom, g.geo, %4$L) and
-	         ST_DWithin( ST_StartPoint(e.geom), g.geo, %4$L) and
-	         ST_DWithin( ST_EndPoint(e.geom), g.geo, %4$L)
-	         )
-	         INSERT INTO %5$s(%6$s,%3$s)  
-	         SELECT x.*,
-	         topology.CreateTopoGeom(%7$L,2,%8$L,ARRAY[ARRAY[ee.edge_id,2]]::topology.topoelementarray ) as %3$s
-	         FROM lines_addes ee, 
-	         jsonb_to_record(ee.column_data_as_json) AS x(%9$s)',
-	         _table_name_result_prefix||'_border_line_many_points',
-	         (_topology_info).topology_name||'.edge_data',
-	         (_input_data).line_table_geo_collumn,
-	         (_topology_info).topology_snap_tolerance,
-	         (_topology_info).topology_name||'.edge_attributes',
-	         (_input_data).line_table_other_collumns_list,
-	         (_topology_info).topology_name,
-	         (_topology_info).topology_attrbute_tables_border_layer_id,
-	         (_input_data).line_table_other_collumns_def,
-	         _bb
-	         );
-	     	 EXECUTE command_string;
+     	 command_string := Format('WITH lines_addes AS (
+         SELECT DISTINCT ON(e.edge_id) e.edge_id, g.column_data_as_json
+         FROM 
+         %1$s as g, 
+         %2$s as e 
+         where ST_CoveredBy(g.geo, %10$L) and g.added_to_master = false and
+         ST_DWithin( e.geom, g.geo, %4$L) and
+         ST_DWithin( ST_StartPoint(e.geom), g.geo, %4$L) and
+         ST_DWithin( ST_EndPoint(e.geom), g.geo, %4$L)
+         )
+         INSERT INTO %5$s(%6$s,%3$s)  
+         SELECT x.*,
+         topology.CreateTopoGeom(%7$L,2,%8$L,ARRAY[ARRAY[ee.edge_id,2]]::topology.topoelementarray ) as %3$s
+         FROM lines_addes ee, 
+         jsonb_to_record(ee.column_data_as_json) AS x(%9$s)',
+         _table_name_result_prefix||'_border_line_segments',
+         (_topology_info).topology_name||'.edge_data',
+         (_input_data).line_table_geo_collumn,
+         (_topology_info).topology_snap_tolerance,
+         (_topology_info).topology_name||'.edge_attributes',
+         (_input_data).line_table_other_collumns_list,
+         (_topology_info).topology_name,
+         (_topology_info).topology_attrbute_tables_border_layer_id,
+         (_input_data).line_table_other_collumns_def,
+         _bb
+         );
+     	 EXECUTE command_string;
+     	 
+     	 command_string := Format('WITH lines_addes AS (
+         SELECT DISTINCT ON(e.edge_id) e.edge_id, g.column_data_as_json
+         FROM 
+         %1$s as g, 
+         %2$s as e 
+         where ST_CoveredBy(g.geo, %10$L) and g.added_to_master = false and
+         ST_DWithin( e.geom, g.geo, %4$L) and
+         ST_DWithin( ST_StartPoint(e.geom), g.geo, %4$L) and
+         ST_DWithin( ST_EndPoint(e.geom), g.geo, %4$L)
+         )
+         INSERT INTO %5$s(%6$s,%3$s)  
+         SELECT x.*,
+         topology.CreateTopoGeom(%7$L,2,%8$L,ARRAY[ARRAY[ee.edge_id,2]]::topology.topoelementarray ) as %3$s
+         FROM lines_addes ee, 
+         jsonb_to_record(ee.column_data_as_json) AS x(%9$s)',
+         _table_name_result_prefix||'_border_line_many_points',
+         (_topology_info).topology_name||'.edge_data',
+         (_input_data).line_table_geo_collumn,
+         (_topology_info).topology_snap_tolerance,
+         (_topology_info).topology_name||'.edge_attributes',
+         (_input_data).line_table_other_collumns_list,
+         (_topology_info).topology_name,
+         (_topology_info).topology_attrbute_tables_border_layer_id,
+         (_input_data).line_table_other_collumns_def,
+         _bb
+         );
+     	 EXECUTE command_string;
 
 	  END IF;
 
@@ -640,7 +649,7 @@ BEGIN
  
      
   ELSIF _cell_job_type = 4 THEN
-    -- heal border edges
+    -- heal border edges added at stage 2
     
      IF _loop_number < 1 THEN 
        -- In first loop only block by egdes
@@ -685,6 +694,7 @@ BEGIN
 
 
   ELSIF _cell_job_type = 5 THEN
+  	-- Simplify and heal edges crossing many lines
 
     command_string := Format('SELECT ST_Union(geom) from (select ST_Expand(ST_Envelope(%1$s),%2$s) as geom from %3$s where ST_intersects(%1$s,%4$L) ) as r', 
     'geom', (_topology_info).topology_snap_tolerance, (_topology_info).topology_name||'.edge_data', _bb);
@@ -711,116 +721,122 @@ BEGIN
 
     BEGIN 
     
-    command_string := Format('CREATE TEMP table temp_left_over_borders as select geo FROM
-    (select geo from topo_update.get_left_over_borders(%1$L,%2$L,%3$L,%4$L) as r) as r', 
-    overlapgap_grid, (_input_data).polygon_table_geo_collumn, _bb, _table_name_result_prefix,(_topology_info).topology_snap_tolerance*inner_cell_distance);
-    EXECUTE command_string;
-    
-    GET DIAGNOSTICS v_cnt_left_over_borders = ROW_COUNT;
+	    command_string := Format('CREATE TEMP table temp_left_over_borders as select geo FROM
+	    (select geo from topo_update.get_left_over_borders(%1$L,%2$L,%3$L,%4$L) as r) as r', 
+	    overlapgap_grid, (_input_data).polygon_table_geo_collumn, _bb, _table_name_result_prefix,(_topology_info).topology_snap_tolerance*inner_cell_distance);
+	    EXECUTE command_string;
+	    GET DIAGNOSTICS v_cnt_left_over_borders = ROW_COUNT;
 
-     IF v_cnt_left_over_borders > 0 AND (_clean_info).simplify_tolerance > 0  THEN
+--		IF v_cnt_left_over_borders > 0 THEN
+--      		RAISE NOTICE 'temp_left_over_borders geo % ' , (SELECT ST_collect(geo) FROM temp_left_over_borders);  
+--		END IF;
 
-      start_time_delta_job := Clock_timestamp();
+		-- if any left over borders and do simplify 
+	     IF v_cnt_left_over_borders > 0 AND (_clean_info).simplify_tolerance > 0  THEN
+	
+	      start_time_delta_job := Clock_timestamp();
+	
+	      command_string := Format('SELECT ARRAY(SELECT e.edge_id   
+	        FROM (
+	        SELECT distinct e1.edge_id 
+	        FROM 
+	          %1$s.edge_data e1,
+	          temp_left_over_borders lb
+	        WHERE
+	   		ST_Intersects(lb.geo,e1.geom)) as e )',
+	        (_topology_info).topology_name);
+	        EXECUTE command_string into edgelist_to_change;
+	
+	        
+	        IF edgelist_to_change IS NOT NULL AND (Array_length(edgelist_to_change, 1)) IS NOT NULL THEN 
+	          FOREACH edge_id_heal IN ARRAY edgelist_to_change 
+	          LOOP
+	            heal_edge_retry_num := 1;
+	            LOOP
+	              command_string := FORMAT('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,%4$L,%5$L,e.edge_id,ST_simplifyPreserveTopology(e.geom,%2$s)) 
+	              from %1$s.edge_data e where e.edge_id = %3$s',
+	              (_topology_info).topology_name, (_clean_info).simplify_tolerance/heal_edge_retry_num, edge_id_heal, (_clean_info).simplify_max_average_vertex_length, (_input_data).utm);
+	              EXECUTE command_string into heal_edge_status;
+	              EXIT WHEN heal_edge_status in (0,1) or heal_edge_retry_num > 5;
+	              heal_edge_retry_num := heal_edge_retry_num  + 1;
+	            END LOOP;
+	            IF heal_edge_status = -1 THEN
+	              RAISE NOTICE 'Failed to run topo_update.try_ST_ChangeEdgeGeom using ST_simplifyPreserveTopologyfor edge_id % for topology % using tolerance % .' , 
+	              edge_id_heal, border_topo_info.topology_name, (_clean_info).simplify_tolerance;
+	            END IF;
+	          END LOOP;
+	        END IF;
+	
+	        RAISE NOTICE 'Did ST_simplifyPreserveTopology for topo % and bb % at % used_time %', 
+	       (_topology_info).topology_name, _bb, Clock_timestamp(), (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
+	
+	    END IF;
 
-      command_string := Format('SELECT ARRAY(SELECT e.edge_id   
-        FROM (
-        SELECT distinct e1.edge_id 
-        FROM 
-          %1$s.edge_data e1,
-          temp_left_over_borders lb
-        WHERE
-   		ST_Intersects(lb.geo,e1.geom)) as e )',
-        (_topology_info).topology_name);
-        EXECUTE command_string into edgelist_to_change;
-
-        
-        IF edgelist_to_change IS NOT NULL AND (Array_length(edgelist_to_change, 1)) IS NOT NULL THEN 
-          FOREACH edge_id_heal IN ARRAY edgelist_to_change 
-          LOOP
-            heal_edge_retry_num := 1;
-            LOOP
-              command_string := FORMAT('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,%4$L,%5$L,e.edge_id,ST_simplifyPreserveTopology(e.geom,%2$s)) 
-              from %1$s.edge_data e where e.edge_id = %3$s',
-              (_topology_info).topology_name, (_clean_info).simplify_tolerance/heal_edge_retry_num, edge_id_heal, (_clean_info).simplify_max_average_vertex_length, (_input_data).utm);
-              EXECUTE command_string into heal_edge_status;
-              EXIT WHEN heal_edge_status in (0,1) or heal_edge_retry_num > 5;
-              heal_edge_retry_num := heal_edge_retry_num  + 1;
-            END LOOP;
-            IF heal_edge_status = -1 THEN
-              RAISE NOTICE 'Failed to run topo_update.try_ST_ChangeEdgeGeom using ST_simplifyPreserveTopologyfor edge_id % for topology % using tolerance % .' , 
-              edge_id_heal, border_topo_info.topology_name, (_clean_info).simplify_tolerance;
-            END IF;
-          END LOOP;
-        END IF;
-
-        RAISE NOTICE 'Did ST_simplifyPreserveTopology for topo % and bb % at % used_time %', 
-       (_topology_info).topology_name, _bb, Clock_timestamp(), (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
-
-    END IF;
-
-    
-    IF v_cnt_left_over_borders > 0 AND (_clean_info).chaikins_nIterations > 0 THEN
-      start_time_delta_job := Clock_timestamp();
-
-      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,%6$L,%3$L,e.edge_id, 
-      ST_simplifyPreserveTopology(topo_update.chaikinsAcuteAngle(e.geom,%3$L,%4$L), %5$s )) 
-      FROM (
-      SELECT distinct e1.edge_id, e1.geom 
-        FROM 
-          %1$s.edge_data e1,
-          temp_left_over_borders lb
-        WHERE
-   		ST_Intersects(lb.geo,e1.geom)) e',
-      (_topology_info).topology_name, _bb, (_input_data).utm, _clean_info, (_topology_info).topology_snap_tolerance/2,(_clean_info).simplify_max_average_vertex_length);
-      EXECUTE command_string;
-      RAISE NOTICE 'Did chaikinsAcuteAngle for topo % and bb % at % used_time %', 
-      (_topology_info).topology_name, _bb, Clock_timestamp(), (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
-
-    END IF;
+		-- if any left over borders and do chaikins 
+	    IF v_cnt_left_over_borders > 0 AND (_clean_info).chaikins_nIterations > 0 THEN
+	      start_time_delta_job := Clock_timestamp();
+	
+	      command_string := Format('SELECT topo_update.try_ST_ChangeEdgeGeom(e.geom,%1$L,%6$L,%3$L,e.edge_id, 
+	      ST_simplifyPreserveTopology(topo_update.chaikinsAcuteAngle(e.geom,%3$L,%4$L), %5$s )) 
+	      FROM (
+	      SELECT distinct e1.edge_id, e1.geom 
+	        FROM 
+	          %1$s.edge_data e1,
+	          temp_left_over_borders lb
+	        WHERE
+	   		ST_Intersects(lb.geo,e1.geom)) e',
+	      (_topology_info).topology_name, _bb, (_input_data).utm, _clean_info, (_topology_info).topology_snap_tolerance/2,(_clean_info).simplify_max_average_vertex_length);
+	      EXECUTE command_string;
+	      RAISE NOTICE 'Did chaikinsAcuteAngle for topo % and bb % at % used_time %', 
+	      (_topology_info).topology_name, _bb, Clock_timestamp(), (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
+	
+	    END IF;
     
        -- remove 
-    face_table_name = (_topology_info).topology_name || '.face';
+   	   face_table_name = (_topology_info).topology_name || '.face';
 
-	  -- remove small polygons in temp in (_clean_info).min_area_to_keep
-	  IF (_clean_info).min_area_to_keep IS NOT NULL AND (_clean_info).min_area_to_keep > 0 THEN
-	    start_time_delta_job := Clock_timestamp();
-	    RAISE NOTICE 'Start 2 clean small polygons for border plygons face_table_name % at %', face_table_name, Clock_timestamp();
-	    -- remove small polygons in temp
-	    CALL topo_update.do_remove_small_areas_no_block (
-		    (_topology_info).topology_name, 
-		    (_clean_info).min_area_to_keep, 
-		    face_table_name, 
-		    ST_Expand(_bb,((_topology_info).topology_snap_tolerance * -6)),
-		    (_input_data).utm);
-	    used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
-	    RAISE NOTICE 'clean 2 small polygons for after adding to main face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
-	  END IF;
-
-	  IF ((_clean_info).resolve_based_on_attribute).attribute_resolve_list IS NOT NULL THEN
-	      start_time_delta_job := Clock_timestamp();
-	      RAISE NOTICE 'Start 2 resolve polygons based on attribute type for face_table_name % at %', face_table_name, Clock_timestamp();
-	      -- TODO call add new code to call
-		      CALL topo_update.do_merge_based_on_attribute_type_no_block (
-		      _input_data,
-		      _clean_info,
-		      (_topology_info).topology_name, 
-		      (_topology_info).topology_snap_tolerance,  
-		      face_table_name, 
-		      ST_Expand(_bb,((_topology_info).topology_snap_tolerance * -6))
-		      );
-	      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
-	      RAISE NOTICE 'Done 2 resolve polygons based on attribute type for face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
-	  END IF;
+		-- DO need to do this if v_cnt_left_over_borders is 0 ??????????
+		
+		  -- remove small polygons after healed/simplify long edges inside bbox
+		  IF (_clean_info).min_area_to_keep IS NOT NULL AND (_clean_info).min_area_to_keep > 0 THEN
+		    start_time_delta_job := Clock_timestamp();
+		    RAISE NOTICE 'Start 2 clean small polygons for border plygons face_table_name % at %', face_table_name, Clock_timestamp();
+		    CALL topo_update.do_remove_small_areas_no_block (
+			    (_topology_info).topology_name, 
+			    (_clean_info).min_area_to_keep, 
+			    face_table_name, 
+			    ST_Expand(_bb,((_topology_info).topology_snap_tolerance * -6)),
+			    (_input_data).utm);
+		    used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
+		    RAISE NOTICE 'clean 2 small polygons for after adding to main face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
+		  END IF;
+		  
+		  -- resolve_based_on_attribute after healed/simplify long edges inside bbox
+		  IF ((_clean_info).resolve_based_on_attribute).attribute_resolve_list IS NOT NULL THEN
+		      start_time_delta_job := Clock_timestamp();
+		      RAISE NOTICE 'Start 2 resolve polygons based on attribute type for face_table_name % at %', face_table_name, Clock_timestamp();
+		      -- TODO call add new code to call
+			      CALL topo_update.do_merge_based_on_attribute_type_no_block (
+			      _input_data,
+			      _clean_info,
+			      (_topology_info).topology_name, 
+			      (_topology_info).topology_snap_tolerance,  
+			      face_table_name, 
+			      ST_Expand(_bb,((_topology_info).topology_snap_tolerance * -6))
+			      );
+		      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
+		      RAISE NOTICE 'Done 2 resolve polygons based on attribute type for face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
+		  END IF;
 
     --drop table temp_left_over_borders;
+
     
     EXCEPTION
       WHEN OTHERS THEN
-  RAISE NOTICE 'Do rollback at timeofday:% for layer %, with _cell_job_type % and box id % .', 
-  Timeofday(), (_topology_info).topology_name || '_', _cell_job_type, box_id;
-
-    ROLLBACK;
-      RETURN;
+  		RAISE NOTICE 'Do rollback at timeofday:% for layer %, with _cell_job_type % and box id % .', 
+  		Timeofday(), (_topology_info).topology_name || '_', _cell_job_type, box_id;
+    	ROLLBACK;
+     	RETURN;
     END;	    
 
   ELSIF _cell_job_type = 6 THEN

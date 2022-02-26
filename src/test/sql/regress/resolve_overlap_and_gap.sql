@@ -245,8 +245,9 @@ null,null,null,null
   40, -- The angle has to be less this given value, This is used to avoid to touch all angles. 
   320 -- OR The angle has to be greather than this given value, This is used to avoid to touch all angles 
 )
-,5,40,
-  resolve_overlap_data_debug_options_func(
+,5 -- this is the max number of paralell jobs to run. There must be at least the same number of free connections
+,3 -- this is the max number rows that intersects with box before it's split into 4 new boxes, default is 5000
+,resolve_overlap_data_debug_options_func(
   false --if set to false, it will do topology.ValidateTopology and stop to if the this call returns any rows
   ) 
 );

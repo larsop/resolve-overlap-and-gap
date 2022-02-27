@@ -139,18 +139,6 @@ END IF;
     IF face_ids_to_remove IS NOT NULL AND (Array_length(face_ids_to_remove, 1)) IS NOT NULL THEN 
        FOREACH face_id_tmp IN ARRAY face_ids_to_remove 
          LOOP
-            command_string := Format('select ST_Expand(ST_LineInterpolatePoint(geom,0.5),%3$L), left_face, right_face FROM (                                                     
-            SELECT edge_id, ST_length(geom)  as edge_length, geom, left_face, right_face from %1$s.edge_data 
-            WHERE left_face != 0 AND right_face != 0 AND  
-            ((%2$L = left_face AND left_face != right_face) or (%2$L = right_face AND left_face != right_face)) 
-            order by edge_length desc
-            ) as r limit 1', 
-            _atopology, 
-            face_id_tmp,
-            _topology_snap_tolerance);
-            EXECUTE command_string INTO edge_geo,lf_tmp,rf_tmp; 
-            RAISE NOTICE 'lf_tmp % rf_tmp % edge_geo % ',lf_tmp,rf_tmp, edge_geo;
-
                
             command_string := Format('
             SELECT r2.edge_id, r2.small_bb FROM (
@@ -187,7 +175,10 @@ END IF;
               -- using perform ST_RemEdgeModFace(_atopology, remove_edge);  seem make invalid faces somtimes
               BEGIN
 
-                --PERFORM ST_RemEdgeNewFace (_atopology, remove_edge);
+                --using PERFORM ST_RemEdgeNewFace (_atopology, remove_edge) is causing 
+                --2022-02-27 05:17:14.989 UTC [1046116] postgres@aeg_02_lars LOG:  duration: 1660.081 ms
+				--2022-02-27 05:17:14.995 UTC [751831] LOG:  server process (PID 1046113) exited with exit code 245
+
                 PERFORM ST_RemEdgeModFace (_atopology, remove_edge);
                 num_rows := num_rows + 1;
                 RAISE NOTICE 'For merge face face_id % has egde_id % been removed',face_id_tmp, remove_edge;

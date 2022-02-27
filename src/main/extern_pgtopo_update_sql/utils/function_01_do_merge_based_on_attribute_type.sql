@@ -181,7 +181,7 @@ END IF;
 				
 				-- PERFORM ST_RemEdgeModFace works ok
 
-                PERFORM ST_RemEdgeNewFace (_atopology, remove_edge);
+                PERFORM ST_RemEdgeModFace (_atopology, remove_edge);
                 num_rows := num_rows + 1;
                 RAISE NOTICE 'For merge face face_id % has egde_id % been removed',face_id_tmp, remove_edge;
                 EXCEPTION

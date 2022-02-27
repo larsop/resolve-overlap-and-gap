@@ -178,8 +178,10 @@ END IF;
                 --using PERFORM ST_RemEdgeNewFace (_atopology, remove_edge) is causing 
                 --2022-02-27 05:17:14.989 UTC [1046116] postgres@aeg_02_lars LOG:  duration: 1660.081 ms
 				--2022-02-27 05:17:14.995 UTC [751831] LOG:  server process (PID 1046113) exited with exit code 245
+				
+				-- PERFORM ST_RemEdgeModFace works ok
 
-                PERFORM ST_RemEdgeModFace (_atopology, remove_edge);
+                PERFORM ST_RemEdgeNewFace (_atopology, remove_edge);
                 num_rows := num_rows + 1;
                 RAISE NOTICE 'For merge face face_id % has egde_id % been removed',face_id_tmp, remove_edge;
                 EXCEPTION

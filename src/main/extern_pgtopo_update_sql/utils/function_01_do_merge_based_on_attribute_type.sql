@@ -18,6 +18,16 @@ _utm boolean,
 _outer_cell_boundary_lines geometry
 );
 
+drop FUNCTION if exists topo_update.do_merge_based_on_attribute_type_no_block (
+_input_data resolve_overlap_data_input_type, 
+_clean_info resolve_overlap_data_clean_type,
+_atopology varchar, 
+_topology_snap_tolerance float,
+_table_name varchar, 
+_bb geometry, 
+_outer_cell_boundary_lines geometry
+);
+
 CREATE OR REPLACE PROCEDURE topo_update.do_merge_based_on_attribute_type_no_block (
 _input_data resolve_overlap_data_input_type, 
 --(_input_data).line_table_name varchar, -- The table with simple feature lines, 
@@ -37,6 +47,7 @@ _atopology varchar,
 _topology_snap_tolerance float,
 _table_name varchar, 
 _bb geometry, 
+_table_name_result_prefix varchar, 
 _outer_cell_boundary_lines geometry default null)
 LANGUAGE plpgsql
 AS $$
@@ -57,6 +68,7 @@ DECLARE
   
 BEGIN
 
+IF _table_name_result_prefix IS NULL OR LENGTH(_table_name_result_prefix) = 0 THEN
   command_string_find := Format('SELECT ARRAY(SELECT g.face_id
  	  from ( 
  		select g.*, topo_update.get_face_area(%1$s,face_id, %6$L) as topo_area 
@@ -78,7 +90,42 @@ BEGIN
  			where  g.mbr_area < %5$s 
  		) as g
  	  ) as g
-  where g.topo_area < %2$s and g.topo_area is not null )', Quote_literal(_atopology), _min_area, _table_name, _bb, min_mbr_area, (_input_data).utm, _outer_cell_boundary_lines);
+  where g.topo_area < %2$s and g.topo_area is not null )', 
+  Quote_literal(_atopology), 
+  _min_area, 
+  _table_name, 
+  _bb, 
+  min_mbr_area, 
+  (_input_data).utm, 
+  _outer_cell_boundary_lines);
+ELSE
+  command_string_find := Format('SELECT ARRAY(SELECT g.face_id
+ 	  from ( 
+	    SELECT DISTINCT g.face_id
+		from ( 
+			select g1.face_id , g1.mbr 
+	        FROM 
+	        %3$s g1,
+	        %7$s b1 
+			where g1.mbr && %4$L and ST_Intersects(g1.mbr,b1.geo)
+			UNION
+			select g1.face_id , g1.mbr 
+	        FROM 
+	        %3$s g1, 
+	        %8$s b1 
+			where g1.mbr && %4$L and ST_Intersects(g1.mbr,b1.geo)
+		) as g ) as g
+		)', 
+  Quote_literal(_atopology), 
+  _min_area, 
+  _table_name, 
+  _bb, 
+  min_mbr_area, 
+  (_input_data).utm, 
+  _table_name_result_prefix||'_border_line_segments',
+  _table_name_result_prefix||'_border_line_many_points'
+  );
+END IF;
  	 
   LOOP
     RAISE NOTICE 'execute command_string; %', command_string_find;
@@ -87,7 +134,7 @@ BEGIN
     EXECUTE command_string_find INTO face_ids_to_remove;
     num_rows = 0;
     
-    RAISE NOTICE 'Found % smalle area from % using min_mbr_area %', (Array_length(face_ids_to_remove, 1)), _table_name, min_mbr_area;
+    RAISE NOTICE 'Found % do_merge_based_on_attribute area from % using min_mbr_area %', (Array_length(face_ids_to_remove, 1)), _table_name, min_mbr_area;
 
     IF face_ids_to_remove IS NOT NULL AND (Array_length(face_ids_to_remove, 1)) IS NOT NULL THEN 
        FOREACH face_id_tmp IN ARRAY face_ids_to_remove 
@@ -140,7 +187,8 @@ BEGIN
               -- using perform ST_RemEdgeModFace(_atopology, remove_edge);  seem make invalid faces somtimes
               BEGIN
 
-                PERFORM ST_RemEdgeNewFace (_atopology, remove_edge);
+                --PERFORM ST_RemEdgeNewFace (_atopology, remove_edge);
+                PERFORM ST_RemEdgeModFace (_atopology, remove_edge);
                 num_rows := num_rows + 1;
                 RAISE NOTICE 'For merge face face_id % has egde_id % been removed',face_id_tmp, remove_edge;
                 EXCEPTION
@@ -153,11 +201,11 @@ BEGIN
         END IF;
 
 
-    RAISE NOTICE 'Removed % (total %) edges for tiny faces tiny polygons from % using min_mbr_area %', num_rows, num_rows_total, _table_name, min_mbr_area;
-    IF num_rows = 0 OR num_rows IS NULL THEN
+    RAISE NOTICE 'Removed % (total %) edges for do_merge_based_on_attribute from % using min_mbr_area % and bb %', num_rows, num_rows_total, _table_name, min_mbr_area, ST_Centroid(_bb);
+--    IF num_rows = 0 OR num_rows IS NULL OR LENGTH(_table_name_result_prefix) > 0 THEN
       EXIT;
       -- exit loop
-    END IF;
+--    END IF;
     num_rows_total := num_rows_total + num_rows;
   END LOOP;
 END

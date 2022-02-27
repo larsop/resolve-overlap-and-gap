@@ -384,6 +384,7 @@ BEGIN
 		      (_topology_info).topology_snap_tolerance,  
 		      face_table_name, 
 		      _bb,
+		      '',
 		      outer_cell_boundary_lines);
 		      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
 		      RAISE NOTICE 'Done resolve polygons based on attribute type for face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
@@ -811,23 +812,6 @@ BEGIN
 		    RAISE NOTICE 'clean 2 small polygons for after adding to main face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
 		  END IF;
 		  
-		  -- resolve_based_on_attribute after healed/simplify long edges inside bbox
-		  IF ((_clean_info).resolve_based_on_attribute).attribute_resolve_list IS NOT NULL THEN
-		      start_time_delta_job := Clock_timestamp();
-		      RAISE NOTICE 'Start 2 resolve polygons based on attribute type for face_table_name % at %', face_table_name, Clock_timestamp();
-		      -- TODO call add new code to call
-			      CALL topo_update.do_merge_based_on_attribute_type_no_block (
-			      _input_data,
-			      _clean_info,
-			      (_topology_info).topology_name, 
-			      (_topology_info).topology_snap_tolerance,  
-			      face_table_name, 
-			      ST_Expand(_bb,((_topology_info).topology_snap_tolerance * -6))
-			      );
-		      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
-		      RAISE NOTICE 'Done 2 resolve polygons based on attribute type for face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;
-		  END IF;
-
     --drop table temp_left_over_borders;
 
     
@@ -888,7 +872,8 @@ BEGIN
 		      (_topology_info).topology_name, 
 		      (_topology_info).topology_snap_tolerance,  
 		      face_table_name, 
-		      ST_Expand(_bb,((_topology_info).topology_snap_tolerance * -6))
+		      ST_Expand(_bb,((_topology_info).topology_snap_tolerance * -6)),
+		      _table_name_result_prefix
 		      );
 	      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));
 	      RAISE NOTICE 'Done 3 resolve polygons based on attribute type for face_table_name % at % used_time: %', face_table_name, Clock_timestamp(), used_time;

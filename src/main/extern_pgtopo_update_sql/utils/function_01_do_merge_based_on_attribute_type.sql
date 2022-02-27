@@ -107,13 +107,13 @@ ELSE
 	        FROM 
 	        %3$s g1,
 	        %7$s b1 
-			where g1.mbr && %4$L and ST_Intersects(g1.mbr,b1.geo)
+			where g1.mbr && %4$L and g1.mbr && b1.geo
 			UNION
 			select g1.face_id , g1.mbr 
 	        FROM 
 	        %3$s g1, 
 	        %8$s b1 
-			where g1.mbr && %4$L and ST_Intersects(g1.mbr,b1.geo)
+			where g1.mbr && %4$L and g1.mbr && b1.geo
 		) as g ) as g
 		)', 
   Quote_literal(_atopology), 
@@ -192,8 +192,8 @@ END IF;
         END IF;
 
 
-    RAISE NOTICE 'Removed % (total %) edges for do_merge_based_on_attribute from % using min_mbr_area % and bb %', num_rows, num_rows_total, _table_name, min_mbr_area, ST_Centroid(_bb);
---    IF num_rows = 0 OR num_rows IS NULL OR LENGTH(_table_name_result_prefix) > 0 THEN
+--    RAISE NOTICE 'Removed % (total %) edges for do_merge_based_on_attribute from % using min_mbr_area % and bb %', num_rows, num_rows_total, _table_name, min_mbr_area, ST_Centroid(_bb);
+--    IF num_rows = 0 OR num_rows IS NULL THEN
       EXIT;
       -- exit loop
 --    END IF;

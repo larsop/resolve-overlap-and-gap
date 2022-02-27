@@ -872,7 +872,7 @@ BEGIN
 		      (_topology_info).topology_name, 
 		      (_topology_info).topology_snap_tolerance,  
 		      face_table_name, 
-		      ST_Expand(_bb,((_topology_info).topology_snap_tolerance * -6)),
+		      _bb,
 		      _table_name_result_prefix
 		      );
 	      used_time := (Extract(EPOCH FROM (Clock_timestamp() - start_time_delta_job)));

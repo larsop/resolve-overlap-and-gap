@@ -270,16 +270,22 @@ EXECUTE Format('ALTER TABLE %s ADD column _other_intersect_id_list %s[]',_table_
 -- Add an extra column to hold info add 
 EXECUTE Format('ALTER TABLE %s ADD column _input_geo_is_valid boolean',_table_name_result_prefix||'_result');
 
-IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null THEN
-  EXECUTE Format('CREATE UNLOGGED TABLE %s(%s) ',(_topology_info).topology_name||'.edge_attributes',(_input_data).line_table_other_collumns_def);
-  EXECUTE Format('SELECT topology.AddTopoGeometryColumn(%L, %L, %L, %L, %L)',
-  (_topology_info).topology_name, (_topology_info).topology_name,'edge_attributes',(_input_data).line_table_geo_collumn,'LINESTRING');
-END IF;
+IF (_topology_info).create_topology_attrbute_tables = true THEN
+	IF(_input_data).line_table_name is not null THEN
+	  EXECUTE Format('CREATE UNLOGGED TABLE %s(%s) ',(_topology_info).topology_name||'.edge_attributes',(_input_data).line_table_other_collumns_def);
+	  EXECUTE Format('SELECT topology.AddTopoGeometryColumn(%L, %L, %L, %L, %L)',
+	  (_topology_info).topology_name, (_topology_info).topology_name,'edge_attributes',(_input_data).line_table_geo_collumn,'LINESTRING');
+	ELSE 
+	  -- TODO REMOVE HACK when we find out how to do this
+	  EXECUTE Format('CREATE UNLOGGED TABLE %s(%s) ',(_topology_info).topology_name||'.edge_attributes','id serial primary key,id_test integer');
+	  EXECUTE Format('SELECT topology.AddTopoGeometryColumn(%L, %L, %L, %L, %L)',
+	  (_topology_info).topology_name, (_topology_info).topology_name,'edge_attributes',(_input_data).line_table_geo_collumn,'LINESTRING');
+	END IF;
 
-IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).polygon_table_name is not null THEN
   EXECUTE Format('CREATE UNLOGGED TABLE %s(%s) ',(_topology_info).topology_name||'.face_attributes',(_input_data).polygon_table_other_collumns_def);
   EXECUTE Format('SELECT topology.AddTopoGeometryColumn(%L, %L, %L, %L, %L)',
   (_topology_info).topology_name, (_topology_info).topology_name,'face_attributes',(_input_data).polygon_table_geo_collumn,'POLYGON');
+	  
 END IF;
 
 

@@ -122,33 +122,39 @@ BEGIN
   
 
   
-  IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).line_table_name is not null 
-     and (_input_data).line_table_other_collumns_def is null THEN
-     EXECUTE Format('select 
-	  Array_to_string(array_agg(column_name||%L||data_type),%L) as column_def,
-	  Array_to_string(array_agg(column_name),%L) as column_name
-	  from INFORMATION_SCHEMA.COLUMNS where  table_schema = %L and table_name = %L and data_type != %L and column_name != %L',
-	  ' ',',',',',
-	  split_part((_input_data).line_table_name, '.', 1),
-	  split_part((_input_data).line_table_name, '.', 2),
-	  'USER-DEFINED',
-	  (_input_data).line_table_geo_collumn) INTO _input_data.line_table_other_collumns_def, _input_data.line_table_other_collumns_list;
-	  
-  END IF;
-
-  IF (_topology_info).create_topology_attrbute_tables = true and (_input_data).polygon_table_name is not null 
-     and (_input_data).polygon_table_other_collumns_def is null THEN
-     EXECUTE Format('select 
-	  Array_to_string(array_agg(column_name||%L||data_type),%L) as column_def,
-	  Array_to_string(array_agg(column_name),%L) as column_name
-	  from INFORMATION_SCHEMA.COLUMNS where  table_schema = %L and table_name = %L and data_type != %L and column_name != %L',
-	  ' ',',',',',
-	  split_part((_input_data).polygon_table_name, '.', 1),
-	  split_part((_input_data).polygon_table_name, '.', 2),
-	  'USER-DEFINED',
-	  (_input_data).polygon_table_geo_collumn) INTO _input_data.polygon_table_other_collumns_def, _input_data.polygon_table_other_collumns_list;
-  END IF;
+	IF (_topology_info).create_topology_attrbute_tables = true THEN
+		IF (_input_data).line_table_name is not null THEN
+			EXECUTE Format('select 
+			Array_to_string(array_agg(column_name||%L||data_type),%L) as column_def,
+			Array_to_string(array_agg(column_name),%L) as column_name
+			from INFORMATION_SCHEMA.COLUMNS where  table_schema = %L and table_name = %L and data_type != %L and column_name != %L',
+			' ',',',',',
+			split_part((_input_data).line_table_name, '.', 1),
+			split_part((_input_data).line_table_name, '.', 2),
+			'USER-DEFINED',
+			(_input_data).line_table_geo_collumn) INTO _input_data.line_table_other_collumns_def, _input_data.line_table_other_collumns_list;
+		ELSE
+			-- TODO REMOVE HACK when we find out how to do this
+			_input_data.line_table_other_collumns_def := 'id_test integer';
+			_input_data.line_table_other_collumns_list := 'id_test';
+			_input_data.line_table_pk_column = 'id';
+			_input_data.line_table_geo_collumn = (_input_data).polygon_table_geo_collumn;
+		END IF;	
+			  
+		IF (_input_data).polygon_table_other_collumns_def is null THEN
+			EXECUTE Format('select 
+			Array_to_string(array_agg(column_name||%L||data_type),%L) as column_def,
+			Array_to_string(array_agg(column_name),%L) as column_name
+			from INFORMATION_SCHEMA.COLUMNS where  table_schema = %L and table_name = %L and data_type != %L and column_name != %L',
+			' ',',',',',
+			split_part((_input_data).polygon_table_name, '.', 1),
+			split_part((_input_data).polygon_table_name, '.', 2),
+			'USER-DEFINED',
+				(_input_data).polygon_table_geo_collumn) INTO _input_data.polygon_table_other_collumns_def, _input_data.polygon_table_other_collumns_list;
+			END IF;
+		END IF;
   
+
   
   IF start_at_job_type = 1 THEN 
     command_string := Format('SELECT resolve_overlap_gap_init(%L,%L,%L,%s,%s)', 

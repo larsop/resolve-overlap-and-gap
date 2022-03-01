@@ -32,7 +32,16 @@ utm_check_added_faces|7
 utm_check_added_simple_feature_polygons|7
 utm|Topology 'test_topo_t3' dropped
 CALL
-ar5_check_added_simple_feature_polygons|0
+ar5_check_added_simple_feature_polygons|9
+ar5_artype_simple_feature_polygons|0b45a9a9-18be-4a3f-90e1-9f25ea2c3fe4|12|395.16129|393
+ar5_artype_simple_feature_polygons|19dbc65f-e710-494b-aba3-e18abd655725|23|2152.55349|2140
+ar5_artype_simple_feature_polygons|54111ed1-0c50-4a26-8ef7-31190df759ae|21|12310.77721|12240
+ar5_artype_simple_feature_polygons|748e9864-704c-4fa4-97e5-e08d4f2dfa15|23|14866.89618|14782
+ar5_artype_simple_feature_polygons|8f983f62-d054-4c41-aabe-ea3ae27b7544|30|2794.45561|2778
+ar5_artype_simple_feature_polygons|acceca27-c879-4721-b6e7-ca7514c6768b|21|63396.09022|63034
+ar5_artype_simple_feature_polygons||||3000
+ar5_artype_simple_feature_polygons||||3705
+ar5_artype_simple_feature_polygons||||4276
 ar5_num_faces|9
 ar5_num_edge_data|54
 ar5_num_relation|63
@@ -134,6 +143,22 @@ CALL
 degrees_check_failed_lines|0
 degrees_check_border_lines|2
 degrees_check_added_faces|6
+degrees_check_added_face_attributes_artype_group by|1|393|12
+degrees_check_added_face_attributes_artype_group by|1|75270|21
+degrees_check_added_face_attributes_artype_group by|2|16922|23
+degrees_check_added_face_attributes_artype_group by|1|2778|30
+degrees_check_added_edge_attributes|1||
+degrees_check_added_edge_attributes|2||
+degrees_check_added_edge_attributes|3||
+degrees_check_added_edge_attributes|4||
+degrees_check_added_edge_attributes|5||
+degrees_check_added_edge_attributes|6||
+degrees_check_added_edge_attributes|7||
+degrees_check_added_edge_attributes|8||
+degrees_check_added_edge_attributes|9||
+degrees_check_added_edge_attributes|10||
+degrees_check_added_edge_attributes|11||
+degrees_check_added_edge_attributes|12||
 degrees_check_added_simple_feature_geo|6
 degrees_check_added_simple_feature_artype|5|95363
 degrees_check_added_simple_feature_artype_group by|1|393|12

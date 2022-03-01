@@ -435,6 +435,7 @@ BEGIN
 
 	   -- Create Topo-Object to attach attributes if we attributes with input lines    
        IF (_topology_info).create_topology_attrbute_tables = true THEN
+       	 IF (_input_data).line_table_name is not null THEN
  	         command_string := Format('WITH lines_addes AS (
 	         SELECT DISTINCT ON(e.edge_id) e.edge_id, g.column_data_as_json
 	         FROM 
@@ -460,6 +461,7 @@ BEGIN
 	         (_input_data).line_table_other_collumns_def
 	         );
 	     	 EXECUTE command_string;
+	     END IF;
 	
 	   END IF;
     

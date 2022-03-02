@@ -461,6 +461,30 @@ BEGIN
 	         (_input_data).line_table_other_collumns_def
 	         );
 	     	 EXECUTE command_string;
+	     ELSE
+ 	         command_string := Format('WITH lines_addes AS (
+	         SELECT DISTINCT ON(e.edge_id) e.edge_id
+	         FROM 
+	         %1$s as g, 
+	         %2$s as e 
+	         where ST_DWithin( e.geom, g.geom, %4$L) and
+	         ST_DWithin( ST_StartPoint(e.geom), g.geom, %4$L) and
+	         ST_DWithin( ST_EndPoint(e.geom), g.geom, %4$L)
+	         )
+	         INSERT INTO %5$s(%3$s)  
+	         SELECT topology.CreateTopoGeom(%7$L,2,%8$L,ARRAY[ARRAY[ee.edge_id,2]]::topology.topoelementarray ) as %3$s
+	         FROM lines_addes ee',
+	         has_edges_temp_table_name,
+	         (_topology_info).topology_name||'.edge_data',
+	         (_input_data).line_table_geo_collumn,
+	         (_topology_info).topology_snap_tolerance,
+	         (_topology_info).topology_name||'.edge_attributes',
+	         (_input_data).line_table_other_collumns_list,
+	         (_topology_info).topology_name,
+	         (_topology_info).topology_attrbute_tables_border_layer_id
+	         );
+	         
+	     	 EXECUTE command_string;
 	     END IF;
 	
 	   END IF;
@@ -555,11 +579,9 @@ BEGIN
 		         ST_DWithin( ST_StartPoint(e.geom), g.geom, %4$L) and
 		         ST_DWithin( ST_EndPoint(e.geom), g.geom, %4$L)
 		         )
-		         INSERT INTO %5$s(%6$s,%3$s)  
-		         SELECT x.*,
-		         topology.CreateTopoGeom(%7$L,2,%8$L,ARRAY[ARRAY[ee.edge_id,2]]::topology.topoelementarray ) as %3$s
-		         FROM lines_addes ee, 
-		         jsonb_to_record(ee.column_data_as_json) AS x(%9$s)',
+		         INSERT INTO %5$s(%3$s)  
+	         	 SELECT topology.CreateTopoGeom(%7$L,2,%8$L,ARRAY[ARRAY[ee.edge_id,2]]::topology.topoelementarray ) as %3$s
+	         	 FROM lines_addes ee',
 		         has_edges_temp_table_name,
 		         (_topology_info).topology_name||'.edge_data',
 		         (_input_data).line_table_geo_collumn,
@@ -570,7 +592,7 @@ BEGIN
 		         (_topology_info).topology_attrbute_tables_border_layer_id,
 		         (_input_data).line_table_other_collumns_def
 		         );
---		     	 EXECUTE command_string;
+		     	 EXECUTE command_string;
 		    
 		 	END IF;
          END IF;
@@ -659,11 +681,9 @@ BEGIN
 	         ST_DWithin( ST_StartPoint(e.geom), g.geo, %4$L) and
 	         ST_DWithin( ST_EndPoint(e.geom), g.geo, %4$L)
 	         )
-	         INSERT INTO %5$s(%6$s,%3$s)  
-	         SELECT x.*,
-	         topology.CreateTopoGeom(%7$L,2,%8$L,ARRAY[ARRAY[ee.edge_id,2]]::topology.topoelementarray ) as %3$s
-	         FROM lines_addes ee, 
-	         jsonb_to_record(ee.column_data_as_json) AS x(%9$s)',
+	         INSERT INTO %5$s(%3$s)  
+	         SELECT topology.CreateTopoGeom(%7$L,2,%8$L,ARRAY[ARRAY[ee.edge_id,2]]::topology.topoelementarray ) as %3$s
+	         FROM lines_addes ee',
 	         tmp_simplified_border_lines_name||'long',
 	         (_topology_info).topology_name||'.edge_data',
 	         (_input_data).line_table_geo_collumn,

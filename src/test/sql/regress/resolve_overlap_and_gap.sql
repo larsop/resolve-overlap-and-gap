@@ -222,7 +222,6 @@ SELECT 'ar5_check_added_topo_line_ref', count(*) from topo_ar5_sysdata_webclient
 SELECT 'ar5_artype_edge_attributes',  qms_id_grense, opphav, round(ST_length(geo::Geometry,true)) from topo_ar5_sysdata_webclient_t1.edge_attributes order by qms_id_grense;
 SELECT 'ar5_check_added_topo_face_ref', count(*) from topo_ar5_sysdata_webclient_t1.face_attributes;
 SELECT 'ar5_artype_face_attributes',  qms_id_flate, opphav, round(ST_Area(geo::Geometry,true)) from topo_ar5_sysdata_webclient_t1.face_attributes order by qms_id_flate;
-\d topo_ar5_sysdata_webclient_t1.face_attributes
 
 
 -- Call function to resolve overlap and gap in the function in test_data.overlap_gap_
@@ -261,7 +260,11 @@ SELECT 'degrees_check_border_lines', count(geo) from test_topo_ar5_test2.flate_t
 
 SELECT 'degrees_check_added_faces', count(mbr) from test_topo_ar5_test2.face;
 
+SELECT 'degrees_check_added_face_attributes_all', count(*) from test_topo_ar5_test2.face_attributes;
+
 SELECT 'degrees_check_added_face_attributes_artype_group by', r.* from (select count(*), round(sum(ST_Area(geo::geometry,true))) as area, artype from test_topo_ar5_test2.face_attributes where artype is not null group by artype) as r order by artype;
+
+SELECT 'degrees_check_added_edge_attributes_all', count(*) from test_topo_ar5_test2.edge_attributes;
 
 SELECT 'degrees_check_added_edge_attributes', id, geo, ST_Length(geo::geometry,true) as length from test_topo_ar5_test2.edge_attributes;
 

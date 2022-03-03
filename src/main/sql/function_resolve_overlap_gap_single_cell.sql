@@ -485,7 +485,7 @@ BEGIN
 	         (_topology_info).topology_attrbute_tables_border_layer_id
 	         );
 	         
-	     	 EXECUTE command_string;
+	     	 --EXECUTE command_string;
 	     END IF;
 	
 	   END IF;
@@ -593,7 +593,7 @@ BEGIN
 		         (_topology_info).topology_attrbute_tables_border_layer_id,
 		         (_input_data).line_table_other_collumns_def
 		         );
-		     	 EXECUTE command_string;
+		     	 --EXECUTE command_string;
 		    
 		 	END IF;
          END IF;
@@ -696,7 +696,7 @@ BEGIN
 	         (_input_data).line_table_other_collumns_def,
 	         _bb
 	         );
-	     	 EXECUTE command_string;
+	     	 --EXECUTE command_string;
      	 
      	 END IF;
 

@@ -113,30 +113,18 @@ ar5_artype_face_attributes|||3000
 CALL
 degrees_check_failed_lines|0
 degrees_check_border_lines|2
-degrees_check_added_faces|7
-degrees_check_added_face_attributes_all|7
+degrees_check_added_faces|6
+degrees_check_added_face_attributes_all|6
 degrees_check_added_face_attributes_artype_group by|1|393|12
-degrees_check_added_face_attributes_artype_group by|2|75270|21
+degrees_check_added_face_attributes_artype_group by|1|75270|21
 degrees_check_added_face_attributes_artype_group by|2|16922|23
 degrees_check_added_face_attributes_artype_group by|1|2778|30
-degrees_check_added_edge_attributes_all|12
-degrees_check_added_edge_attributes|1|(26,1,1,2)|15.565078056392824
-degrees_check_added_edge_attributes|2|(26,1,2,2)|59.02215392413451
-degrees_check_added_edge_attributes|3|(26,1,3,2)|179.63620974186415
-degrees_check_added_edge_attributes|4|(26,1,4,2)|139.81159443103383
-degrees_check_added_edge_attributes|5|(26,1,5,2)|134.9321571426558
-degrees_check_added_edge_attributes|6|(26,1,6,2)|100.79062019599675
-degrees_check_added_edge_attributes|7|(26,1,7,2)|313.7578394556615
-degrees_check_added_edge_attributes|8|(26,1,8,2)|38.85629432964484
-degrees_check_added_edge_attributes|9|(26,1,9,2)|85.57887303057737
-degrees_check_added_edge_attributes|10|(26,1,10,2)|45.885044617015524
-degrees_check_added_edge_attributes|11|(26,1,11,2)|13.48678080242462
-degrees_check_added_edge_attributes|12|(26,1,12,2)|304.9022496927543
-degrees_check_added_simple_feature_geo|7
-degrees_check_added_simple_feature_artype|6|95363
+degrees_check_added_edge_attributes_all|0
+degrees_check_added_simple_feature_geo|6
+degrees_check_added_simple_feature_artype|5|95363
 degrees_check_added_simple_feature_artype_group by|1|393|12
-degrees_check_added_simple_feature_artype_group by|2|75270|21
+degrees_check_added_simple_feature_artype_group by|1|75270|21
 degrees_check_added_simple_feature_artype_group by|2|16922|23
 degrees_check_added_simple_feature_artype_group by|1|2778|30
-degrees_check_added_simple_feature_arskogbon|6
+degrees_check_added_simple_feature_arskogbon|5
 drop test_topo_ar5_test2|Topology 'test_topo_ar5_test2' dropped

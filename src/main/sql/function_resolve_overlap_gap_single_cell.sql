@@ -463,7 +463,7 @@ BEGIN
 	     	 EXECUTE command_string;
 	     ELSE
  	         command_string := Format('WITH lines_addes AS (
-	         SELECT DISTINCT ON(e.edge_id) e.edge_id
+	         SELECT DISTINCT ON(e.edge_id) e.edge_id, e.geom
 	         FROM 
 	         %1$s as g, 
 	         %2$s as e 
@@ -471,8 +471,9 @@ BEGIN
 	         ST_DWithin( ST_StartPoint(e.geom), g.geom, %4$L) and
 	         ST_DWithin( ST_EndPoint(e.geom), g.geom, %4$L)
 	         )
-	         INSERT INTO %5$s(%3$s)  
-	         SELECT topology.CreateTopoGeom(%7$L,2,%8$L,ARRAY[ARRAY[ee.edge_id,2]]::topology.topoelementarray ) as %3$s
+	         INSERT INTO %5$s(%3$s) 
+	         -- SELECT topology.CreateTopoGeom(%7$L,2,%8$L,ARRAY[ARRAY[ee.edge_id,2]]::topology.topoelementarray ) as %3$s
+	         SELECT toTopoGeom(ee.geom, %7$L, %8$L,  %4$L) as %3$s
 	         FROM lines_addes ee',
 	         has_edges_temp_table_name,
 	         (_topology_info).topology_name||'.edge_data',
@@ -571,7 +572,7 @@ BEGIN
 		     	 EXECUTE command_string;
 		    ELSE
 		    	 command_string := Format('WITH lines_addes AS (
-		         SELECT DISTINCT ON(e.edge_id) e.edge_id, g.column_data_as_json
+		         SELECT DISTINCT ON(e.edge_id) e.edge_id, e.geom
 		         FROM 
 		         %1$s as g, 
 		         %2$s as e 
@@ -580,7 +581,7 @@ BEGIN
 		         ST_DWithin( ST_EndPoint(e.geom), g.geom, %4$L)
 		         )
 		         INSERT INTO %5$s(%3$s)  
-	         	 SELECT topology.CreateTopoGeom(%7$L,2,%8$L,ARRAY[ARRAY[ee.edge_id,2]]::topology.topoelementarray ) as %3$s
+	         	 SELECT toTopoGeom(ee.geom, %7$L, %8$L,  %4$L) as %3$s
 	         	 FROM lines_addes ee',
 		         has_edges_temp_table_name,
 		         (_topology_info).topology_name||'.edge_data',
@@ -670,9 +671,9 @@ BEGIN
 	         _bb
 	         );
 	     	 EXECUTE command_string;
-	     	 
+		ELSE	     	 
 	     	 command_string := Format('WITH lines_addes AS (
-	         SELECT DISTINCT ON(e.edge_id) e.edge_id, g.column_data_as_json
+	         SELECT DISTINCT ON(e.edge_id) e.edge_id, e.geom
 	         FROM 
 	         %1$s as g, 
 	         %2$s as e 
@@ -682,7 +683,7 @@ BEGIN
 	         ST_DWithin( ST_EndPoint(e.geom), g.geo, %4$L)
 	         )
 	         INSERT INTO %5$s(%3$s)  
-	         SELECT topology.CreateTopoGeom(%7$L,2,%8$L,ARRAY[ARRAY[ee.edge_id,2]]::topology.topoelementarray ) as %3$s
+	         SELECT toTopoGeom(ee.geom, %7$L, %8$L,  %4$L) as %3$s
 	         FROM lines_addes ee',
 	         tmp_simplified_border_lines_name||'long',
 	         (_topology_info).topology_name||'.edge_data',

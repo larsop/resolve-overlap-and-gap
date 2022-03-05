@@ -108,7 +108,7 @@ $$ LANGUAGE plpgsql;
 --\timing
 
  
-SELECT * FROM topo_update.merge_topo('test_ar50_flate_lars_06.face_attributes',80724,79285,3573,'("test_ar50_flate_lars_06","a","b","geo",3,0.1,2,25833)');
+--SELECT * FROM topo_update.merge_topo('test_ar50_flate_lars_06.face_attributes',80724,79285,3573,'("test_ar50_flate_lars_06","a","b","geo",3,0.1,2,25833)');
 --SELECT * FROM topo_update.merge_topo('test_ar50_flate_lars_06.face_attributes',3579,79681,79704,'("test_ar50_flate_lars_06","a","b","geo",3,0.1,2,25833)');
 --SELECT * FROM topo_update.merge_topo('test_ar50_flate_lars_06.face_attributes',3580,79285,79704,'("test_ar50_flate_lars_06","a","b","geo",3,0.1,2,25833)');
 --SELECT * FROM topo_update.merge_topo('test_ar50_flate_lars_06.face_attributes',2657,79314,79336,'("test_ar50_flate_lars_06","a","b","geo",3,0.1,2,25833)');

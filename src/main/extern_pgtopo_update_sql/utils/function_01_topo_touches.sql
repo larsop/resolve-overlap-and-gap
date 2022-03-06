@@ -12,10 +12,19 @@ DROP FUNCTION IF EXISTS topo_update.touches(
 	_surface_topo_info topo_update.input_meta_info
 );
 
+DROP FUNCTION IF EXISTS topo_update.touches(
+	_face_attributes regclass,
+	_face_attributes_pk_column_name text,  
+	_face_attributes_topology_column_name text,  
+	_face_attributes_equal_attr_namelist text,  
+	_surface_topo_info topo_update.input_meta_info
+);
+
 CREATE OR REPLACE FUNCTION topo_update.touches(
 	_face_attributes regclass,
 	_face_attributes_pk_column_name text,  
 	_face_attributes_topology_column_name text,  
+	_face_attributes_equal_attr_namelist text,  
 	_surface_topo_info topo_update.input_meta_info
 ) 
 RETURNS TABLE (
@@ -28,7 +37,15 @@ AS $$
 DECLARE
 command_string text;
 
+attr_name_cond text = '';
+part text;
+
 BEGIN
+
+foreach part in array string_to_array(_face_attributes_equal_attr_namelist,' ')
+loop
+	attr_name_cond := attr_name_cond || format('AND face_attr_01.%1$s = face_attr_02.%1$s ', part,part);
+END loop;
 
 
 command_string := FORMAT('SELECT 
@@ -71,19 +88,15 @@ AND fa.f2_face_id = r2.element_id AND r2.element_type = %6$L AND r2.layer_id = %
 AND r1.topogeo_id = ((face_attr_01.%4$s).id)
 AND r2.topogeo_id = ((face_attr_02.%4$s).id)
 AND face_attr_01.%3$s != face_attr_02.%3$s
-AND face_attr_01.artype = face_attr_02.artype
-AND face_attr_01.arskogbon = face_attr_02.arskogbon  
-AND face_attr_01.artreslag = face_attr_02.artreslag
-AND face_attr_01.arjordbr = face_attr_02.arjordbr
-AND face_attr_01.arveget = face_attr_02.arveget
+%7$s
 ) r ORDER BY mbr_area',
 _face_attributes,
 _surface_topo_info.topology_name,
 _face_attributes_pk_column_name,
 _face_attributes_topology_column_name,
 _surface_topo_info.border_layer_id,
-_surface_topo_info.element_type    
---
+_surface_topo_info.element_type,
+attr_name_cond    
 );
 
 
@@ -98,6 +111,7 @@ $$ LANGUAGE plpgsql;
 SELECT * FROM topo_update.touches('test_ar50_flate_lars_06.face_attributes',
 'gid',
 'geo',
+'artype arskogbon artreslag arjordbr arveget',
 '("test_ar50_flate_lars_06","a","b","geo",3,0.1,2,25833)'
 );
 
@@ -107,7 +121,7 @@ SELECT * FROM topo_update.touches('test_ar50_flate_lars_06.face_attributes',
 
 --SELECT topo_update.merge_topo('test_ar50_flate_lars_06.face_attributes',topo_object_to_expand::int,topo_object_to_remove::int,edge_id_to_remove,
 --'("test_ar50_flate_lars_06","a","b","geo",3,0.1,2,25833)')
---FROM topo_update.touches('test_ar50_flate_lars_06.face_attributes','gid','geo','("test_ar50_flate_lars_06","a","b","geo",3,0.1,2,25833)');
+--FROM topo_update.touches('test_ar50_flate_lars_06.face_attributes','gid','geo','artype arskogbon artreslag arjordbr arveget','("test_ar50_flate_lars_06","a","b","geo",3,0.1,2,25833)');
 
 --create table ar50_uten_topologi_flate_utvalg_02_resolved  as (SELECT *, geo::geometry(MultiPolygon,25833) as geom_simple from test_ar50_flate_lars_06.face_attributes);
 --alter table ar50_uten_topologi_flate_utvalg_02_resolved ADD PRIMARY KEY (gid);

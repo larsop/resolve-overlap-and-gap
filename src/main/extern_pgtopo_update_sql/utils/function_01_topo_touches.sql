@@ -62,12 +62,14 @@ FROM (
 SELECT face_attr_01.%3$s AS gid1, face_attr_02.%3$s AS gid2, fa.edge_id as edge_id_to_remove, fa.mbr_area, f1_mbr, f2_mbr 
 FROM 
 (
-	SELECT DISTINCT f1_face_id f1_face_id, f2_face_id, edge_id, mbr_area, f1_mbr, f2_mbr
+	SELECT DISTINCT ON (f1_face_id) f1_face_id, f2_face_id, edge_id, mbr_area, f1_mbr, f2_mbr
 	FROM (
 		SELECT 
 		f1.face_id f1_face_id, ST_Area(f1.mbr) AS f1_mbr,  
 		f2.face_id f2_face_id, ST_Area(f2.mbr) AS f2_mbr,
-		e1.edge_id, (ST_Area(f1.mbr) + ST_Area(f2.mbr)) mbr_area
+		e1.edge_id,
+		CASE 
+      	WHEN ST_Area(f1.mbr) > ST_Area(f2.mbr) THEN ST_Area(f1.mbr) ELSE ST_Area(f2.mbr) END AS mbr_area
 		FROM
 		%2$s.face f1,
 		%2$s.face f2,
@@ -105,26 +107,18 @@ RETURN QUERY EXECUTE command_string;
 END
 $$ LANGUAGE plpgsql;
 
--- artype, arskogbon, artreslag, arjordbr, arveget
 
-\timing 
-SELECT * FROM topo_update.touches('test_ar50_flate_lars_06.face_attributes',
-'gid',
-'geo',
-'artype arskogbon artreslag arjordbr arveget',
-'("test_ar50_flate_lars_06","a","b","geo",3,0.1,2,25833)'
-);
+--SELECT * FROM topo_update.touches('test_ar50_flate_lars_06.face_attributes',
+--'gid','geo','artype arskogbon artreslag arjordbr arveget',
+--'("test_ar50_flate_lars_06","a","b","geo",3,0.1,2,25833)'
+--);
+
+--SELECT * FROM topo_update.touches('test_ar5_2022_01.face_attributes',
+--'new_id','geo','artype arskogbon artreslag argrunnf',
+--'("test_ar5_2022_01","a","b","new_id",3,1e-05,2,4258)'
+--) limit 10;
+
+--real    742m37.423s
 
 
-
-\timing
-
---SELECT topo_update.merge_topo('test_ar50_flate_lars_06.face_attributes',topo_object_to_expand::int,topo_object_to_remove::int,edge_id_to_remove,
---'("test_ar50_flate_lars_06","a","b","geo",3,0.1,2,25833)')
---FROM topo_update.touches('test_ar50_flate_lars_06.face_attributes','gid','geo','artype arskogbon artreslag arjordbr arveget','("test_ar50_flate_lars_06","a","b","geo",3,0.1,2,25833)');
-
---create table ar50_uten_topologi_flate_utvalg_02_resolved  as (SELECT *, geo::geometry(MultiPolygon,25833) as geom_simple from test_ar50_flate_lars_06.face_attributes);
---alter table ar50_uten_topologi_flate_utvalg_02_resolved ADD PRIMARY KEY (gid);
---ALTER TABLE ar50_uten_topologi_flate_utvalg_02_resolved drop COLUMN geo;
---ALTER TABLE ar50_uten_topologi_flate_utvalg_02_resolved RENAME COLUMN geom_simple TO geo;
 

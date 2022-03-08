@@ -44,6 +44,7 @@ _face_attribute_pk_column_name
 );
 EXECUTE command_string INTO found_topo_object ;
 IF found_topo_object != 2 THEN
+	RAISE NOTICE 'command_string % returned % rows',command_string, found_topo_object;
 	RETURN face_to_use;
 END IF;
 
@@ -55,6 +56,7 @@ _edge_id_to_remove
 );
 EXECUTE command_string INTO topo_object_edge;
 IF topo_object_edge = 0 THEN
+	RAISE NOTICE 'command_string % returned % rows',command_string, topo_object_edge;
 	RETURN face_to_use;
 END IF;
 
@@ -125,7 +127,7 @@ $$ LANGUAGE plpgsql;
 --\timing
 
  
-SELECT * FROM topo_update.merge_topo('test_ar50_flate_lars_06.face_attributes','gid','geo'
-,79716,79713,3209,
-'("test_ar50_flate_lars_06","a","b","geo",3,0.1,2,25833)');
+--SELECT * FROM topo_update.merge_topo('test_ar50_flate_lars_06.face_attributes','gid','geo'
+--,79716,79713,3209,
+--'("test_ar50_flate_lars_06","a","b","geo",3,0.1,2,25833)');
 

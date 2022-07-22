@@ -129,5 +129,5 @@ $$ LANGUAGE plpgsql;
  
 --SELECT * FROM topo_update.merge_topo('test_ar50_flate_lars_06.face_attributes','gid','geo'
 --,79716,79713,3209,
---'("test_ar50_flate_lars_06","a","b","geo",3,0.1,2,25833)');
+--'("test_ar50_flate_lars_05","a","b","geo",3,0.1,2,25833)');
 

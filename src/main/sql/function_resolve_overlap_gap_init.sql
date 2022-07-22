@@ -55,15 +55,15 @@ BEGIN
   EXECUTE Format('ALTER TABLE %s.face SET unlogged', (_topology_info).topology_name);
   EXECUTE Format('ALTER TABLE %s.relation SET unlogged', (_topology_info).topology_name);
   -- Create indexes
-  -- This Inxdes does not seem to help since  containing_face is null;
-  -- EXECUTE Format('CREATE INDEX ON %s.node(containing_face)', (_topology_info).topology_name);
   EXECUTE Format('CREATE INDEX ON %s.relation(layer_id)', (_topology_info).topology_name);
   EXECUTE Format('CREATE INDEX ON %s.relation(abs(element_id))', (_topology_info).topology_name);
+  EXECUTE Format('CREATE INDEX ON %s.relation(element_id)', (_topology_info).topology_name);
+  EXECUTE Format('CREATE INDEX ON %s.relation(topogeo_id)', (_topology_info).topology_name);
   EXECUTE Format('CREATE INDEX ON %s.edge_data USING GIST (geom)', (_topology_info).topology_name);
   EXECUTE Format('CREATE INDEX ON %s.edge_data(abs_next_left_edge)', (_topology_info).topology_name);
   EXECUTE Format('CREATE INDEX ON %s.edge_data(abs_next_right_edge)', (_topology_info).topology_name);
-  EXECUTE Format('CREATE INDEX ON %s.relation(element_id)', (_topology_info).topology_name);
-  EXECUTE Format('CREATE INDEX ON %s.relation(topogeo_id)', (_topology_info).topology_name);
+  EXECUTE Format('CREATE INDEX ON %s.node(containing_face)', (_topology_info).topology_name);
+  
   -- ----------------------------- DONE - Create Topology master working schema
   -- TODO find out what to do with help tables, they are now created in src/main/extern_pgtopo_update_sql/help_tables_for_logging.sql
   -- TODO what to do with /Users/lop/dev/git/topologi/skog/src/main/sql/table_border_line_segments.sql

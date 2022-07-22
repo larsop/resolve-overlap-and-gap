@@ -293,12 +293,12 @@ BEGIN
 	    EXECUTE Format('CREATE INDEX ON %s.node(containing_face)', border_topo_info.topology_name);
 	    EXECUTE Format('CREATE INDEX ON %s.relation(layer_id)', border_topo_info.topology_name);
 	    EXECUTE Format('CREATE INDEX ON %s.relation(abs(element_id))', border_topo_info.topology_name);
-	    EXECUTE Format('CREATE INDEX ON %s.edge_data USING GIST (geom)', border_topo_info.topology_name);
-	    EXECUTE Format('CREATE INDEX ON %s.edge_data(abs_next_left_edge)', border_topo_info.topology_name);
-	    EXECUTE Format('CREATE INDEX ON %s.edge_data(abs_next_right_edge)', border_topo_info.topology_name);
 	    EXECUTE Format('CREATE INDEX ON %s.relation(element_id)', border_topo_info.topology_name);
 	    EXECUTE Format('CREATE INDEX ON %s.relation(topogeo_id)', border_topo_info.topology_name);
-	
+	 	EXECUTE Format('CREATE INDEX ON %s.edge_data USING GIST (geom)', border_topo_info.topology_name);
+	    EXECUTE Format('CREATE INDEX ON %s.edge_data(abs_next_left_edge)', border_topo_info.topology_name);
+	    EXECUTE Format('CREATE INDEX ON %s.edge_data(abs_next_right_edge)', border_topo_info.topology_name);
+	   
 	    
 	    -- using the input tolreance for adding
 	    border_topo_info.snap_tolerance := snap_tolerance_fixed;
@@ -1206,4 +1206,12 @@ $$;
 --    'topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata_job_list','topo_sr16_mdata_05.trl_2019_test_segmenter_mindredata_grid',
 --    '0103000020E9640000010000000500000000000000A0EA0A4162A964474BDD5A4100000000A0EA0A4142C6ED8430E25A4100000000B49E0B4142C6ED8430E25A4100000000B49E0B4162A964474BDD5A4100000000A0EA0A4162A964474BDD5A41'
 --  ,1,1);
+
   
+
+--CALL resolve_overlap_gap_single_cell(
+--          '(,,,public.clc2018_test_single_polygon,new_id,geom,3035,t,,,,)','(test_02_cls2018,0,f,,)','test_02_cls2018.clc2018_test_single_polygon',
+--          '(0,"(,0,0)",0,10,0,10000,120,240,0,40)',
+--          'test_02_cls2018.clc2018_test_single_polygon_job_list','test_02_cls2018.clc2018_test_single_polygon_grid','0103000020DB0B000001000000050000002085EB41706A4F41D8A3706DEF3F48412085EB41706A4F41343333130EC1544186EB51581CE95B41343333130EC1544186EB51581CE95B41D8A3706DEF3F48412085EB41706A4F41D8A3706DEF3F4841'
+--,2,4);
+--  2504.9883 sec

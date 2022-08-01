@@ -31,6 +31,19 @@ DROP FUNCTION IF EXISTS topo_update.touches(
 	_surface_topo_info topo_update.input_meta_info
 ); 
 
+DROP FUNCTION IF EXISTS topo_update.touches(
+	_face_attributes regclass,
+	_face_attributes_pk_column_name text,  
+	_face_attributes_topology_column_name text,  
+	_face_attributes_equal_attr_namelist text,  
+	_max_new_mbr_area_m2 int, -- this is max new mbr for merged area when bigger than _min_input_mbr_area_m2
+	_min_input_mbr_area_m2 int, -- mbr area smaller than this area should always try to be merged
+	_utm boolean,
+	_surface_topo_info topo_update.input_meta_info,
+	_null_value_should_equal boolean
+	
+); 
+
 CREATE OR REPLACE FUNCTION topo_update.touches(
 	_face_attributes regclass,
 	_face_attributes_pk_column_name text,  
@@ -39,7 +52,8 @@ CREATE OR REPLACE FUNCTION topo_update.touches(
 	_max_new_mbr_area_m2 int, -- this is max new mbr for merged area when bigger than _min_input_mbr_area_m2
 	_min_input_mbr_area_m2 int, -- mbr area smaller than this area should always try to be merged
 	_utm boolean,
-	_surface_topo_info topo_update.input_meta_info
+	_surface_topo_info topo_update.input_meta_info,
+	_null_value_should_equal boolean
 ) 
 RETURNS TABLE (
 topo_object_to_expand text,
@@ -58,10 +72,19 @@ srid_check_latlong text = ')';
 BEGIN
 
 -- set attribute cond
-foreach part in array string_to_array(_face_attributes_equal_attr_namelist,' ')
-loop
-	attr_name_cond := attr_name_cond || format('AND face_attr_01.%1$s = face_attr_02.%1$s ', part,part);
-END loop;
+IF _null_value_should_equal = TRUE THEN 
+	foreach part in array string_to_array(_face_attributes_equal_attr_namelist,' ')
+	loop
+		attr_name_cond := attr_name_cond || format('AND (face_attr_01.%1$s = face_attr_02.%1$s OR (face_attr_01.%1$s IS NULL OR face_attr_02.%1$s IS NULL))', part,part);
+	END loop;
+ELSE
+	foreach part in array string_to_array(_face_attributes_equal_attr_namelist,' ')
+	loop
+		attr_name_cond := attr_name_cond || format('AND face_attr_01.%1$s = face_attr_02.%1$s ', part,part);
+	END loop;
+
+END IF;
+
 
 -- set 
 IF _utm = false THEN
@@ -146,3 +169,7 @@ $$ LANGUAGE plpgsql;
 --) limit 10;
 
 --real    742m37.423s
+
+
+--SELECT * FROM topo_update.touches('test_02_cls2018.face_attributes','tmp_id','geom','objectid code_18',
+--                (200*1000*1000),10000,true,'("test_02_cls2018","a","b","geom",3,0.1,2,3035)',true);

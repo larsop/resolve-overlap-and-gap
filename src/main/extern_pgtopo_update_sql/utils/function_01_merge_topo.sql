@@ -78,7 +78,7 @@ _face_attribute_pk_column_name
 );
 EXECUTE command_string;
 
-command_string := format('SELECT st_remedgemodface FROM ST_RemEdgeModFace (%1$L, %2$s)',
+command_string := format('SELECT st_remedgemodface FROM topology.ST_RemEdgeModFace (%1$L, %2$s)',
 _surface_topo_info.topology_name,
 _edge_id_to_remove
 );
@@ -100,7 +100,7 @@ _face_attribute_pk_column_name --6
 );
 EXECUTE command_string;
 
-command_string := format('SELECT ST_RemEdgeModFace(%1$L, e.edge_id)
+command_string := format('SELECT topology.ST_RemEdgeModFace(%1$L, e.edge_id)
 FROM %1$s.edge_data e 
 WHERE e.left_face = e.right_face AND e.right_face > 0 AND e.left_face = %2$L',
 _surface_topo_info.topology_name,
@@ -109,7 +109,7 @@ face_to_use
 EXECUTE command_string;
 
 
-command_string := format('SELECT ST_RemoveIsoNode(%1$L, n.node_id)
+command_string := format('SELECT topology.ST_RemoveIsoNode(%1$L, n.node_id)
 FROM %1$s.node n 
 WHERE n.containing_face = %2$L',
 _surface_topo_info.topology_name,

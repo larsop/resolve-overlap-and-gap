@@ -22,9 +22,9 @@ BEGIN
   IF face_id_found = true THEN 
   BEGIN
 	  IF (utm = false) THEN
-        face_area := ST_Area (st_getFaceGeometry (_atopology, _face_id), TRUE);
+        face_area := ST_Area (topology.st_getFaceGeometry (_atopology, _face_id), TRUE);
       ELSE
-        face_area := ST_Area (st_getFaceGeometry (_atopology, _face_id)); 
+        face_area := ST_Area (topology.st_getFaceGeometry (_atopology, _face_id)); 
       END IF;
   	  EXCEPTION WHEN OTHERS THEN
 	    GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE, v_msg = MESSAGE_TEXT, v_detail = PG_EXCEPTION_DETAIL, v_hint = PG_EXCEPTION_HINT,

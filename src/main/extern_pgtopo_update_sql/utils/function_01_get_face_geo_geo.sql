@@ -26,7 +26,7 @@ DECLARE
   face_id_mbr Geometry;
 BEGIN
   BEGIN
-	face_geo_ok := st_getFaceGeometry (_atopology, _face_id);
+	face_geo_ok := topology.st_getFaceGeometry (_atopology, _face_id);
 
 	IF face_geo_ok is NULL THEN
 	  -- Try to make face geo for logging
@@ -48,7 +48,7 @@ BEGIN
 
 	 	   FOREACH face_id_found IN ARRAY face_id_list_tmp LOOP
 	 	     RAISE NOTICE 'Face % for toplogy %  we test %',_atopology, face_id_found, ST_Area(g);
-	 	     g_face_geo := st_getFaceGeometry (_atopology, face_id_found) ;
+	 	     g_face_geo := topology.st_getFaceGeometry (_atopology, face_id_found) ;
 
              IF g_face_geo IS NULL THEN
 	           RAISE NOTICE 'Face % for toplogy %  we found mising geo %',_atopology, _face_id, ST_GeometryType(g);
@@ -84,7 +84,7 @@ BEGIN
 
 	 	   FOREACH face_id_found IN ARRAY face_id_list_tmp LOOP
 	 	     RAISE NOTICE 'Face % for toplogy %  we test %',_atopology, face_id_found, ST_Area(g);
-	 	     g_face_geo := st_getFaceGeometry (_atopology, face_id_found) ;
+	 	     g_face_geo := topology.st_getFaceGeometry (_atopology, face_id_found) ;
 
              IF g_face_geo IS NULL THEN
 	           RAISE NOTICE 'Face % for toplogy %  we found mising geo %',_atopology, _face_id, ST_GeometryType(g);

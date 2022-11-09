@@ -1,3 +1,4 @@
+# this code is now moving to https://gitlab.com/nibioopensource/resolve-overlap-and-gap
 
 # resolve-overlap-and-gap
 The plan here is use Postgis Topology to resolve overlaps and gaps for a simple feature layer. 
